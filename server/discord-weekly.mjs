@@ -5,7 +5,7 @@ import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -208,7 +208,7 @@ async function streamerEndurances(env, community, timestamp) {
   const layout = parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {};
   const streamer = nameKey(layout.streamName);
   const regs = (await env.DB.prepare(`SELECT r.event_id,r.departure_id,r.stream_time,r.stream_end,COALESCE(p.name,r.name) AS pilot,cm.crew_id,
-      e.name,e.circuit,e.departures,e.schedule_pending
+      e.name,e.circuit,e.departures,e.schedule_pending,e.duration_minutes
     FROM registrations r JOIN events e ON e.id=r.event_id LEFT JOIN participants p ON p.id=r.participant_id
     LEFT JOIN crew_members cm ON cm.registration_id=r.id
     WHERE r.community_id=? AND COALESCE(e.format,'endurance')<>'solo' AND COALESCE(r.status,'')<>'unavailable'
@@ -221,6 +221,7 @@ async function streamerEndurances(env, community, timestamp) {
     if (!Number.isFinite(Number(start?.startsAt))) continue;
     const key = `${reg.event_id}:${reg.departure_id}`;
     const item = byStart.get(key) || {row:{id:reg.event_id, name:reg.name, circuit:reg.circuit || '', schedule_pending:reg.schedule_pending}, start, startsAt:Number(start.startsAt),
+      endsAt:Number(start.startsAt) + (Number(reg.duration_minutes) || 0) * 60000,
       endurance:{sim:String(reg.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu', info:{crew:null, streamTime:'', streamEnd:'', streamUrl:layout.stream || ''}}, crewId:null, streamerCrew:false};
     if (reg.stream_time && !item.endurance.info.streamTime) Object.assign(item.endurance.info, {streamTime:reg.stream_time, streamEnd:reg.stream_end || ''});
     // The streamer's own crew first, else the crew of the admin who streams it.
@@ -249,7 +250,11 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const simOf = row => isStream(row) ? streamDetails({details:parseJson(row.details, {})}).raceSim || 'stream' : simForEvent(row);
   const starts = rows.filter(row => !sim || (simOf(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
-  starts.push(...(await streamerEndurances(env, community, timestamp)).filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
+  const endurances = await streamerEndurances(env, community, timestamp);
+  // A stream announced during a streamed endurance start is that endurance's stream: shown once (Nathan, 2026-11-08).
+  const streamed = endurances.filter(item => item.endurance.info.streamTime);
+  for (let index = starts.length - 1; index >= 0; index--) if (isStream(starts[index].row) && streamDuringEndurance(starts[index].startsAt, streamed)) starts.splice(index, 1);
+  starts.push(...endurances.filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
   // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
   // once its events are over, the week stays shown until then.
   const currentWeek = parisWeek(timestamp - CALENDAR_TURN_MS);

@@ -6,7 +6,7 @@
 import {calendarType} from './season-calendar.mjs';
 import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
-import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
+import {isSolo,eventAccessLogo,soloCardMeta,streamedStarts,mergedStream} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS,simCatalog,isTraining,trainingSpan} from '../../shared/catalog.mjs';
@@ -20,12 +20,13 @@ const dateOf=day=>new Date(day*DAY);
 const OTHER={lmu:'iracing',iracing:'lmu'};
 // The endurances of the other simulator (the page only loads those of its own): read once a minute at most.
 let other={game:'',events:[],at:0,loading:null};
-function otherEndurances(){
+// The endurances of the other sim (loaded once a minute); onLoad: what to draw again once they come.
+export function otherEndurances(onLoad=()=>{if(state.page==='week')renderWeek();}){
   const game=OTHER[activeGame];
   if(other.game===game&&Date.now()-other.at<60000)return other.events;
   other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
     other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game).map(event=>({...event,otherGame:game})),at:Date.now(),loading:null};
-    if(state.page==='week')renderWeek();
+    onLoad();
   }).catch(()=>{other.loading=null;other.at=Date.now();other.game=game;});
   return other.game===game?other.events:[];
 }
@@ -282,7 +283,7 @@ export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
-  const all=[...state.events,...otherEndurances()];
+  const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
   const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,chosen))}));
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
