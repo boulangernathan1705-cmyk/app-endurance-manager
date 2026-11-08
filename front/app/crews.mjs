@@ -121,7 +121,7 @@ export function renderPilots(event,departure,options={}){
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   const tbdNotice=departure.tbd?`<p class="tbd-notice" role="note">${pickableSlots(event,departure).length
-    ?'Les horaires officiels sont connus : chaque équipage choisit son départ et y part avec ses pilotes. Un pilote sans équipage peut aussi choisir le sien.'
+    ?'Horaires connus : le responsable de chaque équipage choisit son horaire, un pilote sans équipage choisit le sien.'
     :'Horaire pas encore connu : inscris-toi et forme ton équipage ici. Quand les horaires seront publiés, chaque équipage choisira son départ.'}</p>`:'';
   return `<div class="pilot-section">${tbdNotice}<div class="ux-course-overview ux-course-split-overview">
     <section class="ux-course-crews-block"><div class="ux-course-crews-heading"><span class="ux-course-crews-title">Équipages <strong>${crews.length}</strong></span>${createCrew}</div><div class="ux-course-crews-body">${crewCards}</div></section>
