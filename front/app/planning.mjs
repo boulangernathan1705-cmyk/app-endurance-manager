@@ -44,7 +44,7 @@ function startCard(event,departure,body,{minutes,now,open,quick='',tableRow=0}){
   // Waiting start once the real times are known: its pilots and crews still have to pick one.
   const waiting=departure.tbd&&pickableSlots(event,departure).length>0;
   const tags=compact?'':`${mine?`<span class="planning-tag is-mine">${waiting?'Horaire à choisir':pending?'Dispo':'Ton départ'}</span>`:''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>${waiting?'Sans horaire':`<span class="planning-start-word">Départ </span>${esc(timeLabel(departure.time))}`}</strong>${compact&&(done||!tableRow)?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
+  const head=`<span class="planning-start-head"><strong>${waiting?'Sans horaire':`<span class="planning-start-word">Départ </span>${esc(timeLabel(departure.time))}`}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
@@ -54,7 +54,10 @@ function startCard(event,departure,body,{minutes,now,open,quick='',tableRow=0}){
   const names=list=>`<span class="planning-pilot-names">${list.map(esc).join(' · ')}</span>`;
   const byId=new Map(present.map(reg=>[reg.id,communityPrefix(reg)+reg.name]));
   // A crew that still takes pilots shows a green open padlock, a full one a red closed padlock.
-  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line',crewColorClass(crew.id,index))).join('');
+  const mineIds=new Set(present.filter(reg=>reg.mine).map(reg=>reg.id));
+  // The pilot's own crew says so (« Ton équipage »), in the table of a race over several days.
+  const own=crew=>tableRow&&(crew.registrationIds||[]).some(id=>mineIds.has(id))?'<span class="planning-crew-mine">Ton équipage</span>':'';
+  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}${own(crew)}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line',crewColorClass(crew.id,index))).join('');
   const freeLine=free.length?row(NO_CREW_ICON+free.map(([category,,list])=>`<span class="planning-free-group">${logo(category)}${names(list)}</span>`).join(''),' data-free-pilots'):'';
   // Solo event: no crews, the number of participants (and places) instead.
   const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;

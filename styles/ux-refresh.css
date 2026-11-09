@@ -2955,7 +2955,7 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
 
 /* Race over several days, on a computer: a table. One row per start time, aligned from one day to the next;
    a closed start is its hour, who is there, and one button. The other actions come when it opens. */
-.planning-count, .planning-absence { display: none; }
+.planning-count, .planning-absence, .planning-crew-mine { display: none; }
 @media (min-width: 761px) {
   .departure-planning.is-table .planning-days { grid-template-rows: auto repeat(var(--rows, 1), auto); gap: var(--em-space-2) var(--em-space-4); }
   .departure-planning.is-table .planning-day { container-type: normal; grid-row: 1 / -1; grid-template-rows: subgrid; gap: var(--em-space-2); }
@@ -2965,8 +2965,8 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
   .departure-planning.is-table .planning-start:not([open]) > summary { display: grid; grid-template-columns: minmax(64px, auto) minmax(0, 1fr) auto; gap: 0 var(--em-space-3); align-items: start; min-height: 0; padding: var(--em-space-2) var(--em-space-3) !important; }
   .departure-planning.is-table .planning-start:not([open]) .planning-start-head { grid-column: 1; grid-row: 1 / span 12; display: grid; gap: 0; justify-items: start; }
   .departure-planning.is-table .planning-start:not([open]) .planning-start-word { display: none; }
-  .departure-planning.is-table .planning-start:not([open]) .planning-start-end { font-size: var(--em-text-xs); }
-  .departure-planning.is-table .planning-start:not([open]) .planning-tag { margin-top: var(--em-space-1); }
+  .departure-planning.is-table .planning-start:not([open]) :is(.planning-start-end, .planning-tag.is-mine) { display: none; }
+  .departure-planning.is-table .planning-start:not([open]) .planning-crew-mine { display: inline-block; padding: 1px var(--em-space-2); border-radius: 999px; background: var(--em-accent); color: var(--em-bg); font-size: var(--em-text-xs); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
   .departure-planning.is-table .planning-start:not([open]) .planning-row { grid-column: 2; margin-right: 0 !important; padding: 2px 0; border-top: 0; gap: var(--em-space-1) var(--em-space-2); }
   /* A crew is a small frame in its colour; the pilots without a crew stay plain and smaller under it. */
   .departure-planning.is-table .planning-start:not([open]) .planning-row[data-crew-line] { margin: 2px 0; padding: var(--em-space-1) var(--em-space-2); border: 1px solid color-mix(in srgb, var(--crew-color, var(--em-border)) 55%, transparent); border-left: 3px solid var(--crew-color, var(--em-border)); border-radius: var(--em-radius-sm); background: color-mix(in srgb, var(--crew-color, transparent) 7%, transparent); }
