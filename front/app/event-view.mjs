@@ -94,7 +94,7 @@ function quickActions(event,departure){
     if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
   }
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
-  const square=(icon,tip,attrs,label='',extra='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
+  const square=(icon,tip,attrs,label='',extra='',always=true)=>`<button type="button" class="planning-quick-button${label&&always?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
   // Waiting start once the real times are known: no new entry here, the pilot (or the crew's manager) picks a time.
   if(!solo&&pickableSlots(event,departure).length){
     const inCrew=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
@@ -108,8 +108,8 @@ function quickActions(event,departure){
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewAction=solo?null:crewButton(event,departure);
-  // « Demander un équipage » and « Gérer les équipages » are written out: an icon alone would not say it.
-  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='builder'?'':crewAction.label):'';
+  // « Demander un équipage » is always written out; « Gérer les équipages » on the opened start only (a race has many starts).
+  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='builder'?'':crewAction.label,'',crewAction.kind==='request'):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
