@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.9 — 9 novembre 2026
+
+### ✨ Nouveautés
+
+- **Demandes d’équipage sur Discord** : nouvelle question du réglage « Discord ». Si un salon est choisi, chaque demande d’équipage faite sur le site y est postée, sans ping. Quand un responsable crée l’équipage sur le site, la carte devient verte « ✅ Équipage créé » ; refusée, elle devient grise.
+
 ## v2.8 — 8 novembre 2026
 
 ### 🐛 Corrections

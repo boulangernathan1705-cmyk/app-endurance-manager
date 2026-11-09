@@ -273,7 +273,7 @@ function discordRead(form) {
   if (radio('copy')) answers.copy = radio('copy') === 'private';
   if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
-  for (const name of ['under','events','pitAt','announce','stream','streamName']) if (field(name)) answers[name] = field(name).value.trim();
+  for (const name of ['under','events','pitAt','announce','stream','streamName','requests']) if (field(name)) answers[name] = field(name).value.trim();
   answers.week ||= {};
   for (const key of ['all','lmu','iracing']) if (field(`week-${key}`)) answers.week[key] = field(`week-${key}`).value;
   return answers;
@@ -359,6 +359,12 @@ function discordQuestions(form, answers) {
     chosen?.announceReady === false ? `<p class="setup-note setup-error discord-rights">Sur Discord : clic droit sur « ${esc(chosen.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc((chosen.announceMissing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>` : '')
     + (announce ? row('📺 Lien du stream', 'Facultatif : « 📺 Lancement du stream sur Twitch à 19h45 » dans l’annonce, avec l’heure de début du stream de l’event.',
       `<input type="url" name="stream" inputmode="url" maxlength="300" placeholder="https://twitch.tv/…" value="${esc(answers.stream || '')}">`)+row('Nom du streamer','Nom affiché dans « La soirée avec… ». Sans nom renseigné, le nom de la chaîne est utilisé.',`<input name="streamName" maxlength="80" placeholder="La Praline" value="${esc(answers.streamName||'')}">`) : '')]);
+  // « Demander un équipage » (Nathan 2026-11-09): each request made on the site posted in a channel, without a ping.
+  const requests = answers.requests || '', asked = channels.find(item => item.id === requests);
+  const askedMissing = (asked?.announceMissing || []).filter(right => !['Mentionner @everyone','Voir les anciens messages'].includes(right));
+  questions.push(['Poster les demandes d’équipage ?', row('🙋 Demandes d’équipage', 'Chaque demande faite sur le site, sans ping. Les responsables la traitent sur le site.',
+    `<select name="requests"><option value="" ${!requests ? 'selected' : ''}>Ne pas poster</option>${channels.filter(item => item.type === 0).map(item => `<option value="${esc(item.id)}" ${item.id === requests ? 'selected' : ''}>${item.parentId ? '   ' : ''}# ${esc(item.name)}</option>`).join('')}${requests && !asked ? `<option value="${esc(requests)}" selected>Choix enregistré</option>` : ''}</select>`,
+    askedMissing.length ? `<p class="setup-note setup-error discord-rights">Sur Discord : clic droit sur « ${esc(asked.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc(askedMissing.join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>` : '')]);
   return questions;
 }
 const discordEventChannel = form => form.dataset.tdz === 'true' ? '🗓️・calendrier' : 'event-solo-de-la-semaine';
@@ -528,6 +534,7 @@ function discordTabMarkup(setup, settings, look) {
       ${fact('Courses de la semaine', `${esc(MODE_NAMES[answers.mode] || '')} · ${sims}${answers.split && answers.sims === 'all' ? ' séparés' : ''}`, answers.mode === 'events' ? 'Le lundi à 7h30, le bot publie les courses de la semaine dans # endurances-de-la-semaine et ouvre un fil par course. Les pilotes inscrits y sont ajoutés sans notification.' : 'Le lundi à 7h30, le bot publie le récap de la semaine dans le salon choisi, avec un fil par course.')}
       ${fact('Vocaux d’équipage', answers.voices ? (answers.reminders ? 'Oui, avec rappels' : 'Oui') : 'Non', 'Un salon vocal par équipage, ouvert le lundi de la semaine de la course et supprimé 2 h après la fin. Avec les rappels : 24 h et 1 h avant le départ dans son chat.')}
       ${fact('Annonce du jour', answers.announce ? 'Oui, à 7h30' : 'Non', 'Chaque matin à 7h30, une affiche des courses du jour dans le salon choisi. @everyone seulement les jours de stream.')}
+      ${fact('Demandes d’équipage', answers.requests ? 'Postées sur Discord' : 'Sur le site seulement', 'Chaque demande d’équipage faite sur le site, postée sans ping dans le salon choisi. La carte devient verte quand l’équipage est créé.')}
       ${answers.announce ? fact('Stream', answers.stream ? esc(answers.stream.replace(/^https?:\/\//, '')) : 'Aucun', 'Facultatif : le lien et le nom du streamer s’affichent sur l’affiche des jours de stream.') : ''}
     </dl></section>` : '';
   const bot = look.discordServer ? `<section class="adm-block"><h2 class="adm-label">Logo du bot ${tip('L’image du bot, seulement sur ton serveur Discord. Le nom du bot se change directement sur Discord.')}</h2>
