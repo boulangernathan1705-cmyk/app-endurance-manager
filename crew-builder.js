@@ -379,10 +379,13 @@ async function openBuilder(crewId = null, preferredDepartureId = '', preset = {}
       const options=communityOptions(event,departure,session);
       if (!manager && !own.length && !options.some(item => item.manageCrews)) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
       builderState = {mode:'create',eventId,manager,siteManager:manager,communityOptions:options,communityId:'',departureId:departure.id,category:'',car:'',name:'',locked:false,ownerRegistrationId:null,registrationIds:[],originalRegistrationIds:[],step:1};
-      // Only one possible community (always, on a race of the site's community): chosen already.
+      const prefilled = Boolean(preset.registrationIds?.length || preset.category);
+      // Only one possible community (always, on a race of the site's community): chosen already. Prefilled from the
+      // « Équipages » page: the site's community, whose pilots they are (asking would wipe the request).
       if (options.length <= 1) chooseCommunity(event,departure,options[0]?.id || '');
+      else if (prefilled) chooseCommunity(event,departure,session.community?.id || '');
       // Prefilled (« Équipages » page): the request's or the ticked pilots, its name, category and car.
-      if (preset.registrationIds?.length || preset.category) {
+      if (prefilled) {
         if (preset.category && event.categories.includes(preset.category)) builderState.category = preset.category;
         builderState.name = preset.name || builderState.name;
         builderState.car = preset.car || '';

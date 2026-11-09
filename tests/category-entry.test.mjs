@@ -82,7 +82,7 @@ test('with the module on, placing a pilot in a crew removes his entries on the o
   assert.deepEqual(await entriesOf(req,event.id),[['Hypercar'],[]]);
 });
 
-test('without the module, the other starts keep their entries',async()=>{
+test('without the module, the starts of another day keep their entries',async()=>{
   const {req,login}=harness();
   await login(ADMIN,'admin');await login(PILOT,'pilot');
   const {event,first,second,enter}=await raceWithTwoStarts(req);
