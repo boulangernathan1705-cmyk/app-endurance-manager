@@ -2,7 +2,7 @@
    Keep the complete artwork visible as a real image. The image is capped on ultrawide
    displays so browser zoom never stretches it beyond its source resolution; only the
    blurred backdrop fills the unused sides.
-   One size on every page (tokens.css): the whole banner on a computer, a thin band on a phone.
+   One size on every page (tokens.css): a thin band, on a computer and on a phone.
    Only the live pit wall (live.css) keeps a thinner strip. */
 
 header.site-hero {
@@ -120,11 +120,10 @@ header.site-hero .brand-button.logo {
   }
 }
 
-/* The whole banner on the home page and a race's page; a thin band on the lists and calendars (EVENT TDZ, Endurance,
-   Mes inscriptions) so they fit in the window (Nathan 2026-11-07). */
+/* A thin band on every page of a computer (Nathan 2026-11-09, after the lists and calendars on 2026-11-07): on a
+   laptop the whole banner pushed the week, a race's first start and the administration under the window. */
 @media (min-width: 761px) {
-html[data-view="home"] .hero-picture,
-html[data-view="my-entries"] .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-thin); }
+  .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-thin); }
 }
 @media (max-width: 760px) {
   .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-phone); }

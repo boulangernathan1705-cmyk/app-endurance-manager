@@ -23,3 +23,6 @@
 .registration-other-start:has(input:checked){border-color:var(--accent);color:var(--accent);background:rgba(126,227,143,.1)}
 .registration-other-start:has(input:checked) span::before{content:'✓ '}
 .registration-other-start:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+
+/* What a step still misses, under its title (never a window over the page). */
+.registration-step-error{margin:8px 0 0;padding:8px 12px;border-left:3px solid var(--em-danger);border-radius:var(--em-radius-sm);background:color-mix(in srgb,var(--em-danger) 12%,transparent);color:var(--em-danger-text);font-size:14px;font-weight:700}

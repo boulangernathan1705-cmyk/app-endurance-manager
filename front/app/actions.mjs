@@ -61,7 +61,17 @@ function validateRegistrationStep(draft,step){
 function goToRegistrationStep(event,departure,target){
   const draft=draftFor(departure),last=lastRegistrationStep(event,departure,draft),current=registrationStep(draft,last),wanted=Number(target.dataset.step);
   const solo=draft.solo,soloCurrent=solo?Math.min(Math.max(Number(draft.step)||(draft.id?solo+1:1),1),solo+1):current;
-  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:last);step++)validateRegistrationStep(draft,step);
+  // Something missing in the step: said under its title, not in a window over the page (audit 2026-11-09).
+  const sheet=document.getElementById(`departure-${departure.id}`)?.querySelector('.registration-stepper');
+  sheet?.querySelector('.registration-step-error')?.remove();
+  try{if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:last);step++)validateRegistrationStep(draft,step);}
+  catch(error){
+    const label=sheet?.querySelector('.registration-step-label');
+    if(!label)throw error;
+    const note=document.createElement('p');note.className='registration-step-error';note.setAttribute('role','alert');note.textContent=error.message;
+    label.after(note);note.scrollIntoView?.({block:'nearest'});
+    return;
+  }
   if(target.dataset.edit)draft.returnToSummary=true;
   else if(wanted===(solo?solo+1:last)||wanted<soloCurrent)draft.returnToSummary=false;
   draft.step=wanted;
@@ -267,6 +277,7 @@ async function perform(action,target){
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
     case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
     case 'crews-view': case 'crews-sim': case 'crews-category': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
+    case 'crews-delete': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Équipage supprimé.');break;
     case 'crews-lock': if(await crewsAction(action,target)==='refresh')await refreshAfterSave(target.dataset.locked==='1'?'Équipage rouvert.':'Équipage marqué complet.');break;
     // « Demander un équipage » (pilots).
     case 'crew-request': openCrewRequest(event,target.dataset.departure);break;

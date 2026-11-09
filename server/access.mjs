@@ -125,7 +125,7 @@ async function rolePermissions(env, community, roles) {
 
 // The organisers of a community: its members whose roles give « Équipages » (or « Administrer »), told on the site
 // when a pilot asks for a crew. [{user_id, community_id}]
-export async function crewOrganisers(env, community) {
+async function membersAllowed(env, community, allowed) {
   const everyone = community.discordGuildId;
   const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
   const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
@@ -136,9 +136,12 @@ export async function crewOrganisers(env, community) {
     if (member.discord_admin) return true;
     const granted = new Set(base);
     for (const role of JSON.parse(member.discord_roles || '[]')) for (const permission of byRole.get(role) || []) granted.add(permission);
-    return granted.has('access') && (granted.has('crews') || granted.has('admin'));
+    return granted.has('access') && allowed(granted);
   }).map(member => ({user_id:member.user_id, community_id:community.id}));
 }
+export const crewOrganisers = (env, community) => membersAllowed(env, community, granted => granted.has('crews') || granted.has('admin'));
+// The administrators of a community (told in the bell when its Discord bot can no longer publish).
+export const communityAdmins = (env, community) => membersAllowed(env, community, granted => granted.has('admin'));
 
 // Permissions of a stored membership (members page).
 export async function memberPermissions(env, community, membership) {
