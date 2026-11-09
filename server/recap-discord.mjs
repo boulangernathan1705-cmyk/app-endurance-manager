@@ -216,6 +216,13 @@ export async function validateDiscordLayout(env, community, input) {
     const before = parseLayout((await botRecapSettings(env, community))?.layout);
     layout.announceAt = before?.announce === layout.announce && before.announceAt ? before.announceAt : Date.now();
   }
+  if (layout.requests) {
+    const place = destinations.find(item => item.id === layout.requests && [0,5].includes(item.type));
+    if (!place) throw Object.assign(new Error('Choisis un salon qui existe sur le serveur Discord de cette communauté pour les demandes d’équipage.'), {status:400});
+    // No @everyone and no history needed: only see, write and show the card.
+    const missing = (place.announceMissing || []).filter(right => !['Mentionner @everyone','Voir les anciens messages'].includes(right));
+    if (missing.length) throw Object.assign(new Error(`Dans les permissions du salon « ${place.name} », autorise le bot : ${missing.join(', ')}.`), {status:400});
+  }
   if (wantedCategories(layout).length) {
     const server = await serverRights(env, community);
     if (server.missing.length) throw Object.assign(new Error(`Pour créer ses catégories, le bot a besoin sur le serveur de : ${server.missing.join(', ')}. Invite-le à nouveau avec ses droits.`), {status:400});

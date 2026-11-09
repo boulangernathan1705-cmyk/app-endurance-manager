@@ -38,6 +38,7 @@ import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 
 
+import {postCrewRequestCard, decideCrewRequestCard, deleteCrewRequestCard} from './crew-request-discord.mjs';
 import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
@@ -690,12 +691,16 @@ async function api(request, env) {
     const mates = wanted.map(item => regs.find(reg => reg.id===item && reg.category===input.category && reg.id!==own.id)).filter(Boolean);
     if (mates.length !== wanted.filter(item => item!==own.id).length) fail(409,'Un coéquipier choisi n’est plus libre dans cette catégorie. Actualise la page.');
     const requestId = id();
+    // A new request replaces the pilot's last one on this start: its Discord card goes too.
+    const replaced = await env.DB.prepare(`SELECT * FROM crew_requests WHERE user_id=? AND departure_id=? AND status='pending'`).bind(actor.user.id, departure.id).first();
     await env.DB.batch([
       env.DB.prepare(`DELETE FROM crew_requests WHERE user_id=? AND departure_id=? AND status='pending'`).bind(actor.user.id, departure.id),
       env.DB.prepare(`INSERT INTO crew_requests(id,community_id,event_id,departure_id,user_id,name,category,car,registration_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
         .bind(requestId, community.id, event.id, departure.id, actor.user.id, name, input.category, car || null, JSON.stringify([own.id, ...mates.map(reg => reg.id)]), now())
     ]);
     await notify(env, await crewOrganisers(env, community), 'crew_request', event, {departure, skip:[actor.user.id], pilot:own.participant_name||own.name, crewName:name, departureId:departure.id});
+    await deleteCrewRequestCard(env, replaced);
+    await postCrewRequestCard(env, community, requestId);
     return json({id:requestId},201);
   }
   if (requestRoute && method === 'POST') {
@@ -707,6 +712,7 @@ async function api(request, env) {
     if (action === 'cancel') {
       if (row.user_id !== actor.user.id) fail(403,'Seul le pilote qui l’a faite annule sa demande.');
       await env.DB.prepare('DELETE FROM crew_requests WHERE id=?').bind(row.id).run();
+      await deleteCrewRequestCard(env, row);
       return json({ok:true});
     }
     requirePermission(actor,'crews','Seuls les organisateurs traitent les demandes d’équipage.');
@@ -720,6 +726,7 @@ async function api(request, env) {
     await env.DB.prepare(`UPDATE crew_requests SET status=?,decided_by=?,decided_at=? WHERE id=? AND status='pending'`).bind(action==='accept'?'accepted':'refused', actor.user.id, now(), row.id).run();
     if (event) await notify(env, [{user_id:row.user_id, community_id:community.id}], action==='accept'?'crew_request_accepted':'crew_request_refused', event,
       {departure:JSON.parse(event.departures).find(item => item.id===row.departure_id)||null, skip:[actor.user.id], crewName, by:actor.user.name});
+    await decideCrewRequestCard(env, community, row, {status:action==='accept'?'accepted':'refused', by:actor.user.name, crewId:input.crewId});
     return json({ok:true});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
