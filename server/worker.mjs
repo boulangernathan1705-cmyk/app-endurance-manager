@@ -280,6 +280,36 @@ function canManageCrew(crew, actor) {
 // with its community, and is changed on that community's site only.
 // `perms`: the player's permissions in each of his other communities; `official`: ids of the official races, whose
 // entries all show their community (logo or short name).
+// Placed in a crew, the pilot leaves his other categories on that start, and his other starts of the race on the same
+// day where he has no crew (Nathan 2026-11-09: a pilot stayed entered on the other start of the day); with
+// « Inscription par catégorie », all his other starts. Run in a batch right after the crew_members insert.
+const leaveOtherStarts=`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND participant_id=? AND (departure_id=?
+  OR (departure_id IN (SELECT value FROM json_each(?)) AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=registrations.id)))`;
+const parisDay = timestamp => new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Paris', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(Number(timestamp)));
+function startsToLeave(event, departure, community) {
+  const all = community?.modules?.categoryEntry === true;
+  return JSON.stringify(JSON.parse(event.departures || '[]').filter(item => item.id !== departure.id && (all || parisDay(item.startsAt) === parisDay(departure.startsAt))).map(item => item.id));
+}
+
+// « Demander un équipage »: a pilot's request is answered as soon as he is placed in a crew, whatever the way
+// (« Créer cet équipage », pilots ticked on the « Équipages » page, « Ajouter à… »): he is told and the Discord card
+// turns green. Returns true when a request was answered.
+async function acceptCrewRequests(env, community, registrationId, crewId, actor) {
+  // Never blocks placing the pilot (a database without migration 0091 has no request to answer).
+  const rows = (await env.DB.prepare(`SELECT * FROM crew_requests WHERE community_id=? AND status='pending' AND json_extract(registration_ids,'$[0]')=?`).bind(community.id, registrationId).all().catch(() => null))?.results || [];
+  let answered = false;
+  for (const row of rows) {
+    const done = await env.DB.prepare(`UPDATE crew_requests SET status='accepted',decided_by=?,decided_at=? WHERE id=? AND status='pending'`).bind(actor.user.id, now(), row.id).run();
+    if (!done.meta.changes) continue;
+    answered = true;
+    const [event, crew] = await Promise.all([env.DB.prepare('SELECT * FROM events WHERE id=?').bind(row.event_id).first(), env.DB.prepare('SELECT name FROM crews WHERE id=?').bind(crewId).first()]);
+    if (event) await notify(env, [{user_id:row.user_id, community_id:community.id}], 'crew_request_accepted', event,
+      {departure:JSON.parse(event.departures).find(item => item.id===row.departure_id)||null, skip:[actor.user.id], crewName:crew?.name || row.name, by:actor.user.name});
+    await decideCrewRequestCard(env, community, row, {status:'accepted', by:actor.user.name, crewId});
+  }
+  return answered;
+}
+
 function publicRegistration(reg, actor, userNames = new Map(), community = null, names = new Map(), perms = new Map(), official = new Set(), pilotNames = new Map()) {
   let cars = [];
   try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
@@ -706,9 +736,14 @@ async function api(request, env) {
   if (requestRoute && method === 'POST') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord.');
     const input = await body(request);
-    const row = await env.DB.prepare(`SELECT * FROM crew_requests WHERE id=? AND community_id=? AND status='pending'`).bind(requestRoute[1], community.id).first();
-    if (!row) fail(404,'Cette demande a déjà été traitée. Actualise la page.');
+    const row = await env.DB.prepare(`SELECT * FROM crew_requests WHERE id=? AND community_id=?`).bind(requestRoute[1], community.id).first();
     const action = requestRoute[2];
+    // Already accepted when its pilot joined the crew (acceptCrewRequests): the Discord card shows the full crew.
+    if (row?.status === 'accepted' && action === 'accept' && can(actor,'crews')) {
+      await decideCrewRequestCard(env, community, row, {status:'accepted', by:actor.user.name, crewId:input.crewId});
+      return json({ok:true});
+    }
+    if (row?.status !== 'pending') fail(404,'Cette demande a déjà été traitée. Actualise la page.');
     if (action === 'cancel') {
       if (row.user_id !== actor.user.id) fail(403,'Seul le pilote qui l’a faite annule sa demande.');
       await env.DB.prepare('DELETE FROM crew_requests WHERE id=?').bind(row.id).run();
@@ -759,13 +794,13 @@ async function api(request, env) {
         const results=await env.DB.batch([
           crewUpdate,
           env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(input.registrationId,crew.id),
-          // « Inscription par catégorie »: placed in a crew, the pilot's other starts of the race are no longer needed.
-          env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND participant_id=? AND (departure_id=? OR ?=1)`).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,here.modules?.categoryEntry===true?1:0)
+          env.DB.prepare(leaveOtherStarts).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,startsToLeave(event,departure,here))
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
         const pilot=selected.participant_name||selected.name;
         await notify(env,await crewPilots(env,crew.id),'crew_join',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot,crewName:crew.name});
-        if (!selfJoin && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
+        const answered=await acceptCrewRequests(env,here,selected.id,crew.id,actor);
+        if (!selfJoin && !answered && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true,removedRegistrations:results[2].meta.changes});
       }
       if (method==='DELETE' && crewRoute[2]) {
@@ -861,9 +896,10 @@ async function api(request, env) {
     const results=await env.DB.batch([
       env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
       env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
-      env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND participant_id=? AND (departure_id=? OR ?=1)`).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,here.modules?.categoryEntry===true?1:0)
+      env.DB.prepare(leaveOtherStarts).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,startsToLeave(event,departure,here))
     ]);
     if (!results[0].meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
+    await acceptCrewRequests(env,here,selected.id,crewId,actor);
     return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
   }
   if (path === '/api/events' && method === 'POST') {
