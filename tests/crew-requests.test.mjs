@@ -4,6 +4,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
+import {crewRequestCard, requestsChannel, cleanCrewRequestCards} from '../server/crew-request-discord.mjs';
+import {layoutInput} from '../server/discord-layout.mjs';
 
 // « Demander un équipage » (migration 0091): a pilot without « Équipages » proposes a crew, the organisers are told on
 // the site, check it on the « Équipages » page, create it or refuse it. The pilot never becomes its manager.
@@ -38,7 +40,7 @@ function harness(){
     try{await req(`/api/auth/discord/callback?code=test&state=${state}`,'GET',null,actor);}finally{globalThis.fetch=realFetch;}
     setMember(DB.db,discordId,roles);
   }
-  return {DB,req,login};
+  return {DB,env,req,login};
 }
 
 test('a pilot asks for a crew, every organiser is told, one creates it and the pilot is told',async()=>{
@@ -87,4 +89,58 @@ test('joining an open crew never makes the pilot its manager',async()=>{
   assert.equal((await req(`/api/crews/${crew}/members`,'POST',{registrationId:mine,version:listing.version,selfJoin:true},'pilot')).status,200);
   listing=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal(listing.canManage,false);assert.equal(listing.ownedByMe,false);
+});
+
+// « Demander un équipage » on Discord (Nathan 2026-11-09): the requests posted in the admins' channel, without a ping;
+// the same card turns green once the crew is created, and goes when the request is cancelled.
+test('a crew request is posted on Discord, turns green once created and goes when cancelled',async()=>{
+  const {DB,env,req,login}=harness();
+  await login(ADMIN,'admin');await login(ORGA,'orga',[ORGA_ROLE]);await login(PILOT,'pilot');await login(MATE,'mate');
+  await req('/api/events','POST',{name:'6h test',categories:['GT3'],departures:[{date:'2090-10-15',time:'15:00'}]},'admin');
+  const event=(await req('/api/events','GET',null,'pilot')).data.events[0],dep=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${dep.id}`;
+  const mine=(await req(base+'/registrations','POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot')).data.id;
+  const mate=(await req(base+'/registrations','POST',{name:'Mate',category:'GT3',status:'whole'},'mate')).data.id;
+  const community=DB.db.prepare('SELECT id FROM communities LIMIT 1').get().id;
+  DB.db.prepare(`INSERT INTO community_recap_settings(community_id,mode,scope,guild_id,destination_id,destination_name,layout) VALUES(?,?,?,?,?,?,?)`)
+    .run(community,'events','all','g','','',JSON.stringify({v:1,mode:'events',sims:'all',requests:'900000000000000001'}));
+  env.DISCORD_BOT_TOKEN='bot';
+  const calls=[],realFetch=globalThis.fetch;
+  globalThis.fetch=async(url,init={})=>{calls.push({url:String(url),method:init.method,body:init.body?JSON.parse(init.body):null});return new Response(JSON.stringify({id:'800000000000000001'}),{headers:{'Content-Type':'application/json'}});};
+  try{
+    const sent=await req(base+'/crew-requests','POST',{name:'Les Tortues',category:'GT3',registrationIds:[mate]},'pilot');
+    assert.equal(sent.status,201);
+    const post=calls.find(call=>call.method==='POST'&&call.url.endsWith('/channels/900000000000000001/messages'));
+    assert.ok(post,'the card is posted in the chosen channel');
+    assert.deepEqual(post.body.allowed_mentions,{parse:[]});
+    assert.match(post.body.embeds[0].title,/Demande d’équipage/);assert.match(post.body.embeds[0].description,/Les Tortues/);
+    assert.equal(DB.db.prepare('SELECT discord_message_id FROM crew_requests WHERE id=?').get(sent.data.id).discord_message_id,'800000000000000001');
+    // The organiser creates it (maybe renamed): the same card turns green with the crew as made.
+    const crew=(await req(base+'/crews','POST',{name:'Les Lièvres',category:'GT3',join:false},'orga')).data.id;
+    calls.length=0;
+    assert.equal((await req(`/api/crew-requests/${sent.data.id}/accept`,'POST',{crewId:crew},'orga')).status,200);
+    const edit=calls.find(call=>call.method==='PATCH'&&call.url.endsWith('/messages/800000000000000001'));
+    assert.ok(edit,'the card is edited');assert.match(edit.body.embeds[0].title,/ÉQUIPAGE CRÉÉ · Les Lièvres/);assert.equal(edit.body.embeds[0].color,0x23a55a);
+    // Another start's request, cancelled by the pilot: its card is deleted.
+    await req('/api/events','POST',{name:'4h test',categories:['GT3'],departures:[{date:'2090-11-15',time:'15:00'}]},'admin');
+    const other=(await req('/api/events','GET',null,'pilot')).data.events.find(item=>item.name==='4h test'),odep=other.departures[0];
+    await req(`/api/events/${other.id}/departures/${odep.id}/registrations`,'POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot');
+    const second=(await req(`/api/events/${other.id}/departures/${odep.id}/crew-requests`,'POST',{name:'Solo',category:'GT3'},'pilot')).data.id;
+    calls.length=0;
+    assert.equal((await req(`/api/crew-requests/${second}/cancel`,'POST',{},'pilot')).status,200);
+    assert.ok(calls.some(call=>call.method==='DELETE'&&call.url.endsWith('/messages/800000000000000001')));
+    assert.ok(mine);
+  }finally{globalThis.fetch=realFetch;}
+});
+
+test('a crew request card: no channel, never on dev, stale cards cleaned',async()=>{
+  assert.equal(requestsChannel(null),'');
+  assert.equal(requestsChannel({enabled:0,layout:JSON.stringify({requests:'900000000000000001'})}),'');
+  assert.equal(requestsChannel({enabled:1,layout:JSON.stringify({requests:'900000000000000001'})}),'900000000000000001');
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',requests:'900000000000000001'}).requests,'900000000000000001');
+  assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',requests:'général'}),/demandes d’équipage/);
+  const pending=crewRequestCard({status:'pending',requester:'Max',name:'Team @everyone',category:'GT3',pilots:['Max','Léo'],eventName:'6h',game:'lmu',url:'https://x'});
+  assert.ok(!pending.description.includes('@'),'no mention in a card');
+  assert.match(crewRequestCard({status:'refused',requester:'Max',name:'A',by:'Nathan'}).title,/non retenue/);
+  assert.equal(await cleanCrewRequestCards({SITE_ENV:'development',DISCORD_BOT_TOKEN:'bot'}),0);
 });

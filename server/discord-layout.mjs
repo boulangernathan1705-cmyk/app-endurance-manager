@@ -14,6 +14,7 @@
 //   copy / pitCopy: the bot's categories / « Pit talk » take the rights of the category they sit under (private like it)
 //   announce: the text or announcement channel of the morning announcement (server/discord-announce.mjs), '' for none
 //   stream: the community's stream, linked in the intro of the announcement, '' for none
+//   requests: the text channel where the bot posts the pilots' crew requests (server/crew-request-discord.mjs), '' for none
 // Discord shows every name in the same size: an emoji in front makes the bot's own stand out (custom emojis are not allowed
 // in names).
 export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
@@ -75,6 +76,10 @@ export function layoutInput(input) {
   const streamName=String(input.streamName??'').trim();
   if(streamName.length>80)throw bad('Le nom du streamer est limité à 80 caractères.');
   if(announce&&stream&&streamName)layout.streamName=streamName;
+  // « Demander un équipage »: each request posted there, without a ping.
+  const requests = String(input.requests ?? '').trim();
+  if (requests && !ID.test(requests)) throw bad('Choisis le salon des demandes d’équipage.');
+  if (requests) layout.requests = requests;
   return layout;
 }
 

@@ -13,6 +13,7 @@ import {syncAnnouncements} from './discord-announce.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse,withoutProductionCookies} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
+import {cleanCrewRequestCards} from './crew-request-discord.mjs';
 // The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
 export {LiveRoom} from './live.mjs';
 
@@ -216,6 +217,8 @@ export default {
     // Maintenance stays every 15 minutes; crew sync has its own schedule, so it is not duplicated here.
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
+    // The Discord cards of crew requests no longer useful (start passed, pilot placed or gone).
+    if (env.DISCORD_BOT_TOKEN) run('Crew request cards cleanup failed', () => cleanCrewRequestCards(env, at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official team and solo iRacing endurances, once for the whole platform.
