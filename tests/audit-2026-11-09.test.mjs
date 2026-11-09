@@ -71,3 +71,13 @@ test('a 24 h race groups its hours by Paris day',async()=>{
   assert.equal((html.match(/aria-pressed="true"/g)||[]).length,2);
   assert.equal(raceDayGroups({...departure,tbd:true},24).length,1);
 });
+
+test('a race over several days is a table: one row per start time, one button on a closed start',()=>{
+  const planning=read('front/app/planning.mjs');
+  assert.match(planning,/const table=days\.length>1&&!isSolo\(event\)/);
+  assert.match(planning,/--rows:\$\{times\.length\}/);
+  assert.match(read('front/app/event-view.mjs'),/absence:absenceButton\(event,'Absent pour cette course'\)/);
+  const css=read('styles/ux-refresh.css');
+  assert.match(css,/\.departure-planning\.is-table \.planning-day \{[^}]*grid-template-rows: subgrid/);
+  assert.match(css,/\.planning-quick > :not\(\.is-primary\) \{ display: none; \}/);
+});
