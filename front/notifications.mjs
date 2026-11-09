@@ -31,6 +31,7 @@ function sentence(item) {
     case 'crew_request': return `${b(item.pilot)} demande un équipage : ${crew}`;
     case 'crew_request_accepted': return `Ta demande est acceptée : tu roules avec l’équipage ${crew}`;
     case 'crew_request_refused': return `Ta demande d’équipage ${crew} n’a pas été retenue`;
+    case 'discord_error': return `Le bot Discord ne peut plus publier${item.message ? ` : ${esc(item.message)}` : ''}`;
     case 'race_reminder': return `Rappel : ta course commence dans moins de 24 h${item.crewName ? ` avec ton équipage ${crew}` : ''}${discordChannel(item) ? ' · ouvre le salon de l’équipage sur Discord' : ''}`;
     default: return 'Du nouveau sur une de tes courses';
   }
@@ -56,6 +57,8 @@ function ago(seconds) {
 const discordChannel = item => item.kind === 'race_reminder' && /^https:\/\/discord\.com\/channels\/\d+\/\d+$/.test(item.channelUrl || '') ? item.channelUrl : '';
 
 function link(item) {
+  // The bot in trouble: its setting, in the administration.
+  if (item.kind === 'discord_error') return '/members#discord';
   if (!item.eventId || item.kind === 'race_deleted') return '';
   if (discordChannel(item)) return discordChannel(item);
   // A crew request opens the organisers' « Équipages » page on its start.

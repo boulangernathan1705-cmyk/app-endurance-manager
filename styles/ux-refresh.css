@@ -2855,7 +2855,10 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .crews-coverage-text { margin-left: 92px; }
   .crews-gauge-bar { flex-basis: 100%; }
   .crews-filters-hint { display: none; }
+  .crews-crew.is-done .crews-line:not(.crews-coverage) { display: none; }
+  .crews-crew.is-done .crews-names { display: block; }
 }
+.crews-names { display: none; margin: var(--em-space-2) 0 0; color: var(--muted); font-size: var(--em-text-sm); }
 @media (max-width: 760px) {
   .crews-pilot { grid-template-columns: minmax(0, 1fr); }
   .crews-add select { width: 100%; }
@@ -2928,3 +2931,24 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .planning-free-group .category-logo { width: 22px; height: auto; flex: none; }
 .planning-row[data-free-pilots] { gap: 4px 14px; }
 .planning-row[data-free-pilots]:hover .planning-no-crew { color: var(--community-accent, #52d3d8); }
+
+/* Race page: the crews' and the pilots' hours as thin bars, as on the « Équipages » page. */
+.crews-line.is-mine > span:first-child { font-weight: 800; color: var(--em-accent); }
+html[data-game] #app .crews-line .link-button.crews-line-edit { min-height: 0 !important; height: auto !important; padding: 0 !important; font: inherit; color: inherit; }
+.crews-line .solo-driver-badge { margin-left: var(--em-space-1); }
+.pilot-hours { display: grid; gap: var(--em-space-1); min-width: 0; }
+.pilot-hours .crews-axis { display: block; margin: 0; }
+.pilot-hours .crews-axis > span:first-child { display: none; }
+.pilot-hours small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.pilot-row > .pilot-hours { grid-column: 1 / -1; }
+
+/* Long race (more than 12 h): the hours are chosen day by day, the hour written in each cell. */
+.presence-days { display: grid; gap: var(--em-space-3); }
+.presence-day-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 var(--em-space-1); }
+.presence-day-head strong { color: var(--em-accent); font-size: var(--em-text-sm); letter-spacing: .08em; text-transform: uppercase; }
+.presence-day-head small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.presence-day-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--em-space-1); }
+html body .presence-day-grid .presence-hour { min-width: 0 !important; min-height: 40px !important; height: 40px !important; padding: 0 !important; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); background: var(--em-panel-2); color: var(--em-muted); font-size: var(--em-text-sm); font-weight: 700; box-shadow: none; }
+html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-accent); background: var(--em-accent); color: var(--em-bg); }
+.crews-bar .day { margin-left: var(--em-space-1); }
+.crews-axis .crews-bar span b { color: var(--em-accent); }

@@ -29,7 +29,7 @@ function canCreateCrewOnDeparture(departure,event=null){
 // {kind:'organiser'|'builder'|'request', label, attrs} or null.
 function crewButton(event,departure){
   if(!state.user||isSolo(event)||departure.startsAt<=Date.now())return null;
-  if(can('crews'))return {kind:'organiser',label:'Former les équipages',attrs:`data-action="crews-page" data-departure="${departure.id}" data-game="${activeGame}"`};
+  if(can('crews'))return {kind:'organiser',label:'Gérer les équipages',attrs:`data-action="crews-page" data-departure="${departure.id}" data-game="${activeGame}"`};
   if(canCreateCrewOnDeparture(departure,event))return {kind:'builder',label:'Créer un équipage',attrs:`data-crew-builder-open data-departure="${departure.id}"`};
   if(categoryEntryOn(event))return null;
   const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]).map(String));
@@ -108,8 +108,8 @@ function quickActions(event,departure){
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewAction=solo?null:crewButton(event,departure);
-  // « Demander un équipage » is written out for pilots (an icon alone would not say it); organisers keep the icon.
-  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='request'?crewAction.label:''):'';
+  // « Demander un équipage » and « Gérer les équipages » are written out: an icon alone would not say it.
+  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='builder'?'':crewAction.label):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }

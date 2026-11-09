@@ -1,6 +1,8 @@
 import {effectivePermissions,withBotAccess,VOICE_ACCESS,PUBLIC_VOICE_ACCESS} from './discord-permissions.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {administrators} from './core.mjs';
+import {notify} from './notifications.mjs';
+import {communityAdmins} from './access.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
 import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
@@ -927,7 +929,12 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
       return {ok:true,partial:true};
     }
     const message = error.message.startsWith('Discord') ? recapError(error) : error.message;
+    const before = await env.DB.prepare('SELECT last_error FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=?,dirty=1 WHERE community_id=? AND lock_token=?').bind(message,community.id,token).run();
+    // The bot has lost a right or a channel (not a passing limit): the administrators are told once in the bell,
+    // when the error appears, not at each later try (audit 2026-11-09).
+    if (!before?.last_error && [401,403,404].includes(error.status))
+      await notify(env, await communityAdmins(env, community), 'discord_error', {id:null, name:'', community_id:community.id}, {message:String(message).slice(0,200)});
     throw new Error(message);
   } finally {
     await env.DB.prepare("UPDATE community_recap_settings SET checked_at=?,lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(timestamp,community.id,token).run();

@@ -2,7 +2,7 @@ import {contextHelpMarker as helpContext} from './core.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerChoice} from './grindfest.mjs';
 import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
-import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
+import {raceHourLabel,raceEndLabel,raceDayGroups,LONG_RACE_HOURS} from '../timeline.mjs';
 import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
 import {isAdmin,app,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
@@ -10,6 +10,7 @@ import {getLocale} from '../i18n.mjs';
 import {timeInput,endBefore} from './solo-form.mjs';
 import {streamSpan,streamUrl} from '../../shared/stream.mjs';
 import {raceFinishAt} from '../../shared/duration.mjs';
+import {hoursAxis,hoursBar,hoursText} from './crews-page.mjs';
 
 // The player's own entries (on an official race, possibly made with another of his communities).
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
@@ -57,10 +58,11 @@ export function statusLabel(status) {
 }
 function slotLabel(status) { return status==='whole'?'Toute la course':status==='unavailable'?'Indisponible':String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>`Heure ${part.slice(1)}`).join(' · ')||statusLabel(status); }
 
-export function renderRegistration(reg,departure,duration,showCarPreference=true) {
+// A pilot's card: his hours as a thin bar under the hours of the race, as in the crews.
+export function renderRegistration(reg,departure,event,showCarPreference=true) {
   const locked=departure.startsAt<=Date.now();
   const origin=reg.addedByName?` <span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
-  const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
+  const timeline=reg.status==='unavailable'?'':`<div class="pilot-hours">${hoursAxis(event,departure)}${hoursBar(event,departure,reg)}<small>${esc(hoursText(event,departure,reg))}</small></div>`;
   // One card per pilot: his entries in several categories on this start show together.
   const cats=reg.groupCategories||(reg.category?[reg.category]:[]);
   return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name" ${pilotNameTip(reg)}>${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo${cats.length>1?' is-several':''}" title="${esc(cats.join(' ou ')||'Catégorie')}" aria-label="${esc(cats.join(' ou ')||'Catégorie')}">${cats.length?cats.map(category=>logo(category)).join(''):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}${reg.streamTime?`<span class="pilot-preference">📺 Stream ${esc(streamSpan(reg.streamTime,reg.streamEnd))}</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
@@ -202,9 +204,12 @@ function hoursSummary(status,departure,duration){
   // Same hour labels as the timeline (minutes of the start and clock changes included).
   const clock=offset=>offset===duration&&Number(departure.endsAt)?raceEndLabel(departure):raceHourLabel(departure,offset);
   const ranges=[];let first=hours[0],previous=first;
+  // A long race names the day of each range: « sam. 16h–20h, dim. 8h–12h ».
+  const days=duration>LONG_RACE_HOURS?raceDayGroups(departure,duration):[];
+  const dayOf=offset=>days.length>1?`${days.find(group=>group.hours.includes(offset))?.short||''} `:'';
   for(const hour of [...hours.slice(1),null]){
     if(hour!==null&&hour===previous+1){previous=hour;continue;}
-    ranges.push(`${clock(first-1)}–${clock(previous)}`);first=hour;previous=hour;
+    ranges.push(`${dayOf(first-1)}${clock(first-1)}–${clock(previous)}`);first=hour;previous=hour;
   }
   // The last slot of a race with minutes is shorter (2 h 30: the third slot lasts 30 min).
   const total=Number(departure.endsAt)?(departure.endsAt-departure.startsAt)/60000:duration*60;
@@ -352,7 +357,9 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const cars=stateDraft.carAny?'Peu importe':(stateDraft.cars||[]).length?esc(stateDraft.cars.join(', ')):'—';
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
-  const next=step<last?button('registration-step',stateDraft.returnToSummary?'Revenir au récapitulatif':'Continuer',`data-departure="${departure.id}" data-step="${stateDraft.returnToSummary?last:step+1}"`,'primary-button registration-next'):`<button type="submit" class="save-button registration-next">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'VALIDER MON INSCRIPTION'}</button>`;
+  // Step 1 with only the category left to choose: the choice moves on by itself, so no « Continuer » to press.
+  const choiceOnly=step===1&&!identity&&!stateDraft.category;
+  const next=choiceOnly?'':step<last?button('registration-step',stateDraft.returnToSummary?'Revenir au récapitulatif':'Continuer',`data-departure="${departure.id}" data-step="${stateDraft.returnToSummary?last:step+1}"`,'primary-button registration-next'):`<button type="submit" class="save-button registration-next">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'VALIDER MON INSCRIPTION'}</button>`;
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="${step}" data-last-step="${last}">
 <div class="registration-progress" aria-hidden="true">${steps.map((_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
 <p class="registration-step-label">Étape ${step} sur ${last} · ${step===1&&identity?'Pilote et catégorie':steps[step-1]}</p>
