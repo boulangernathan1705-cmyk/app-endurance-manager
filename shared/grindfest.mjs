@@ -1,5 +1,5 @@
 import {tdzOnly} from './catalog.mjs';
-// Entitlement is tied to the immutable community slug, never to a client-supplied flag.
+// Entitlement comes from the community row in the database (its `event_tdz` flag), never from a client-supplied flag.
 export const grindfestAvailable = tdzOnly;
 export const grindfestEnabled = (community, development = false) => grindfestAvailable(community, development) && community?.modules?.grindfest === true;
 export function eventDetails(event) {
