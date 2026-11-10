@@ -2987,3 +2987,6 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
 @media (min-width: 761px) {
   .departure-planning.is-table .planning-start:not([open]) .planning-row[data-free-pilots] .planning-pilot-names { color: var(--em-muted); font-size: var(--em-text-xs); }
 }
+/* The same thin hour bars in the crew window and in « Inscription par catégorie ». */
+.crew-builder-coverage-bars { margin-top: var(--em-space-2); }
+.crew-builder-pilot .pilot-hours { margin-top: var(--em-space-2); }

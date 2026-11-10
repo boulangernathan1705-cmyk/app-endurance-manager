@@ -81,3 +81,12 @@ test('a race over several days is a table: one row per start time, one button on
   assert.match(css,/\.departure-planning\.is-table \.planning-day \{[^}]*grid-template-rows: subgrid/);
   assert.match(css,/\.planning-quick > :not\(\.is-primary\) \{ display: none; \}/);
 });
+
+test('EVENT TDZ is a flag of the community in the database, no longer only its name',async()=>{
+  const {tdzOnly}=await import('../shared/catalog.mjs');
+  assert.equal(tdzOnly({slug:'autre',eventTdz:true}),true);
+  assert.equal(tdzOnly({slug:'autre',eventTdz:false}),false);
+  assert.equal(tdzOnly({slug:'tdz'}),true);
+  assert.match(read('migrations/0097_community_event_tdz.sql'),/UPDATE communities SET event_tdz = 1 WHERE slug = 'tdz'/);
+  assert.match(read('server/community.mjs'),/eventTdz:Number\(row\.event_tdz\) === 1/);
+});

@@ -12,7 +12,7 @@ function parseJson(value) {
 }
 function toCommunity(row) {
   return {id:row.id, slug:row.slug, name:row.name, shortName:row.short_name, discordGuildId:row.discord_guild_id || null,
-    appearance:parseJson(row.appearance), modules:parseJson(row.modules), discordInviteUrl:row.discord_invite_url || null};
+    appearance:parseJson(row.appearance), modules:parseJson(row.modules), discordInviteUrl:row.discord_invite_url || null, eventTdz:Number(row.event_tdz) === 1};
 }
 
 export function communitySlug(env, request) {
