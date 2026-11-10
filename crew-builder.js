@@ -2,6 +2,7 @@ import {helpContext} from './front/context-help.mjs';
 import {CARS,categories as categoryCatalog} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {hoursAxis,hoursBar,hoursText,coverage as hoursCoverage} from './front/app/crews-page.mjs';
+import {communityTag} from './front/app/core.mjs';
 import {introduceCommunitiesOnce} from './front/community-intro.mjs';
 
 const app = document.getElementById('app');
@@ -140,7 +141,7 @@ function pilotCard(event, departure, registration, disabled = false, required = 
   const checked = builderState.registrationIds.includes(registration.id);
   const lock = disabled || required;
   return `<label class="crew-builder-pilot ${checked ? 'is-selected' : ''}${lock ? ' is-locked' : ''}">
-    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''} ${lock ? 'disabled' : ''}><span><strong>${esc(registration.name)}</strong>${required?'<em>Responsable de l’équipage</em>':''}<small>${esc(registrationCarLabel(registration))}</small></span></span>
+    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''} ${lock ? 'disabled' : ''}><span>${communityTag(registration)}<strong>${esc(registration.name)}</strong>${required?'<em>Responsable de l’équipage</em>':''}<small>${esc(registrationCarLabel(registration))}</small></span></span>
     <span class="crew-builder-pilot-wish">Coéquipier souhaité : <strong>${esc(registration.preferredPilot || 'aucune préférence')}</strong></span>${registration.comment?`<span class="crew-builder-pilot-wish">« ${esc(registration.comment)} »</span>`:''}
     <span class="pilot-hours">${hoursAxis(event, departure)}${hoursBar(event, departure, registration)}<small>${esc(hoursText(event, departure, registration))}</small></span>
   </label>`;
