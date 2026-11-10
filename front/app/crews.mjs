@@ -1,4 +1,4 @@
-import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
+import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag,carLogo} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 import {hoursAxis,hoursBar,coverage as hoursCoverage} from './crews-page.mjs';
@@ -8,14 +8,19 @@ function statusPill(crew){return `<span class="crew-compact-status ${crew.locked
 // Opened crew: one thin bar per pilot under the hours of the race, then « Couverture » with the hours nobody drives.
 // A name is a link when the viewer may change that entry (the pilot himself, an organiser).
 // tag:false inside a crew that already shows its community before its name.
-export function pilotLines(event,departure,regs,{editable=true,tag=true}={}){
+// note: the pilot's wishes (cars, partner, comment) in small under his bar, for the pilots without a crew.
+export function pilotLines(event,departure,regs,{editable=true,tag=true,note=false}={}){
   const locked=departure.startsAt<=Date.now();
   return hoursAxis(event,departure)+regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" data-tip="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const name=`${tag?communityTag(reg):''}<span class="pilot-name" ${pilotNameTip(reg)}>${esc(reg.name)}</span>`;
     const label=editable&&reg.canEdit&&!locked?button('edit-registration',name,`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crews-line-edit'):name;
-    return `<div class="crews-line${reg.mine?' is-mine':''}"><span>${label}${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}</span>${hoursBar(event,departure,reg)}</div>`;
+    return `<div class="crews-line${reg.mine?' is-mine':''}"><span>${label}${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}</span>${hoursBar(event,departure,reg)}${note?pilotNote(reg):''}</div>`;
   }).join('');
+}
+function pilotNote(reg){
+  const parts=[registrationCarLabel(reg),reg.preferredPilot?`Souhaite rouler avec <strong>${esc(reg.preferredPilot)}</strong>`:'',reg.comment?`« ${esc(reg.comment)} »`:''].filter(Boolean);
+  return parts.length?`<small class="crews-line-note">${parts.map(part=>part.includes('<')?part:esc(part)).join(' · ')}</small>`:'';
 }
 export function crewAvailability(event,departure,regs,{editable=true,tag=true}={}){
   if(!regs.length)return '<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
@@ -70,7 +75,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
         <span class="crew-tile-head">${communityTag(crew)}<span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
-        <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
+        <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${carLogo(crew.car)}${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
@@ -103,7 +108,10 @@ export function renderPilots(event,departure,options={}){
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
   const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
-  const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${groupByPilot(unassigned,event).map(reg=>renderRegistration(reg,departure,event)+(reg.canEdit&&!startHasBegun(departure)?slotPicker(event,departure,{kind:'registration',id:reg.id,version:reg.version,label:reg.mine?'Choisir mon départ':`Choisir le départ de ${reg.name}`}):'')).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
+  // Pilots without a crew (Nathan 2026-11-10): the same thin lines as in the crews, by category.
+  const picker=reg=>reg.canEdit&&!startHasBegun(departure)?slotPicker(event,departure,{kind:'registration',id:reg.id,version:reg.version,label:reg.mine?'Choisir mon départ':`Choisir le départ de ${reg.name}`}):'';
+  const groups=event.categories.map(category=>[category,unassigned.filter(reg=>reg.category===category)]).filter(([,regs])=>regs.length);
+  const pilots=unassigned.length?`<section class="ux-unassigned-section">${groups.map(([category,regs])=>`<div class="crew-pilot-lines free-pilots-group"><h4 class="free-pilots-title">${logo(category)}<span>${esc(category)}</span><small>${regs.length}</small></h4>${pilotLines(event,departure,regs,{note:true})}${regs.map(picker).join('')}</div>`).join('')}</section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event)).join('')}</div></details>`:'';
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   const tbdNotice=departure.tbd?`<p class="tbd-notice" role="note">${pickableSlots(event,departure).length

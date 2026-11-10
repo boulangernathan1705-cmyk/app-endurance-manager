@@ -1,5 +1,16 @@
 # Nouveautés d'Endurance Manager
 
+## v2.11 — 10 novembre 2026
+
+### ✨ Nouveautés
+
+- **Logos de marques** : le logo de la marque s’affiche devant la voiture des équipages, sur la page de course, la page Équipages et Mes inscriptions.
+- **Streamer** : le streamer de la communauté (son pseudo = « Nom du streamer » dans Administration › Discord) peut cocher « Je streame ce départ », même sans être admin.
+
+### 🐛 Corrections
+
+- **Pilotes sans équipage** : dans le tableau d’une course sur plusieurs jours, ils sont listés sous les départs du jour ; dans un départ ouvert, ils ont les mêmes barres fines que les équipages.
+
 ## v2.10 — 10 novembre 2026
 
 ### ✨ Nouveautés
