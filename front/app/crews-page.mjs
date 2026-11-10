@@ -3,7 +3,7 @@
 // crews on one side, its pilots without a crew on the other, each with the bar of their hours. The organiser ticks
 // pilots and creates a crew (the usual crew window, filled in), puts a pilot in an open crew (« Ajouter à… »), or
 // checks a pilot's request (« Demander un équipage ») before creating it. Pilots only see their race pages.
-import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,communityTag,carLogo} from './core.mjs';
+import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,communityTag,carLogo,carLabel} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {raceDayGroups,LONG_RACE_HOURS} from '../timeline.mjs';
@@ -192,7 +192,7 @@ function crewCard(start,crew){
   // A complete crew that covers the race is done: on a phone it keeps its names and « Couverture », without the bars.
   const done=crew.locked&&regs.length>0&&!gaps(event,departure,regs).length;
   return `<article class="crews-crew${done?' is-done':''}">
-    <div class="crews-crew-head">${communityTag(crew)}<span class="crews-cat">${logo(crew.category)}</span><strong>${esc(crew.name)}</strong><small>${carLogo(crew.car)}${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
+    <div class="crews-crew-head">${communityTag(crew)}<span class="crews-cat">${logo(crew.category)}</span><strong>${esc(crew.name)}</strong><small>${carLabel(crew.car,'Voiture à choisir')}</small>${status}${manage}</div>
     ${done?`<p class="crews-names">${esc(regs.map(reg=>reg.name).join(' · '))}</p>`:''}
     ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${crew.community?esc(reg.name):pilotLabel(reg)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
   </article>`;

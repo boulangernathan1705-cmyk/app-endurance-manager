@@ -3,7 +3,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {carBrand} from '../../shared/car-brands.mjs';
+import {carBrand, carShortName} from '../../shared/car-brands.mjs';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -76,6 +76,12 @@ export function carLogo(car) {
   const brand = carBrand(car);
   if(!brand) return '';
   return brand.logo ? `<img class="car-brand" src="/images/brands/${brand.logo}.webp" alt="${esc(brand.name)}" title="${esc(brand.name)}" width="40" height="24" loading="lazy" decoding="async">` : `<span class="car-brand car-brand-text" aria-hidden="true">${esc(brand.initials)}</span>`;
+}
+// Logo + short car name (full name in the info bubble), or the fallback text when no car is chosen.
+export function carLabel(car, fallback) {
+  if(!car) return esc(fallback);
+  const short = carShortName(car);
+  return `${carLogo(car)}${short === car ? esc(car) : `<span title="${esc(car)}">${esc(short)}</span>`}`;
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
