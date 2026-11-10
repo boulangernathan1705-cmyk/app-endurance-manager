@@ -1,12 +1,3 @@
-.help-nav-button {
-  margin-left: 2px;
-}
-
-.help-nav-button[aria-current="page"] {
-  border-color: var(--green);
-  color: var(--green);
-}
-
 .help-page {
   max-width: 980px;
   margin: 0 auto;
@@ -136,8 +127,7 @@
   margin-top: 5px;
 }
 
-.help-tip,
-.help-callout {
+.help-tip {
   margin-top: 14px;
   padding: 13px 15px;
   border-left: 3px solid var(--green);
@@ -145,83 +135,8 @@
   background: rgba(49,184,107,.08);
 }
 
-.help-callout strong {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--green);
-}
-
-.help-callout p {
-  margin: 0;
-}
-
-.help-demo-hours {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(34px, 1fr));
-  gap: 6px;
-  max-width: 560px;
-  margin-top: 16px;
-}
-
-.help-demo-hours span {
-  display: grid;
-  min-height: 38px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--panel);
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.help-demo-hours .is-on {
-  border-color: rgba(49,184,107,.55);
-  background: rgba(49,184,107,.14);
-  color: #d9ffe4;
-}
-
-.help-status-grid,
-.help-rights {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 12px 0 16px;
-}
-
-.help-status-grid > div,
-.help-rights > div {
-  padding: 15px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--panel);
-}
-
-.help-status-grid strong,
-.help-rights strong {
-  display: block;
-  margin-bottom: 5px;
-}
-
-.help-status-grid small {
-  display: block;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.help-lock {
-  float: right;
-  margin-left: 10px;
-  font-size: 18px;
-}
-
-.help-screenshot,
-.help-screenshot-grid {
+.help-screenshot {
   margin: 18px 0 2px;
-}
-
-.help-screenshot-grid {
-  display: grid;
-  gap: 14px;
 }
 
 .help-screenshot {
@@ -230,10 +145,6 @@
   border-radius: 10px;
   background: #0d1012;
   box-shadow: 0 12px 30px rgba(0,0,0,.18);
-}
-
-.help-screenshot-grid .help-screenshot {
-  margin: 0;
 }
 
 /* Screenshots keep their real size (never stretched): narrow ones stay sharp. */
@@ -268,9 +179,6 @@
 }
 
 @media (max-width: 700px) {
-  .help-nav-button {
-    margin-left: 0;
-  }
 
   .help-hero {
     padding: 20px 18px;
@@ -288,17 +196,7 @@
     font-size: 14px;
   }
 
-  .help-status-grid,
-  .help-rights {
-    grid-template-columns: 1fr;
-  }
-
-  .help-demo-hours {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .help-screenshot,
-  .help-screenshot-grid {
+  .help-screenshot {
     margin-top: 14px;
   }
 

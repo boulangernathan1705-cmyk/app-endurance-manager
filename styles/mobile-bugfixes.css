@@ -2,7 +2,6 @@
 @media (max-width:760px) {
   /* Event cards: make the circuit map clearly visible without overlapping category badges. */
   .event-card { position:relative; }
-  .event-card .event-card-title-row { padding-right:96px; }
   .event-card .circuit-visual {
     right:12px!important;
     top:12px!important;
@@ -15,7 +14,6 @@
 
   /* Candidate cards: reserve room for Ajouter only around text, never around the timeline. */
   .crew-management-accordion-body .crew-candidate-info { padding-right:0!important; }
-  .crew-management-accordion-body .crew-candidate-info .ux-candidate-head,
   .crew-management-accordion-body .crew-candidate-info > small { padding-right:82px; }
   .crew-management-accordion-body .crew-candidate-info .presence-timeline {
     width:100%!important;
@@ -32,8 +30,6 @@
 }
 
 @media (max-width:390px) {
-  .event-card .event-card-title-row { padding-right:88px; }
   .event-card .circuit-visual { width:74px!important; max-width:74px!important; }
-  .crew-management-accordion-body .crew-candidate-info .ux-candidate-head,
   .crew-management-accordion-body .crew-candidate-info > small { padding-right:76px; }
 }

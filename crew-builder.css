@@ -170,8 +170,6 @@
   font-size: 13px;
 }
 
-.crew-builder-coverage-message.needs-pilots { color: #9ce1b4; }
-
 .crew-builder-actions {
   display: flex;
   justify-content: flex-end;

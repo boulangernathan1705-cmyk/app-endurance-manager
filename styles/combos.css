@@ -270,12 +270,6 @@ tr.cb-crew td { font-weight: 700; background: rgba(255,255,255,.035); border-bot
 .an-choices select { font-size: 14px; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
 .an-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; min-width: 0; }
 .an-body.is-loading { opacity: .55; }
-.an-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 10px; }
-.an-side { border: 1px solid var(--cb-line); border-left: 4px solid var(--dc); border-radius: 8px; background: var(--cb-panel); padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
-.an-side-name { font-weight: 600; color: var(--dc); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.an-figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px 12px; }
-.an-figures span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-.an-figures b { font-variant-numeric: tabular-nums; font-size: 15px; }
 .an-metrics, .an-picks { display: flex; flex-wrap: wrap; gap: 6px; }
 .an-metrics button, .an-picks button { background: var(--cb-panel); color: var(--muted); border: 1px solid var(--cb-line); border-radius: 999px; padding: 5px 12px; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
 .an-metrics button[aria-pressed="true"], .an-picks button[aria-pressed="true"] { color: var(--text); border-color: var(--text); }
@@ -301,8 +295,6 @@ tr.cb-crew td { font-weight: 700; background: rgba(255,255,255,.035); border-bot
 .an-readout span[style] { color: var(--dc); }
 .an-readout i, th.an-who i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dc); margin-right: 5px; }
 th.an-who { color: var(--dc) !important; }
-.an-zones td.an-slow { color: #ef6b6b; }
-.an-zones td.an-fast { color: #4ade80; }
 .an-charts { display: grid; gap: 10px; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); padding: 10px 12px; }
 .an-chart { display: grid; gap: 2px; }
 .an-chart-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
@@ -320,7 +312,6 @@ th.an-who { color: var(--dc) !important; }
 @media (max-width: 999px) {
   .an-lap { grid-template-columns: minmax(0, 1fr); }
 }
-.combos-page .an-zones th, .combos-page .an-zones td { padding: 4px 8px; font-size: 13px; }
 .an-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .combos-page .an-size select { width: auto; font-size: 13px; padding: 3px 6px; }
 .an-laps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }

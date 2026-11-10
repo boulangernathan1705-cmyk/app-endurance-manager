@@ -123,12 +123,6 @@ main {
   margin-bottom: 5px;
 }
 
-.page-subtitle {
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 25px;
-}
-
 
 /* =========================================================
    BOUTONS GENERAUX
@@ -164,10 +158,6 @@ main {
 
 .secondary-button:hover {
   background: var(--panel3);
-}
-
-.back-button {
-  margin-bottom: 20px;
 }
 
 
@@ -230,12 +220,9 @@ main {
 .event-card.event-type-lmu { --event-accent: #2bc56f; }
 .event-card.event-type-private { --event-accent: #4c98ef; }
 .event-card-body { display: block; min-width: 0; }
-.event-card-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; min-width: 0; }
 .event-card { min-height: 210px; padding-right: 350px; }
 .event-card .circuit-visual { position: absolute; top: 18px; right: 20px; width: 310px; height: 174px; }
 .event-card .circuit-visual img { width: 100%; height: 100%; object-fit: contain; }
-.event-card-title-row .event-name { margin: 0; }
-.event-card-title-row .event-info { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .event-card-status { display: grid; gap: 4px; margin-top: 15px; }
 .event-card.archived { opacity: .58; filter: saturate(.55); }
 .event-card.archived:hover { opacity: .82; filter: saturate(.8); }
@@ -250,11 +237,6 @@ main {
   margin-bottom: 7px;
 }
 
-.event-info {
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .event-countdown {
   margin-top: 10px;
   color: var(--green);
@@ -267,17 +249,6 @@ main {
 .event-countdown.soon { color: #f0a23a; }
 .event-countdown.running { color: var(--red); }
 .event-countdown.finished { color: var(--muted); }
-.event-countdown-primary {
-  margin-top: 12px;
-  font-size: clamp(30px, 4.5vw, 46px);
-  line-height: 1;
-  font-weight: 950;
-  letter-spacing: .8px;
-}
-.event-countdown-primary.running {
-  color: var(--red);
-  text-shadow: 0 0 18px rgba(227,76,76,.18);
-}
 
 
 /* =========================================================
@@ -306,10 +277,6 @@ main {
   border-radius: 7px;
 
   padding: 20px;
-}
-
-.form-group {
-  margin-bottom: 18px;
 }
 
 .form-label {
@@ -384,7 +351,6 @@ input:focus {
 .event-header {
   margin-bottom: 22px;
 }
-.event-heading-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 
 .event-title {
   font-size: 27px;
@@ -393,32 +359,10 @@ input:focus {
   margin-bottom: 5px;
 }
 
-.event-subtitle {
-  color: var(--muted);
-  font-size: 12px;
-}
-.event-subtitle .event-type-badge { margin-right: 9px; }
-
 
 /* =========================================================
    NOM PILOTE
 ========================================================= */
-
-.pilot-name-panel {
-  background: var(--panel);
-
-  border: 1px solid var(--border);
-
-  border-radius: 7px;
-
-  padding: 15px;
-
-  margin-bottom: 18px;
-}
-
-.pilot-name-panel input {
-  max-width: 450px;
-}
 
 
 /* =========================================================
@@ -511,20 +455,6 @@ input:focus {
   color: var(--muted);
 }
 
-.finished-label {
-  margin-left: auto;
-
-  margin-right: 10px;
-
-  color: var(--muted);
-
-  font-size: 10px;
-
-  font-weight: 900;
-
-  letter-spacing: 1px;
-}
-
 .departure-toggle {
   border: 1px solid var(--border);
 
@@ -556,91 +486,10 @@ input:focus {
   padding: 12px;
 }
 
-.pilot-section-title {
-  color: var(--muted);
-
-  font-size: 10px;
-
-  font-weight: 900;
-
-  letter-spacing: 1px;
-
-  margin-bottom: 7px;
-}
-
-.pilot-list {
-  display: grid;
-
-  gap: 4px;
-}
-
 
 /* =========================================================
    GROUPES CATEGORIES
 ========================================================= */
-
-.category-group {
-  margin-bottom: 10px;
-}
-
-.category-group:last-child {
-  margin-bottom: 0;
-}
-
-.category-group-header {
-  display: flex;
-
-  align-items: center;
-
-  gap: 7px;
-
-  padding: 6px 7px;
-
-  margin-bottom: 4px;
-
-  background: #0e1011;
-
-  border-left: 3px solid var(--border);
-
-  font-size: 9px;
-
-  font-weight: 900;
-
-  letter-spacing: 1px;
-
-  color: var(--muted);
-}
-
-.category-group-header img {
-  width: 25px;
-  height: 17px;
-
-  object-fit: contain;
-}
-
-.category-group-header.hyper {
-  border-left-color: var(--blue);
-}
-
-.category-group-header.lmp2 {
-  border-left-color: var(--green);
-}
-
-.category-group-header.lmp3 {
-  border-left-color: var(--yellow);
-}
-
-.category-group-header.gt3 {
-  border-left-color: var(--red);
-}
-
-.category-count {
-  margin-left: auto;
-
-  color: #656a6f;
-
-  font-size: 8px;
-}
 
 
 /* =========================================================
@@ -708,51 +557,6 @@ input:focus {
    BARRE DISPONIBILITE PILOTE
 ========================================================= */
 
-.availability-bar {
-  display: grid;
-
-  grid-template-columns:
-    repeat(3, 1fr);
-
-  gap: 2px;
-
-  height: 17px;
-}
-
-.availability-segment {
-  background: #292d31;
-
-  border-radius: 2px;
-}
-
-.availability-segment.beginning.active {
-  background: var(--green);
-}
-
-.availability-segment.middle.active {
-  background: var(--yellow);
-}
-
-.availability-segment.end.active {
-  background: var(--red);
-}
-
-.availability-whole {
-  grid-column: 1 / 4;
-
-  background: var(--green);
-
-  border-radius: 2px;
-}
-
-.availability-unavailable {
-  grid-column: 1 / 4;
-
-  background: #35383b;
-
-  border-radius: 2px;
-}
-
 
 /* =========================================================
    EDIT
@@ -814,79 +618,6 @@ input:focus {
 /* =========================================================
    NOUVELLE BARRE DE DISPONIBILITE
 ========================================================= */
-
-.relay-container {
-  margin-bottom: 10px;
-}
-
-.relay-bar {
-  display: grid;
-
-  grid-template-columns:
-    repeat(3, 1fr);
-
-  gap: 3px;
-
-  background: #0a0c0d;
-
-  padding: 3px;
-
-  border: 1px solid var(--border);
-
-  border-radius: 6px;
-
-  height: 48px;
-}
-
-.relay-button {
-  border: 0;
-
-  background: #202427;
-
-  color: #777d82;
-
-  font-size: 9px;
-
-  font-weight: 900;
-
-  letter-spacing: .5px;
-
-  position: relative;
-
-  transition: .12s;
-}
-
-.relay-button:first-child {
-  border-radius: 4px 2px 2px 4px;
-}
-
-.relay-button:last-child {
-  border-radius: 2px 4px 4px 2px;
-}
-
-.relay-button:hover {
-  background: #292d31;
-
-  color: white;
-}
-
-.relay-button.active.beginning {
-  background: var(--green);
-
-  color: #07100a;
-}
-
-.relay-button.active.middle {
-  background: var(--yellow);
-
-  color: #151200;
-}
-
-.relay-button.active.end {
-  background: var(--red);
-
-  color: white;
-}
 
 
 /* =========================================================
@@ -956,18 +687,6 @@ input:focus {
   gap: 12px;
 
   padding-top: 4px;
-}
-
-.category-label {
-  color: var(--muted);
-
-  font-size: 9px;
-
-  font-weight: 900;
-
-  letter-spacing: .7px;
-
-  white-space: nowrap;
 }
 
 .categories {

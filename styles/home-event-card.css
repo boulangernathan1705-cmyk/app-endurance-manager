@@ -1,35 +1,9 @@
 /* Layout des cartes d'événements sur les accueils LMU et iRacing. */
-.event-card.event-card-harmonized .event-compact-date {
-  color: #aebbbc;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
 
 /* Les catégories et leurs inscrits restent disponibles dans le détail de l'événement.
    Sur la carte d'accueil, les compteurs pilotes/équipages suffisent et évitent une ligne redondante. */
 .event-card.event-card-harmonized .event-category-badges {
   display: none !important;
-}
-
-.event-card.event-card-harmonized .event-info {
-  flex-direction: column;
-  gap: 5px;
-}
-
-.event-card.event-card-harmonized .event-pilot-count {
-  display: block;
-  color: #b6c3c5;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-  text-align: left;
-}
-
-.event-card.event-card-harmonized .event-home-crews {
-  display: block;
-  min-width: 0;
-  text-align: left;
 }
 
 @media (min-width: 761px) {
@@ -45,30 +19,12 @@
     min-height: 142px;
   }
 
-  .event-card.event-card-harmonized .event-card-title-row {
-    display: flex !important;
-    align-items: baseline !important;
-    flex-wrap: wrap;
-    gap: 7px 10px;
-    min-width: 0;
-  }
-
   .event-card.event-card-harmonized .event-name {
     margin: 0 !important;
     color: #f4ead9;
     font-size: 18px;
     font-weight: 900;
     line-height: 1.15;
-  }
-
-  .event-card.event-card-harmonized .event-info {
-    display: flex !important;
-    align-items: flex-start;
-    margin-top: 7px;
-  }
-
-  .event-card.event-card-harmonized .event-home-crews {
-    margin-top: 12px;
   }
 
   .event-card.event-card-harmonized .circuit-visual {
@@ -112,38 +68,9 @@
     min-width: 0;
   }
 
-  .event-card.event-card-harmonized .event-card-title-row {
-    grid-area: title;
-    display: flex !important;
-    align-items: baseline !important;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    min-width: 0;
-    padding-right: 0 !important;
-  }
-
   .event-card.event-card-harmonized .event-name {
     margin: 0 !important;
     line-height: 1.12;
-  }
-
-  .event-card.event-card-harmonized .event-compact-date {
-    font-size: 11px;
-  }
-
-  .event-card.event-card-harmonized .event-info {
-    grid-area: info;
-    display: flex !important;
-    align-items: flex-start;
-    margin: 0;
-    min-width: 0;
-  }
-
-  .event-card.event-card-harmonized .event-home-crews {
-    grid-area: crews;
-    width: 100%;
-    min-width: 0;
-    margin: 2px 0 0;
   }
 
   .event-card.event-card-harmonized .event-card-status {
