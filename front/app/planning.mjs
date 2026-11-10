@@ -60,17 +60,31 @@ function startCard(event,departure,body,{minutes,now,open,quick='',tableRow=0}){
   const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${communityTag(crew)}${logo(crew.category)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}${own(crew)}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line',crewColorClass(crew.id,index))).join('');
   const freeLine=free.length?row(NO_CREW_ICON+free.map(([category,,list])=>`<span class="planning-free-group">${logo(category)}${names(list)}</span>`).join(''),' data-free-pilots'):'';
   // Solo event: no crews, the number of participants (and places) instead.
+  // In the table of a race over several days (computer), they sit under the day's starts instead (dayFree).
   const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
   // Table of a race over several days: who is there in a few words, on the right of the names.
   const count=isSolo(event)?'':`<span class="planning-count">${pilots?`${crews.length?`${crews.length} équipage${crews.length>1?'s':''} · `:''}${pilots} pilote${pilots>1?'s':''}`:'Personne'}</span>`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}${quick?' has-quick':''}" id="departure-${departure.id}"${tableRow?` style="--row:${tableRow}"`:''} ${open?'open':''}><summary>${head}${details}${count}${quick}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
 
+// Table of a race over several days (Nathan 2026-11-10): the pilots without a crew sit under the day's starts,
+// one line per start, so a start's row only holds its crews. A line opens its start on that list.
+function dayFree(event,day){
+  const lines=day.items.map(({departure})=>{
+    const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
+    const regs=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id));
+    const groups=event.categories.map(category=>[category,regs.filter(reg=>reg.category===category)]).filter(([,list])=>list.length);
+    if(!groups.length)return '';
+    return `<button type="button" class="planning-day-free-line" data-free-pilots data-departure="${departure.id}"><strong>${departure.tbd?'Sans horaire':esc(timeLabel(departure.time))}</strong><span>${groups.map(([category,list])=>`<span class="planning-free-group">${logo(category)}<span class="planning-pilot-names">${list.map(reg=>esc(communityPrefix(reg)+reg.name)).join(' · ')}</span></span>`).join('')}</span></button>`;
+  }).join('');
+  return lines?`<div class="planning-day-free"><span class="planning-day-free-title">${NO_CREW_ICON}Sans équipage</span>${lines}</div>`:'';
+}
+
 // `body(departure, index)`: what an opened start shows (buttons, registration, crews and pilots), as in the list.
 // `actions`: the race's own buttons (link, edit, delete), on the heading line of the planning.
 // `cards(departure)`: when it returns something, the start is shown as those cards (an event in rounds: one
 // card per round) instead of one start card.
-export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>'',absence=''}={}){
+export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>''}={}){
   const minutes=eventMinutes(event),now=Date.now();
   // A race over several days is a table on a computer: one row per start time, aligned from one day to the next.
   const custom=new Map(days.flatMap(day=>day.items.map(({departure})=>[departure.id,cards(departure)])));
@@ -84,13 +98,13 @@ export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()
   const tabs=days.map(day=>{const first=day.items[0].departure.startsAt,mine=day.items.some(({departure})=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
     return `<button type="button" class="planning-tab${day===active?' is-active':''}" data-action="planning-day" data-day="${day.key}" aria-pressed="${day===active}"><small>${esc(weekdayLabel(first))}</small><strong>${esc(dayMonthShort(first))}</strong><small>${finished(day)?'terminé':`${day.items.length} départ${day.items.length>1?'s':''}`}</small>${mine?'<i class="planning-tab-mine" aria-label="ton départ"></i>':''}</button>`;}).join('');
   const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=pilotCount(day.items.flatMap(({departure})=>departure.availability||[])),today=dayKey(now)===day.key;
-    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>custom.get(departure.id)||startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure),tableRow:rowOf(departure)})).join('')}</section>`;}).join('');
+    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>custom.get(departure.id)||startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure),tableRow:rowOf(departure)})).join('')}${table?dayFree(event,day):''}</section>`;}).join('');
   const span=planningSpan(days.length);
   // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
   const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
-  return `<section class="departure-planning${table?' is-table':''}" style="--days:${days.length};--rows:${times.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"${days.length<=3&&!actions?' hidden':''}>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div>${days.length>1?`<div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div>`:''}${table&&absence?`<div class="planning-absence">${absence}</div>`:''}<div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  return `<section class="departure-planning${table?' is-table':''}" style="--days:${days.length};--rows:${times.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"${days.length<=3&&!actions?' hidden':''}>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div>${days.length>1?`<div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div>`:''}<div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;
@@ -195,7 +209,7 @@ globalThis.addEventListener?.('resize',()=>syncPlanning());
 // The line of the pilots without a crew opens the start with that list unfolded, under the crews.
 globalThis.document?.addEventListener('click',event=>{
   const line=event.target?.closest?.('[data-free-pilots]');
-  const start=line?.closest('.planning-start');
+  const start=line?.closest('.planning-start')||(line?.dataset.departure?document.getElementById(`departure-${line.dataset.departure}`):null);
   if(!start)return;
   event.preventDefault();
   start.open=true;

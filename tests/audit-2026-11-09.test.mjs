@@ -72,14 +72,15 @@ test('a 24 h race groups its hours by Paris day',async()=>{
   assert.equal(raceDayGroups({...departure,tbd:true},24).length,1);
 });
 
-test('a race over several days is a table: one row per start time, one button on a closed start',()=>{
+test('a race over several days is a table: one row per start time, « M’inscrire » and « Absent » on a closed start, the pilots without a crew under the day’s starts',()=>{
   const planning=read('front/app/planning.mjs');
   assert.match(planning,/const table=days\.length>1&&!isSolo\(event\)/);
   assert.match(planning,/--rows:\$\{times\.length\}/);
-  assert.match(read('front/app/event-view.mjs'),/absence:absenceButton\(event,'Absent pour cette course'\)/);
+  assert.match(planning,/table\?dayFree\(event,day\):''/);
   const css=read('styles/ux-refresh.css');
   assert.match(css,/\.departure-planning\.is-table \.planning-day \{[^}]*grid-template-rows: subgrid/);
-  assert.match(css,/\.planning-quick > :not\(\.is-primary\) \{ display: none; \}/);
+  assert.match(css,/\.planning-quick > :not\(\.is-primary, \.is-absence\) \{ display: none; \}/);
+  assert.match(css,/\.is-table \.planning-day-free \{ grid-row: calc\(var\(--rows, 1\) \+ 2\)/);
 });
 
 test('EVENT TDZ is a flag of the community in the database, no longer only its name',async()=>{

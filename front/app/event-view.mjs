@@ -265,7 +265,7 @@ export function renderEvent(message=''){
   // The planning shows the crews and pilots of every start: no category summary above it, and the race
   // actions sit on its heading line.
   // A stream: when, the streamer's crew and the links; no start to enter.
-  const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure),absence:absenceButton(event,'Absent pour cette course')})
+  const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
