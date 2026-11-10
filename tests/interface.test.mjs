@@ -107,7 +107,6 @@ test('le compte déconnecté garde Aide et Discord alignés horizontalement et e
   assert.match(account,/Discord OAuth/);
   assert.match(account,/aucun mot de passe transmis à Endurance Manager/);
   assert.match(css,/\.account-disconnected-actions\s*\{[^}]*display:\s*flex/s);
-  assert.match(css,/\.account-disconnected-actions \.account-help-link\s*\{[^}]*width:\s*auto/s);
   assert.match(css,/white-space:\s*nowrap/);
   assert.match(game,/account-menu\.css\?v=4-oauth-trust/);
 });

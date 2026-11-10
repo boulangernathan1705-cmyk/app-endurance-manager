@@ -69,13 +69,3 @@
 
 /* Vue détaillée : même principe, avec une fenêtre dédiée qui empêche
    tout SVG de sortir du header quelle que soit sa viewBox. */
-.event-heading-line > .circuit-visual {
-  overflow: hidden !important;
-}
-
-@media (min-width: 1000px) {
-  .event-heading-line > .circuit-visual {
-    width: 430px !important;
-    height: 230px !important;
-  }
-}

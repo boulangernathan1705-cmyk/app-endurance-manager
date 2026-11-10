@@ -39,11 +39,6 @@
   .crew-management-accordion-body > .crew-card-header > div {
     width: 100%;
   }
-  .crew-management-accordion-body .coverage-summary {
-    margin: 0 !important;
-    padding: 5px 8px !important;
-    font-size: 10px !important;
-  }
 
   /* Open/complete selector becomes a compact toolbar instead of a full-width form block. */
   .crew-management-accordion-body .crew-state-control {

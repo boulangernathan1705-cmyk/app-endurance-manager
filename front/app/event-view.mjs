@@ -29,7 +29,7 @@ function canCreateCrewOnDeparture(departure,event=null){
 // {kind:'organiser'|'builder'|'request', label, attrs} or null.
 function crewButton(event,departure){
   if(!state.user||isSolo(event)||departure.startsAt<=Date.now())return null;
-  if(can('crews'))return {kind:'organiser',label:'Former les équipages',attrs:`data-action="crews-page" data-departure="${departure.id}" data-game="${activeGame}"`};
+  if(can('crews'))return {kind:'organiser',label:'Gérer les équipages',attrs:`data-action="crews-page" data-departure="${departure.id}" data-game="${activeGame}"`};
   if(canCreateCrewOnDeparture(departure,event))return {kind:'builder',label:'Créer un équipage',attrs:`data-crew-builder-open data-departure="${departure.id}"`};
   if(categoryEntryOn(event))return null;
   const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]).map(String));
@@ -63,12 +63,12 @@ const ICON_ABSENT=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1
 // A pilot with a small minus: « Me désinscrire ».
 const ICON_UNREGISTER=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6');
 // « Je serai absent » next to « M'inscrire » (the absence is for the whole event); once said, a click withdraws it.
-function absenceButton(event){
+function absenceButton(event,text='Absent'){
   if(!state.user)return '';
   const absent=(event.absences||[]).some(item=>item.mine);
   const entered=(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
   if(entered&&!absent)return '';
-  const label='Absent',tip=absent?'Tu es noté absent : clique pour retirer ton absence':'Je serai absent';
+  const label=text,tip=absent?'Tu es noté absent : clique pour retirer ton absence':'Je serai absent';
   return `<button type="button" class="planning-quick-button is-labelled is-absence${absent?' is-active':''}" data-action="${absent?'event-absence-cancel':'event-absence'}" data-id="${event.id}" data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${ICON_ABSENT}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
 }
 // The pilot's own entry, always unfolded: one click enters him (or opens his entry). The other choices
@@ -94,22 +94,22 @@ function quickActions(event,departure){
     if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
   }
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
-  const square=(icon,tip,attrs,label='',extra='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
+  const square=(icon,tip,attrs,label='',extra='',always=true)=>`<button type="button" class="planning-quick-button${label&&always?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
   // Waiting start once the real times are known: no new entry here, the pilot (or the crew's manager) picks a time.
   if(!solo&&pickableSlots(event,departure).length){
     const inCrew=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
     const alone=mine.find(reg=>!inCrew.has(reg.id)),pick=alone||(departure.crews||[]).some(crew=>crew.canManage);
-    const choose=pick?square(ICON_REGISTER,'Choisir l’horaire',`data-action="choose-start" data-departure="${departure.id}" data-id="${alone?.id||''}"`,'Choisir l’horaire'):'';
+    const choose=pick?square(ICON_REGISTER,'Choisir l’horaire',`data-action="choose-start" data-departure="${departure.id}" data-id="${alone?.id||''}"`,'Choisir l’horaire',' is-primary'):'';
     const out=mine.length===1?square(ICON_UNREGISTER,'Me désinscrire',`data-action="delete-registration" data-departure="${departure.id}" data-id="${mine[0].id}"`,'',' is-leave'):'';
     return choose||out?`<span class="planning-quick">${choose}${out}</span>`:'';
   }
-  const register=main?square(main.leave?ICON_UNREGISTER:ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label,main.leave?' is-leave':''):'';
+  const register=main?square(main.leave?ICON_UNREGISTER:ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label,` is-primary${main.leave?' is-leave':''}`):'';
   const unregister=leave?square(ICON_UNREGISTER,leave.label,`data-action="${leave.action}" data-departure="${departure.id}" ${leave.extra}`,leave.label,' is-leave'):'';
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewAction=solo?null:crewButton(event,departure);
-  // « Demander un équipage » is written out for pilots (an icon alone would not say it); organisers keep the icon.
-  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='request'?crewAction.label:''):'';
+  // « Demander un équipage » is always written out; « Gérer les équipages » on the opened start only (a race has many starts).
+  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='builder'?'':crewAction.label,'',crewAction.kind==='request'):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
@@ -265,7 +265,7 @@ export function renderEvent(message=''){
   // The planning shows the crews and pilots of every start: no category summary above it, and the race
   // actions sit on its heading line.
   // A stream: when, the streamer's crew and the links; no start to enter.
-  const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
+  const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure),absence:absenceButton(event,'Absent pour cette course')})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;

@@ -104,26 +104,9 @@ header {
     margin-bottom: 14px;
   }
 
-  .event-header-compact .event-heading-line {
-    display: grid;
-    grid-template-columns: minmax(320px,.9fr) minmax(420px,1.1fr);
-    align-items: center;
-    gap: 28px;
-    min-height: 0;
-  }
-
-  .event-header-compact .event-heading-copy {
-    align-self: center;
-  }
-
   .event-header-compact .event-title {
     font-size: clamp(30px,3vw,42px);
     line-height: 1;
-  }
-
-  .event-header-compact .event-subtitle {
-    margin-top: 8px;
-    font-size: 14px;
   }
 
   .event-header-compact .circuit-visual {
@@ -141,29 +124,6 @@ header {
     height: 245px;
     max-width: 560px;
     object-fit: contain;
-  }
-
-  .event-header-summary {
-    grid-template-columns: minmax(0,1fr) auto auto;
-    gap: 10px;
-    padding-top: 9px;
-  }
-
-  .event-header-summary .event-category-badges {
-    gap: 6px;
-  }
-
-  .event-header-summary .event-category-badge {
-    padding: 6px 9px;
-  }
-
-  .event-header-stats > span {
-    min-width: 58px;
-    padding: 6px 8px;
-  }
-
-  .event-header-countdown {
-    padding: 6px 10px;
   }
 }
 
@@ -223,8 +183,7 @@ header {
     font-size: 10px;
   }
 
-  #navigation button,
-  #navigation .discord-button {
+  #navigation button {
     min-width: 0;
     min-height: 36px;
     padding: 7px 8px;
@@ -240,26 +199,10 @@ header {
     padding: 10px 11px;
   }
 
-  .event-header-compact .event-heading-line {
-    display: grid;
-    grid-template-columns: minmax(0,1fr) 128px;
-    align-items: center;
-    gap: 8px;
-    min-height: 0;
-  }
-
-  .event-header-compact .event-heading-copy {
-    min-width: 0;
-  }
-
   .event-header-compact .event-title {
     margin: 0;
     font-size: clamp(21px,7vw,29px);
     line-height: 1.02;
-  }
-
-  .event-header-compact .event-subtitle {
-    margin-top: 5px;
   }
 
   .event-header-compact .circuit-visual {
@@ -276,19 +219,6 @@ header {
     height: 72px;
     max-width: none;
     object-fit: contain;
-  }
-
-  .event-header-summary {
-    gap: 6px;
-    padding-top: 7px;
-  }
-
-  .event-header-stats > span {
-    padding: 5px 2px;
-  }
-
-  .event-header-countdown {
-    padding: 5px 7px;
   }
 }
 
@@ -308,8 +238,7 @@ header {
     gap: 5px;
   }
 
-  #navigation button,
-  #navigation .discord-button {
+  #navigation button {
     min-height: 34px;
     padding: 6px 5px;
     font-size: 11px;
@@ -321,10 +250,6 @@ header {
 
   #navigation .account-name small {
     font-size: 9px;
-  }
-
-  .event-header-compact .event-heading-line {
-    grid-template-columns: minmax(0,1fr) 110px;
   }
 
   .event-header-compact .circuit-visual,

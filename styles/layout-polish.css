@@ -5,33 +5,9 @@
   background: transparent !important;
 }
 
-.ux-unassigned-section > .ux-section-heading {
-  display: none !important;
-}
-
 /* Le seul compte à rebours conservé est celui de l'en-tête de l'événement. */
-.departure-fold > summary > .fold-countdown,
-.race-recap .recap-countdown,
-.event-card .event-countdown:not(.running),
-.my-entry-meta > span:last-child {
+.event-card .event-countdown:not(.running) {
   display: none !important;
-}
-
-.event-heading-copy > .event-header-countdown {
-  display: block !important;
-  width: fit-content;
-  margin-top: 8px;
-  color: #b8c6c7;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.25;
-  text-align: left;
-}
-
-.event-heading-copy > .event-header-countdown strong {
-  color: #9beeb4;
-  font-size: 14px;
-  font-weight: 900;
 }
 
 /* Départs : même en-tête compact dans Course et Équipages. */
@@ -127,14 +103,8 @@
 }
 
 /* Accordéons de contenu : Pilotes inscrits / Équipages / Pilotes restants. */
-.ux-course-pilots-accordion,
-.ux-course-crews-accordion,
-.ux-remaining-pilots-section {
+.ux-course-pilots-accordion {
   overflow: hidden;
-}
-
-.ux-course-split-section > .pilot-section {
-  margin: 0;
 }
 
 .ux-course-split-overview {
@@ -142,8 +112,7 @@
   gap: 12px;
 }
 
-.ux-course-split-overview > .ux-course-pilots-accordion,
-.ux-course-split-overview > .ux-course-crews-accordion {
+.ux-course-split-overview > .ux-course-pilots-accordion {
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -205,15 +174,12 @@
   transition: transform .15s ease;
 }
 
-.ux-course-pilots-accordion[open] > .ux-content-accordion-summary .ux-content-accordion-chevron,
-.ux-course-crews-accordion[open] > .ux-content-accordion-summary .ux-content-accordion-chevron,
-.ux-remaining-pilots-section[open] > .ux-content-accordion-summary .ux-content-accordion-chevron {
+.ux-course-pilots-accordion[open] > .ux-content-accordion-summary .ux-content-accordion-chevron {
   transform: rotate(90deg);
 }
 
 .ux-course-pilots-body,
-.ux-course-crews-body,
-.ux-remaining-pilots-section > .ux-remaining-pilot-grid {
+.ux-course-crews-body {
   margin-top: 8px;
 }
 
@@ -223,35 +189,6 @@
 }
 
 /* Équipages : pilotes restants en cartes, tout en bas. */
-.ux-legacy-unassigned-hidden {
-  display: none !important;
-}
-
-.ux-remaining-pilots-section {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.ux-remaining-pilot-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.ux-remaining-pilot-card {
-  min-width: 0;
-  height: 100%;
-  margin: 0 !important;
-  padding: 12px !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 10px;
-  background: var(--panel2);
-}
-
-.ux-remaining-pilot-card .presence-timeline {
-  width: 100%;
-}
 
 @media (max-width: 1100px) {
   .departure-fold > summary {
@@ -264,10 +201,6 @@
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
     width: 155px !important;
-  }
-
-  .ux-remaining-pilot-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -318,15 +251,6 @@
     justify-self: start !important;
   }
 
-  .event-heading-copy > .event-header-countdown {
-    margin-top: 6px;
-    font-size: 12px;
-  }
-
-  .event-heading-copy > .event-header-countdown strong {
-    font-size: 13px;
-  }
-
   .ux-content-accordion-title {
     font-size: 18px;
   }
@@ -337,12 +261,7 @@
     font-size: 13px;
   }
 
-  .ux-course-split-overview > .ux-course-pilots-accordion,
-  .ux-course-split-overview > .ux-course-crews-accordion {
+  .ux-course-split-overview > .ux-course-pilots-accordion {
     padding-inline: 11px;
-  }
-
-  .ux-remaining-pilot-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

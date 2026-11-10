@@ -78,25 +78,6 @@
   color:#cbd5d5;
 }
 
-.crew-unified-card[open] .coverage-summary{
-  display:inline-flex!important;
-  align-items:center!important;
-  width:auto!important;
-  min-width:0!important;
-  min-height:0!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  color:#aebcbd!important;
-  font-size:10.5px!important;
-  font-weight:850!important;
-  line-height:1.2!important;
-  white-space:nowrap!important;
-}
-
 /* The coverage number already tells the story; no extra sentence is needed. */
 .crew-unified-card[open] .crew-capacity-message{display:none!important}
 
@@ -129,9 +110,6 @@
   .crew-unified-card[open] .crew-state-select{
     min-width:78px!important;
     min-height:27px!important;
-    font-size:10px!important;
-  }
-  .crew-unified-card[open] .coverage-summary{
     font-size:10px!important;
   }
   .crew-unified-card[open] .crew-member-grid>.pilot-row{

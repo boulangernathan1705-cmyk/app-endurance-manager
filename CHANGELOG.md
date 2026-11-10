@@ -1,5 +1,23 @@
 # Nouveautés d'Endurance Manager
 
+## v2.10 — 10 novembre 2026
+
+### ✨ Nouveautés
+
+- **Heures en barres fines partout** : sur la page de course, la page Équipages, la fenêtre d’équipage et l’inscription par catégorie, les heures de chaque pilote sont une barre fine, avec une ligne « Couverture » qui montre les heures sans pilote.
+- **Course sur plusieurs jours** : sur ordinateur, un tableau avec une ligne par heure de départ, alignée d’un jour à l’autre. Les équipages sont dans un cadre à leur couleur, avec « Ton équipage » sur le tien.
+- **Course de plus de 12 h** : tu choisis tes heures jour par jour.
+- **Équipages** : les responsables gèrent les équipages sur la page Équipages (bouton « Gérer les équipages » depuis la course), et peuvent y supprimer un équipage.
+- **Courses officielles** : le logo de la communauté s’affiche devant le nom de l’équipage, puis sa catégorie, sur toutes les pages.
+
+### 🐛 Corrections
+
+- **Demandes d’équipage** : la demande est acceptée dès que le pilote entre dans un équipage, quel que soit le chemin. Une fois placé, le pilote quitte ses autres départs de la course le même jour.
+- **Inscription** : un oubli est dit sous le titre de l’étape, et le bouton « Continuer » inutile disparaît.
+- **Discord** : les admins sont prévenus par la cloche quand le bot ne peut plus publier.
+- **Calendrier** : l’heure du stream n’est plus coupée.
+- **Site plus léger** : la feuille de style perd 13 % de son poids.
+
 ## v2.9 — 9 novembre 2026
 
 ### ✨ Nouveautés

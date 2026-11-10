@@ -20,16 +20,6 @@ html[data-game="iracing"] .game-space-bar strong {
   color: var(--blue);
 }
 
-.help-sim-stack {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.help-sim-stack > .help-nav-button {
-  width: 100%;
-}
-
 .nav-game-switcher {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -96,16 +86,6 @@ html[data-game="iracing"] .nav-game-switcher-iracing {
 
   .game-space-bar strong {
     font-size: 11px;
-  }
-
-  #navigation > .help-sim-stack {
-    display: contents;
-  }
-
-  .help-sim-stack > .help-nav-button {
-    width: 100%;
-    min-height: 42px;
-    padding: 8px 10px;
   }
 
   #navigation > [data-action="logout"] {

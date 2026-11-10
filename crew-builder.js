@@ -1,7 +1,8 @@
 import {helpContext} from './front/context-help.mjs';
 import {CARS,categories as categoryCatalog} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
-import {renderAvailabilityTimeline} from './front/timeline.mjs';
+import {hoursAxis,hoursBar,hoursText,coverage as hoursCoverage} from './front/app/crews-page.mjs';
+import {communityTag} from './front/app/core.mjs';
 import {introduceCommunitiesOnce} from './front/community-intro.mjs';
 
 const app = document.getElementById('app');
@@ -133,17 +134,16 @@ function coverageMarkup(event, departure) {
       ? `${coverage.missing} h de course ${coverage.missing > 1 ? 'ne sont' : 'n’est'} pas encore couverte${coverage.missing > 1 ? 's' : ''}.`
       : 'Toutes les heures de course sont couvertes par la sélection actuelle.';
   return `<div class="crew-builder-coverage-heading"><div><span class="crew-builder-step-label">COUVERTURE PRÉVUE</span><strong>${coverage.covered}/${coverage.duration} h couvertes</strong></div><span>${selectedCount} pilote${selectedCount > 1 ? 's' : ''}</span></div>
-    ${renderAvailabilityTimeline({departure,duration:coverage.duration,counts:coverage.counts,label:'Couverture prévue de l’équipage'})}
-    <p class="crew-builder-coverage-message ${coverage.missing && selectedCount ? 'needs-pilots' : ''}">${esc(message)}</p>`;
+    ${selectedCount ? `<div class="crew-builder-coverage-bars">${hoursAxis(event, departure)}${coverage.registrations.map(registration => `<div class="crews-line"><span>${esc(registration.name)}</span>${hoursBar(event, departure, registration)}</div>`).join('')}${hoursCoverage(event, departure, coverage.registrations)}</div>` : `<p class="crew-builder-coverage-message">${esc(message)}</p>`}`;
 }
 
 function pilotCard(event, departure, registration, disabled = false, required = false) {
   const checked = builderState.registrationIds.includes(registration.id);
   const lock = disabled || required;
   return `<label class="crew-builder-pilot ${checked ? 'is-selected' : ''}${lock ? ' is-locked' : ''}">
-    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''} ${lock ? 'disabled' : ''}><span><strong>${esc(registration.name)}</strong>${required?'<em>Responsable de l’équipage</em>':''}<small>${esc(registrationCarLabel(registration))}</small></span></span>
+    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''} ${lock ? 'disabled' : ''}><span>${communityTag(registration)}<strong>${esc(registration.name)}</strong>${required?'<em>Responsable de l’équipage</em>':''}<small>${esc(registrationCarLabel(registration))}</small></span></span>
     <span class="crew-builder-pilot-wish">Coéquipier souhaité : <strong>${esc(registration.preferredPilot || 'aucune préférence')}</strong></span>${registration.comment?`<span class="crew-builder-pilot-wish">« ${esc(registration.comment)} »</span>`:''}
-    ${renderAvailabilityTimeline({departure,duration:event.durationHours || 6,status:registration.status,label:`Disponibilités de ${registration.name}`})}
+    <span class="pilot-hours">${hoursAxis(event, departure)}${hoursBar(event, departure, registration)}<small>${esc(hoursText(event, departure, registration))}</small></span>
   </label>`;
 }
 
@@ -379,10 +379,13 @@ async function openBuilder(crewId = null, preferredDepartureId = '', preset = {}
       const options=communityOptions(event,departure,session);
       if (!manager && !own.length && !options.some(item => item.manageCrews)) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
       builderState = {mode:'create',eventId,manager,siteManager:manager,communityOptions:options,communityId:'',departureId:departure.id,category:'',car:'',name:'',locked:false,ownerRegistrationId:null,registrationIds:[],originalRegistrationIds:[],step:1};
-      // Only one possible community (always, on a race of the site's community): chosen already.
+      const prefilled = Boolean(preset.registrationIds?.length || preset.category);
+      // Only one possible community (always, on a race of the site's community): chosen already. Prefilled from the
+      // « Équipages » page: the site's community, whose pilots they are (asking would wipe the request).
       if (options.length <= 1) chooseCommunity(event,departure,options[0]?.id || '');
+      else if (prefilled) chooseCommunity(event,departure,session.community?.id || '');
       // Prefilled (« Équipages » page): the request's or the ticked pilots, its name, category and car.
-      if (preset.registrationIds?.length || preset.category) {
+      if (prefilled) {
         if (preset.category && event.categories.includes(preset.category)) builderState.category = preset.category;
         builderState.name = preset.name || builderState.name;
         builderState.car = preset.car || '';

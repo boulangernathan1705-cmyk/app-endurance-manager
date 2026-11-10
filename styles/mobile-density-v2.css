@@ -145,33 +145,13 @@
     row-gap: 5px !important;
   }
 
-  .event-card.event-card-harmonized .event-card-title-row {
-    gap: 3px 6px !important;
-  }
-
   .event-card.event-card-harmonized .event-name {
     font-size: 17px !important;
-  }
-
-  .event-card.event-card-harmonized .event-compact-date {
-    font-size: 10.5px !important;
-  }
-
-  .event-card.event-card-harmonized .event-info {
-    gap: 4px !important;
-  }
-
-  .event-card.event-card-harmonized .event-pilot-count {
-    font-size: 11px !important;
   }
 
   .event-type-badge {
     padding: 4px 8px !important;
     font-size: 11px !important;
-  }
-
-  .event-card.event-card-harmonized .event-home-crews {
-    margin-top: 0 !important;
   }
 
   .crew-summary-heading {
@@ -189,16 +169,6 @@
   /* Event detail / My entries / creation pages use the same tighter vertical rhythm. */
   .event-header {
     padding: 10px !important;
-  }
-
-  .event-header-summary {
-    gap: 7px !important;
-    margin-top: 8px !important;
-  }
-
-  .event-actions-toolbar {
-    gap: 5px !important;
-    margin-block: 7px !important;
   }
 
   .departure-accordion {
@@ -251,18 +221,6 @@
     padding: 0 !important;
   }
 
-  .hub-topbar {
-    gap: 5px !important;
-    margin-bottom: 7px !important;
-  }
-
-  .hub-topbar > .language-toggle {
-    width: 34px !important;
-    height: 34px !important;
-    min-height: 34px !important;
-    font-size: 17px !important;
-  }
-
   .hub-intro h1 {
     font-size: 20px !important;
   }
@@ -290,16 +248,11 @@
     padding: 10px 11px !important;
   }
 
-  .hub-next-race,
-  .hub-empty {
+  .hub-next-race {
     padding: 14px 15px 16px !important;
   }
 
   /* Member management: keep the existing compact layout, shave only redundant gaps. */
-  .members-topbar-inner {
-    gap: 5px !important;
-    padding: 6px 0 !important;
-  }
 
   .members-main {
     margin-top: 9px !important;
@@ -307,10 +260,6 @@
 
   .members-panel {
     padding: 9px !important;
-  }
-
-  .members-heading {
-    margin-bottom: 9px !important;
   }
 
   /* Footer and long-information pages. */

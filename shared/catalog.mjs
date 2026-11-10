@@ -166,7 +166,9 @@ export const eventLogoName = ({sim, access, type}) => normalizeTdzEventType(type
 // The events module (modules.soloRaces) is « EVENT TDZ » for the TDZ community (plus « test » on the dev site),
 // with its types and OPEN / SAFE access; everywhere else it is « EVENT SOLO »: no type, open to the « Endurances » permission.
 export const SOLO_EVENTS_LABEL = 'EVENT SOLO';
-export const tdzOnly = (community, development = false) => community?.slug === 'tdz' || (development && community?.slug === 'test');
+// EVENT TDZ and Gridfest: the community's `event_tdz` flag in the database (migration 0097). The TDZ slug still
+// counts, for a community object built without the flag.
+export const tdzOnly = (community, development = false) => community?.eventTdz === true || community?.slug === 'tdz' || (development && community?.slug === 'test');
 export const eventsLabel = (community, development = false) => tdzOnly(community, development) ? TDZ_EVENTS_LABEL : SOLO_EVENTS_LABEL;
 export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
 // Default number of places of a solo race: the game server size for that track. LMU hosted servers

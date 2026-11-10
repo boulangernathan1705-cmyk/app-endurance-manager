@@ -8,8 +8,9 @@ test('every duration from 1 to 24 keeps all hourly intervals, final boundary and
     for (const status of ['', 'whole', 'unavailable', 'h1', `h1,h${duration}`, 'beginning,middle']) {
       const html = renderAvailabilityTimeline({departure,duration,status,interactive:true});
       assert.equal((html.match(/<button /g)||[]).length,duration);
-      assert.equal((html.match(/class="presence-boundary /g)||[]).length,duration+1);
-      assert(html.indexOf('presence-edges')>html.indexOf('presence-track'));
+      // A long race is chosen day by day: no scale, the hour is written in each cell.
+      if(duration>12){assert.match(html,/class="presence-days"/);assert.equal((html.match(/class="presence-hour/g)||[]).length,duration);}
+      else{assert.equal((html.match(/class="presence-boundary /g)||[]).length,duration+1);assert(html.indexOf('presence-edges')>html.indexOf('presence-track'));}
       assert(html.includes(`data-value="h${duration}"`));
       const selected = status==='whole' ? duration : new Set(status.split(',').filter(x=>/^h\d+$/.test(x))).size;
       assert.equal((html.match(/aria-pressed="true"/g)||[]).length,selected);

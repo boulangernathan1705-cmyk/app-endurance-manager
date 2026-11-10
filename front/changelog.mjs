@@ -26,6 +26,22 @@ async function filter() {
   }
   for (const section of page.querySelectorAll('.changelog-version'))
     section.hidden = !section.querySelector('p') && ![...section.querySelectorAll('li')].some(shown);
+  fold();
+}
+
+// The latest versions first: the older ones wait behind « Voir les versions précédentes » (23 000 px of history on a
+// phone otherwise, audit 2026-11-09).
+const LATEST = 5;
+function fold() {
+  const older = [...page.querySelectorAll('.changelog-version')].filter(section => !section.hidden).slice(LATEST);
+  if (!older.length || page.querySelector('.changelog-more')) return;
+  for (const section of older) section.classList.add('is-older');
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'secondary-button changelog-more'; more.textContent = 'Voir les versions précédentes';
+  more.addEventListener('click', () => { page.classList.add('all-versions'); more.remove(); });
+  older[0].before(more);
+  // A link to an older version (#…) opens them all.
+  try { if (location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)))?.closest('.is-older')) more.click(); } catch {}
 }
 
 if (page) filter();

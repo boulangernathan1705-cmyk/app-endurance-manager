@@ -144,3 +144,41 @@ test('a crew request card: no channel, never on dev, stale cards cleaned',async(
   assert.match(crewRequestCard({status:'refused',requester:'Max',name:'A',by:'Nathan'}).title,/non retenue/);
   assert.equal(await cleanCrewRequestCards({SITE_ENV:'development',DISCORD_BOT_TOKEN:'bot'}),0);
 });
+
+// Nathan 2026-11-09: « la création ne sauvegarde pas ce qu'ils ont demandé ». Whatever way the organiser places the
+// pilot (pilots ticked, « Ajouter à… »), his request is answered and he is told once.
+test('a request is answered as soon as its pilot is placed in a crew, whatever the way',async()=>{
+  const {DB,req,login}=harness();
+  await login(ADMIN,'admin');await login(ORGA,'orga',[ORGA_ROLE]);await login(PILOT,'pilot');
+  await req('/api/events','POST',{name:'6h test',categories:['GT3'],departures:[{date:'2090-10-15',time:'15:00'}]},'admin');
+  const event=(await req('/api/events','GET',null,'pilot')).data.events[0],dep=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${dep.id}`;
+  const mine=(await req(base+'/registrations','POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot')).data.id;
+  const sent=(await req(base+'/crew-requests','POST',{name:'Les Tortues',category:'GT3'},'pilot')).data.id;
+  const crew=(await req(base+'/crews','POST',{name:'Autre nom',category:'GT3',join:false},'orga')).data.id;
+  const version=(await req('/api/events','GET',null,'orga')).data.events[0].departures[0].crews[0].version;
+  assert.equal((await req(`/api/crews/${crew}/members`,'POST',{registrationId:mine,version},'orga')).status,200);
+  assert.equal(DB.db.prepare('SELECT status FROM crew_requests WHERE id=?').get(sent).status,'accepted');
+  const kinds=DB.db.prepare('SELECT kind FROM notifications WHERE user_id=? ORDER BY rowid').all(PILOT).map(row=>row.kind);
+  assert.deepEqual(kinds.filter(kind=>kind.startsWith('crew_')),['crew_request_accepted'],'told once, not twice');
+  // The crew window still closes it afterwards (it refreshes the Discord card): no error.
+  assert.equal((await req(`/api/crew-requests/${sent}/accept`,'POST',{crewId:crew},'orga')).status,200);
+  assert.equal((await req(`/api/crew-requests/${sent}/refuse`,'POST',{},'orga')).status,404);
+});
+
+// Nathan 2026-11-09: « le pilote est toujours inscrit sur des horaires de la même journée ».
+test('placed in a crew, the pilot leaves his other starts of the same day, not those of another day or in a crew',async()=>{
+  const {req,login}=harness();
+  await login(ADMIN,'admin');await login(ORGA,'orga',[ORGA_ROLE]);await login(PILOT,'pilot');
+  await req('/api/events','POST',{name:'6h test',categories:['GT3'],departures:[{date:'2090-10-15',time:'15:00'},{date:'2090-10-15',time:'21:00'},{date:'2090-10-16',time:'15:00'}]},'admin');
+  const event=(await req('/api/events','GET',null,'pilot')).data.events[0];
+  const [first,evening,nextDay]=event.departures;
+  const enter=dep=>req(`/api/events/${event.id}/departures/${dep.id}/registrations`,'POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot');
+  const placed=(await enter(first)).data.id;await enter(evening);await enter(nextDay);
+  const crew=(await req(`/api/events/${event.id}/departures/${first.id}/crews`,'POST',{name:'Crew',category:'GT3',join:false},'orga')).data.id;
+  const version=(await req('/api/events','GET',null,'orga')).data.events[0].departures[0].crews[0].version;
+  const added=await req(`/api/crews/${crew}/members`,'POST',{registrationId:placed,version},'orga');
+  assert.equal(added.status,200);assert.equal(added.data.removedRegistrations,1);
+  const mine=(await req('/api/events','GET',null,'pilot')).data.events[0].departures.map(dep=>dep.availability.filter(reg=>reg.mine).length);
+  assert.deepEqual(mine,[1,0,1]);
+});

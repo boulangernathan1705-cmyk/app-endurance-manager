@@ -100,7 +100,7 @@ function card({event,departure,reg}, grouped=false) {
     ${crewAvailability(event,departure,members,{editable:false})}
   </article>`:`<article class="ux-my-awaiting-crew">
     <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>
-    <section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,[reg],{editable:false})}</section>
+    <section class="crew-pilot-lines">${pilotLines(event,departure,[reg],{editable:false})}</section>
   </article>`;
 
   const otherCrewsBody = otherCrews.length
@@ -108,7 +108,7 @@ function card({event,departure,reg}, grouped=false) {
     : '<p class="muted">Aucun autre équipage sur ce départ.</p>';
 
   const unassignedBody = unassigned.length
-    ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,freePilots,{editable:false})}</section>`
+    ? `<section class="crew-pilot-lines">${pilotLines(event,departure,freePilots,{editable:false})}</section>`
     : '<p class="empty">Aucun autre pilote sans équipage sur ce départ.</p>';
 
   const situation = crew
@@ -188,13 +188,15 @@ export function renderMyEntries() {
     groups.get(key).push(item);
   }
   const cards=[...groups.values()].map(list=>list.length===1?list[0]:{...list[0],reg:groupByPilot(list.map(item=>item.reg),list[0].event)[0]});
+  // One title when the pilot only has his own entries; the two groups are named only when he also manages others'.
+  const managed=cards.some(item=>item.reg.managed);
   const section=(title,list)=>`<section class="native-my-entries-group">
-    <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
+    ${managed?`<div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>`:''}
     ${list.length?`<div class="native-my-entry-list">${raceCards(list)}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1>${helpContext('entries')}<p>Tes événements et tes endurances, avec ton équipage.</p></div>
+  app.innerHTML=`<div class="native-my-entries-heading"><h1 class="page-title">MES INSCRIPTIONS</h1>${helpContext('entries')}</div>
     ${section('Mes inscriptions personnelles',cards.filter(item=>item.reg.mine))}
-    ${cards.some(item=>item.reg.managed)?section('Inscriptions que je gère',cards.filter(item=>item.reg.managed)):''}`;
+    ${managed?section('Inscriptions que je gère',cards.filter(item=>item.reg.managed)):''}`;
   notifyRender();
 }
 

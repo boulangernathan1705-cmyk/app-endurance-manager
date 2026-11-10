@@ -22,7 +22,39 @@ export function timelineLabelVisible(index, duration, capacity) {
   return index === 0 || index === duration || (index % step === 0 && duration - index >= step);
 }
 
+const timelineDayKey = new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Paris', year:'numeric', month:'2-digit', day:'2-digit'});
+const timelineDayName = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', weekday:'long', day:'numeric'});
+const timelineDayShort = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', weekday:'short'});
+// A long race is chosen day by day (more than 12 hours): the single line of small cells no longer fits a phone.
+export const LONG_RACE_HOURS = 12;
+// The hours of a race grouped by Paris day: [{key, name, short, hours:[index…]}]; one group while the time is unknown.
+export function raceDayGroups(departure, duration) {
+  if (departure.tbd || departure.hideClock) return [{key:'', name:'', short:'', hours:Array.from({length:duration}, (_, i) => i)}];
+  const groups = [];
+  for (let i = 0; i < duration; i++) {
+    const at = new Date(departure.startsAt + i * 3600000), key = timelineDayKey.format(at);
+    if (groups.at(-1)?.key !== key) groups.push({key, name:timelineDayName.format(at), short:timelineDayShort.format(at), hours:[]});
+    groups.at(-1).hours.push(i);
+  }
+  return groups;
+}
+// The hours of a long race, one block per day, the hour written in each cell.
+function renderHourPicker({departure, duration, status, label}) {
+  const parts = new Set(status.split(',')), groups = raceDayGroups(departure, duration);
+  const end = index => index + 1 === duration && Number(departure.endsAt) ? raceEndLabel(departure) : raceHourLabel(departure, index + 1);
+  return `<div class="presence-days" role="group" aria-label="${timelineEscape(label)}">${groups.map(group => {
+    const head = group.name ? `<p class="presence-day-head"><strong>${timelineEscape(group.name)}</strong><small>${raceHourLabel(departure, group.hours[0])} → ${end(group.hours.at(-1))}</small></p>` : '';
+    const cells = group.hours.map(i => {
+      const present = status === 'whole' || parts.has(`h${i+1}`);
+      const description = timelineEscape(`${group.name ? `${group.name} · ` : ''}${raceHourLabel(departure, i)} → ${end(i)} · ${present ? 'Disponible' : 'Non sélectionné'}`);
+      return `<button type="button" class="presence-hour${present?' is-present':''}" aria-label="${description}" data-action="availability" data-departure="${timelineEscape(departure.id)}" data-value="h${i+1}" aria-pressed="${present}">${raceHourLabel(departure, i)}</button>`;
+    }).join('');
+    return `<div class="presence-day">${head}<div class="presence-day-grid">${cells}</div></div>`;
+  }).join('')}</div>`;
+}
+
 export function renderAvailabilityTimeline({departure, duration, status = '', counts = null, interactive = false, label = 'Disponibilité'}) {
+  if (interactive && duration > LONG_RACE_HOURS) return renderHourPicker({departure, duration, status, label});
   const parts = new Set(status.split(','));
   const isCoverage = Array.isArray(counts);
   const hours = Array.from({length:duration + 1}, (_, i) => raceHourLabel(departure, i));
