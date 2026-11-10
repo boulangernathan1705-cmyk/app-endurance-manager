@@ -3,7 +3,7 @@
 // crews on one side, its pilots without a crew on the other, each with the bar of their hours. The organiser ticks
 // pilots and creates a crew (the usual crew window, filled in), puts a pilot in an open crew (« Ajouter à… »), or
 // checks a pilot's request (« Demander un équipage ») before creating it. Pilots only see their race pages.
-import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel} from './core.mjs';
+import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,communityTag} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {raceDayGroups,LONG_RACE_HOURS} from '../timeline.mjs';
@@ -115,6 +115,8 @@ function dayStarts(event,departure){
 }
 const cellClass=(names,isDay)=>{const list=[names,isDay?'day':''].filter(Boolean).join(' ');return list?` class="${list}"`:'';};
 // The hours of a pilot, one cell per hour of the race (the race page's bar, in small).
+// Name of a pilot on a line of hours, after his community's mark on an official race (same on every page).
+export const pilotLabel=reg=>`${communityTag(reg)}${esc(reg.name)}`;
 export function hoursBar(event,departure,reg){
   const days=dayStarts(event,departure);
   const cells=Array.from({length:hoursOf(event)},(_,index)=>`<i${cellClass(coversHour(reg,index)?'on':'',index in days)}></i>`).join('');
@@ -190,9 +192,9 @@ function crewCard(start,crew){
   // A complete crew that covers the race is done: on a phone it keeps its names and « Couverture », without the bars.
   const done=crew.locked&&regs.length>0&&!gaps(event,departure,regs).length;
   return `<article class="crews-crew${done?' is-done':''}">
-    <div class="crews-crew-head"><span class="crews-cat">${logo(crew.category)}</span><strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
+    <div class="crews-crew-head"><span class="crews-cat">${logo(crew.category)}</span>${communityTag(crew)}<strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
     ${done?`<p class="crews-names">${esc(regs.map(reg=>reg.name).join(' · '))}</p>`:''}
-    ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${esc(reg.name)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
+    ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${pilotLabel(reg)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
   </article>`;
 }
 function pilotCard(start,{main,regs}){
@@ -202,7 +204,7 @@ function pilotCard(start,{main,regs}){
   const open=crews.filter(crew=>!crew.locked&&crew.canManage&&categories.includes(crew.category));
   const add=open.length?`<label class="crews-add"><span class="sr-only">Ajouter ${esc(main.name)} à un équipage</span><select data-crews-add>${['<option value="">Ajouter à…</option>',...open.map(crew=>{const reg=regs.find(item=>item.category===crew.category);return `<option value="${esc(crew.id)}|${esc(reg.id)}|${crew.version}">${esc(crew.name)} · ${esc(crew.category)}</option>`;})].join('')}</select></label>`:'';
   return `<div class="crews-pilot">
-    <label class="crews-pick"><input type="checkbox" data-crews-pick value="${esc(regs.map(reg=>reg.id).join(','))}" data-category="${esc(main.category)}"><span><strong>${esc(main.name)}</strong> ${categories.map(category=>`<span class="crews-cat">${logo(category)}</span>`).join('')}</span></label>
+    <label class="crews-pick"><input type="checkbox" data-crews-pick value="${esc(regs.map(reg=>reg.id).join(','))}" data-category="${esc(main.category)}"><span>${communityTag(main)}<strong>${esc(main.name)}</strong> ${categories.map(category=>`<span class="crews-cat">${logo(category)}</span>`).join('')}</span></label>
     ${add}
     ${pilotMeta(event,departure,main)}
     ${hoursBar(event,departure,main)}
@@ -226,7 +228,7 @@ function requestRecap(start,request){
   return `<section class="crews-request" id="request-${esc(request.id)}">
     <h4>Demande de ${esc(request.requester)} · ${esc(ago(request.createdAt))}</h4>
     <dl><div><dt>Équipage</dt><dd>${esc(request.name)}</dd></div><div><dt>Catégorie</dt><dd>${esc(request.category)}</dd></div><div><dt>Voiture</dt><dd>${esc(request.car||'À choisir')}</dd></div><div><dt>Pilotes</dt><dd>${esc(regs.map(reg=>reg.name).join(', '))}</dd></div></dl>
-    ${regs.map(reg=>`<div class="crews-line"><span>${esc(reg.name)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}
+    ${regs.map(reg=>`<div class="crews-line"><span>${pilotLabel(reg)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}
     ${notes.length?`<p class="crews-note">⚠ ${esc(notes.join(' '))}</p>`:''}
     <div class="crews-actions"><button type="button" class="primary-button" ${preset} data-step="3">Créer cet équipage</button><button type="button" class="secondary-button" ${preset} data-step="1">Modifier</button>${button('crew-request-refuse','Refuser',`data-id="${esc(request.id)}" data-name="${esc(request.requester)}"`,'link-button crews-refuse')}</div>
   </section>`;

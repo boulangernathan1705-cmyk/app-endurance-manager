@@ -2781,3 +2781,4 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
   :has(> .crews-line .community-tag) > .crews-line { grid-template-columns: 128px minmax(0, 1fr); }
   :has(> .crews-line .community-tag) .crews-coverage-text { margin-left: 136px; }
 }
+.crews-pick .community-tag, .crew-builder-pilot-head .community-tag { margin-right: var(--em-space-2); vertical-align: middle; }
