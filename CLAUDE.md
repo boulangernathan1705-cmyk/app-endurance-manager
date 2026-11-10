@@ -10,7 +10,7 @@ Devise : « La simplicité, c'est la sophistication suprême » : interface la p
 
 | Sujet | Fichiers |
 | --- | --- |
-| API, routes `/api/*` | `server/worker.mjs` (gros fichier : chercher la route avec Grep, lire seulement la section) |
+| API, routes `/api/*` | `server/worker.mjs` (session, courses, inscriptions), `server/api-crews.mjs` (équipages, demandes), `server/api-community.mjs` (réglages, Discord), `server/api-platform.mjs` ; aides communes `server/api-shared.mjs`. Chercher la route avec Grep, lire seulement la section |
 | Entrée Worker, en-têtes, migrations | `server/worker-with-migrations.mjs` |
 | Accès, rôles, communautés | `server/access.mjs`, `server/community.mjs`, `server/core.mjs` |
 | Discord : affiche du jour, calendrier, fils, vocaux | `server/discord-*.mjs`, `server/recap-discord.mjs`, `server/crew-discord.mjs` |

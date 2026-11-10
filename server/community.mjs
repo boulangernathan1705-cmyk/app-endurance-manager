@@ -63,3 +63,6 @@ export function appearanceOf(community) {
   const bannerUrl = Number.isInteger(appearance.bannerVersion) ? `/api/community/banner?v=${appearance.bannerVersion}` : null;
   return {accent, logoUrl, bannerUrl};
 }
+
+// Solo races: a module each community turns on or off (settings of the members page).
+export const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
