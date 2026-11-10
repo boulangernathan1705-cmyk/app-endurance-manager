@@ -2736,12 +2736,13 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
 
 /* Race over several days, on a computer: a table. One row per start time, aligned from one day to the next;
    a closed start is its hour, who is there, and one button. The other actions come when it opens. */
-.planning-count, .planning-day-free, .planning-crew-mine { display: none; }
+.planning-count, .planning-absence, .planning-day-free, .planning-crew-mine { display: none; }
 @media (min-width: 761px) {
   .departure-planning.is-table .planning-days { grid-template-rows: auto repeat(var(--rows, 1), auto) auto; gap: var(--em-space-2) var(--em-space-4); }
   .departure-planning.is-table .planning-day { container-type: normal; grid-row: 1 / -1; grid-template-rows: subgrid; gap: var(--em-space-2); }
   .departure-planning.is-table .planning-day-head { grid-row: 1; }
   .departure-planning.is-table .planning-start { grid-row: var(--row); align-self: start; }
+  .departure-planning.is-table .planning-absence { display: flex; justify-content: flex-end; margin-bottom: var(--em-space-2); }
   /* The pilots without a crew, under the day's starts: one line per start. */
   .departure-planning.is-table .planning-day-free { grid-row: calc(var(--rows, 1) + 2); align-self: start; display: grid; gap: var(--em-space-1); margin-top: var(--em-space-2); padding: var(--em-space-2) var(--em-space-3); border: 1px dashed var(--em-border); border-radius: var(--em-radius-sm); }
   .departure-planning.is-table .planning-start > summary .planning-row[data-free-pilots] { display: none; }
@@ -2766,7 +2767,7 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
   .departure-planning.is-table .planning-start.is-empty:not([open]) .planning-count { grid-column: 2; justify-self: start; align-self: center; font-size: var(--em-text-sm); }
   .departure-planning.is-table .planning-start:not([open]) .planning-quick { position: static; grid-column: 3; grid-row: 2; justify-self: end; }
   .departure-planning.is-table .planning-start.is-empty:not([open]) .planning-quick { grid-row: 1; }
-  .departure-planning.is-table .planning-start:not([open]) .planning-quick > :not(.is-primary, .is-absence) { display: none; }
+  .departure-planning.is-table .planning-start:not([open]) .planning-quick > :not(.is-primary) { display: none; }
   .departure-planning.is-table .planning-start:not([open]) .planning-chevron { display: none; }
   .departure-planning.is-table.is-tight .planning-start:not([open]) > summary { grid-template-columns: minmax(56px, auto) minmax(0, 1fr); }
   .departure-planning.is-table.is-tight .planning-start:not([open]) :is(.planning-count, .planning-quick) { grid-column: 2; grid-row: auto; justify-self: start; }
@@ -2800,3 +2801,12 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
 html[data-game] #app .crew-tile-head .crew-compact-category .category-logo { width: 30px; height: 30px; object-fit: contain; }
 html[data-game] #app .crew-tile-head > .community-tag { height: 30px; min-width: 30px; font-size: 12px; }
 html[data-game] #app .crew-tile-head > .community-tag.has-logo { width: 30px; }
+
+/* Pilots without a crew in an opened start: the crews' thin lines, by category. */
+.free-pilots-group + .free-pilots-group { margin-top: var(--em-space-4); }
+.free-pilots-title { display: flex; align-items: center; gap: var(--em-space-2); margin: 0; font-size: var(--em-text-sm); font-weight: 800; }
+.free-pilots-title .category-logo { width: 24px; }
+.free-pilots-title small { color: var(--em-muted); font-weight: 700; }
+.crews-line-note { grid-column: 2; margin-top: -2px; color: var(--em-muted); font-size: var(--em-text-xs); }
+.free-pilots-group > .crews-line { grid-template-columns: 164px minmax(0, 1fr); }
+@media (max-width: 760px) { .free-pilots-group > .crews-line { grid-template-columns: 128px minmax(0, 1fr); } }

@@ -84,7 +84,7 @@ function dayFree(event,day){
 // `actions`: the race's own buttons (link, edit, delete), on the heading line of the planning.
 // `cards(departure)`: when it returns something, the start is shown as those cards (an event in rounds: one
 // card per round) instead of one start card.
-export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>''}={}){
+export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>'',absence=''}={}){
   const minutes=eventMinutes(event),now=Date.now();
   // A race over several days is a table on a computer: one row per start time, aligned from one day to the next.
   const custom=new Map(days.flatMap(day=>day.items.map(({departure})=>[departure.id,cards(departure)])));
@@ -104,7 +104,7 @@ export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
   const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
-  return `<section class="departure-planning${table?' is-table':''}" style="--days:${days.length};--rows:${times.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"${days.length<=3&&!actions?' hidden':''}>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div>${days.length>1?`<div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div>`:''}<div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  return `<section class="departure-planning${table?' is-table':''}" style="--days:${days.length};--rows:${times.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"${days.length<=3&&!actions?' hidden':''}>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div>${days.length>1?`<div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div>`:''}${table&&absence?`<div class="planning-absence">${absence}</div>`:''}<div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;
