@@ -129,3 +129,22 @@
     text-align: left;
   }
 }
+
+/* Car brand logo before the car name: colour logo without background, initials when there is none. */
+.car-brand {
+  display: inline-block;
+  width: 2.2em;
+  height: 1.4em;
+  margin-right: var(--em-space-2);
+  vertical-align: -0.35em;
+  object-fit: contain;
+}
+.car-brand-text {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--em-muted);
+}
