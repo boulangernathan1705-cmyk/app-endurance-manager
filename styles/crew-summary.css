@@ -151,9 +151,6 @@
 
 /* Phone: the logo must not cut the car name (the old 125-150 px cap counted without it). */
 html[data-game] #app .crew-tile-summary .crew-tile-foot .crew-compact-car { max-width: none; min-width: 0; }
-@media (max-width: 760px) {
-  .car-brand { width: 1.7em; height: 1.15em; margin-right: var(--em-space-1); vertical-align: -0.25em; }
-}
 @media (max-width: 390px) {
   html[data-game] #app .crew-tile-summary .crew-tile-foot .crew-compact-car { display: flex !important; align-items: center; white-space: normal; text-align: left !important; }
 }
