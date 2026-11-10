@@ -27,3 +27,18 @@ test('on phones the car name is not capped by the old 125-150 px width', async (
   const css = await readFile(new URL('../styles/crew-summary.css', import.meta.url), 'utf8');
   assert.match(css, /\.crew-tile-summary \.crew-tile-foot \.crew-compact-car \{ max-width: none;/);
 });
+
+test('short names: every catalogue car has one, and two different cars of one game never share it', async () => {
+  const {carShortName} = await import('../shared/car-brands.mjs');
+  for(const [game, catalog] of Object.entries(GAME_CATALOGS)) {
+    const seen = new Map();
+    for(const cars of Object.values(catalog.cars)) for(const car of cars) {
+      const short = carShortName(car);
+      assert.ok(short && short.length <= car.length, car);
+      assert.ok(!seen.has(short) || seen.get(short) === car, `${game}: « ${short} » = ${seen.get(short)} et ${car}`);
+      seen.set(short, car);
+    }
+  }
+  assert.equal(carShortName('Porsche 911 Cup (992.2)'), '911 Cup');
+  assert.equal(carShortName('Voiture inconnue'), 'Voiture inconnue');
+});

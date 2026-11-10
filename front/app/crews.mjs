@@ -1,4 +1,4 @@
-import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag,carLogo} from './core.mjs';
+import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag,carLogo,carLabel} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 import {hoursAxis,hoursBar,coverage as hoursCoverage} from './crews-page.mjs';
@@ -75,7 +75,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
         <span class="crew-tile-head">${communityTag(crew)}<span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
-        <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${carLogo(crew.car)}${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
+        <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${carLabel(crew.car,'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
