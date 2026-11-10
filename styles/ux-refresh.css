@@ -2771,3 +2771,13 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
 /* The same thin hour bars in the crew window and in « Inscription par catégorie ». */
 .crew-builder-coverage-bars { margin-top: var(--em-space-2); }
 .crew-builder-pilot .pilot-hours { margin-top: var(--em-space-2); }
+
+/* Official race: the community's mark before a pilot's name takes room, so the names' column is wider
+   (same width on every line of the block, the hours stay aligned). */
+:has(> .crews-line .community-tag) > .crews-line { grid-template-columns: 164px minmax(0, 1fr); }
+:has(> .crews-line .community-tag) .crews-coverage-text { margin-left: 172px; }
+.crews-line .community-tag { margin-right: var(--em-space-2); vertical-align: middle; }
+@media (max-width: 760px) {
+  :has(> .crews-line .community-tag) > .crews-line { grid-template-columns: 128px minmax(0, 1fr); }
+  :has(> .crews-line .community-tag) .crews-coverage-text { margin-left: 136px; }
+}
