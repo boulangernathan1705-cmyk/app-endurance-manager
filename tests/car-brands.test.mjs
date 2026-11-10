@@ -21,3 +21,9 @@ test('brand matching', () => {
   assert.equal(carBrand(''), null);
   assert.equal(carBrand('Voiture inconnue'), null);
 });
+
+test('on phones the car name is not capped by the old 125-150 px width', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const css = await readFile(new URL('../styles/crew-summary.css', import.meta.url), 'utf8');
+  assert.match(css, /\.crew-tile-summary \.crew-tile-foot \.crew-compact-car \{ max-width: none;/);
+});
