@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.12 — 10 novembre 2026
+
+### 🐛 Corrections
+
+- **Voitures sur téléphone** : le nom de la voiture n’est plus coupé à côté du logo de la marque ; un nom court s’affiche, le nom complet reste dans la bulle.
+
 ## v2.11 — 10 novembre 2026
 
 ### ✨ Nouveautés
