@@ -1,7 +1,7 @@
 import {helpContext} from './front/context-help.mjs';
 import {CARS,categories as categoryCatalog} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
-import {hoursAxis,hoursBar,hoursText,pilotLabel,coverage as hoursCoverage} from './front/app/crews-page.mjs';
+import {hoursAxis,hoursBar,hoursText,coverage as hoursCoverage} from './front/app/crews-page.mjs';
 import {communityTag} from './front/app/core.mjs';
 import {introduceCommunitiesOnce} from './front/community-intro.mjs';
 
@@ -134,7 +134,7 @@ function coverageMarkup(event, departure) {
       ? `${coverage.missing} h de course ${coverage.missing > 1 ? 'ne sont' : 'n’est'} pas encore couverte${coverage.missing > 1 ? 's' : ''}.`
       : 'Toutes les heures de course sont couvertes par la sélection actuelle.';
   return `<div class="crew-builder-coverage-heading"><div><span class="crew-builder-step-label">COUVERTURE PRÉVUE</span><strong>${coverage.covered}/${coverage.duration} h couvertes</strong></div><span>${selectedCount} pilote${selectedCount > 1 ? 's' : ''}</span></div>
-    ${selectedCount ? `<div class="crew-builder-coverage-bars">${hoursAxis(event, departure)}${coverage.registrations.map(registration => `<div class="crews-line"><span>${pilotLabel(registration)}</span>${hoursBar(event, departure, registration)}</div>`).join('')}${hoursCoverage(event, departure, coverage.registrations)}</div>` : `<p class="crew-builder-coverage-message">${esc(message)}</p>`}`;
+    ${selectedCount ? `<div class="crew-builder-coverage-bars">${hoursAxis(event, departure)}${coverage.registrations.map(registration => `<div class="crews-line"><span>${esc(registration.name)}</span>${hoursBar(event, departure, registration)}</div>`).join('')}${hoursCoverage(event, departure, coverage.registrations)}</div>` : `<p class="crew-builder-coverage-message">${esc(message)}</p>`}`;
 }
 
 function pilotCard(event, departure, registration, disabled = false, required = false) {

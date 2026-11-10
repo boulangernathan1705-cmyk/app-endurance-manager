@@ -192,9 +192,9 @@ function crewCard(start,crew){
   // A complete crew that covers the race is done: on a phone it keeps its names and « Couverture », without the bars.
   const done=crew.locked&&regs.length>0&&!gaps(event,departure,regs).length;
   return `<article class="crews-crew${done?' is-done':''}">
-    <div class="crews-crew-head"><span class="crews-cat">${logo(crew.category)}</span>${communityTag(crew)}<strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
+    <div class="crews-crew-head">${communityTag(crew)}<span class="crews-cat">${logo(crew.category)}</span><strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
     ${done?`<p class="crews-names">${esc(regs.map(reg=>reg.name).join(' · '))}</p>`:''}
-    ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${pilotLabel(reg)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
+    ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${crew.community?esc(reg.name):pilotLabel(reg)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
   </article>`;
 }
 function pilotCard(start,{main,regs}){

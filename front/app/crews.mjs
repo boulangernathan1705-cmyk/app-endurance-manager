@@ -7,18 +7,19 @@ function contentSummary(title,count){return `<summary class="ux-content-accordio
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}" data-tip="${crew.locked?'Le responsable a verrouillé l’équipage : sa composition est fixée.':'Des pilotes de la catégorie peuvent encore rejoindre cet équipage.'}">${crew.locked?'Complet':'Places libres'}</span>`;}
 // Opened crew: one thin bar per pilot under the hours of the race, then « Couverture » with the hours nobody drives.
 // A name is a link when the viewer may change that entry (the pilot himself, an organiser).
-export function pilotLines(event,departure,regs,{editable=true}={}){
+// tag:false inside a crew that already shows its community before its name.
+export function pilotLines(event,departure,regs,{editable=true,tag=true}={}){
   const locked=departure.startsAt<=Date.now();
   return hoursAxis(event,departure)+regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" data-tip="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
-    const name=`${communityTag(reg)}<span class="pilot-name" ${pilotNameTip(reg)}>${esc(reg.name)}</span>`;
+    const name=`${tag?communityTag(reg):''}<span class="pilot-name" ${pilotNameTip(reg)}>${esc(reg.name)}</span>`;
     const label=editable&&reg.canEdit&&!locked?button('edit-registration',name,`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crews-line-edit'):name;
     return `<div class="crews-line${reg.mine?' is-mine':''}"><span>${label}${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}</span>${hoursBar(event,departure,reg)}</div>`;
   }).join('');
 }
-export function crewAvailability(event,departure,regs,{editable=true}={}){
+export function crewAvailability(event,departure,regs,{editable=true,tag=true}={}){
   if(!regs.length)return '<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
-  return `<section class="crew-pilot-lines" aria-label="Heures de chaque pilote">${pilotLines(event,departure,regs,{editable})}${hoursCoverage(event,departure,regs)}</section>`;
+  return `<section class="crew-pilot-lines" aria-label="Heures de chaque pilote">${pilotLines(event,departure,regs,{editable,tag})}${hoursCoverage(event,departure,regs)}</section>`;
 }
 
 function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
@@ -66,14 +67,14 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   return `<div class="crew-card-shell ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}${ownMember?' is-mine':''}">
     <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
       <summary class="crew-pilot-accordion-summary crew-tile-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
-        <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team">${communityTag(crew)}<strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
+        <span class="crew-tile-head">${communityTag(crew)}<span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
         <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
-        ${crewAvailability(event,departure,regs)}
+        ${crewAvailability(event,departure,regs,{tag:!crew.community})}
       </div>
     </details>
     ${actions}

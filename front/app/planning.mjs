@@ -57,7 +57,7 @@ function startCard(event,departure,body,{minutes,now,open,quick='',tableRow=0}){
   const mineIds=new Set(present.filter(reg=>reg.mine).map(reg=>reg.id));
   // The pilot's own crew says so (« Ton équipage »), in the table of a race over several days.
   const own=crew=>tableRow&&(crew.registrationIds||[]).some(id=>mineIds.has(id))?'<span class="planning-crew-mine">Ton équipage</span>':'';
-  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}${own(crew)}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line',crewColorClass(crew.id,index))).join('');
+  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${communityTag(crew)}${logo(crew.category)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}${own(crew)}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line',crewColorClass(crew.id,index))).join('');
   const freeLine=free.length?row(NO_CREW_ICON+free.map(([category,,list])=>`<span class="planning-free-group">${logo(category)}${names(list)}</span>`).join(''),' data-free-pilots'):'';
   // Solo event: no crews, the number of participants (and places) instead.
   const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
