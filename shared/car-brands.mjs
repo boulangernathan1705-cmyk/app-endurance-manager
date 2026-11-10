@@ -1,13 +1,13 @@
 // Car brand of a catalogue car name, for the small logo before the car.
-// Logos: Simple Icons (CC0), one-colour SVG in /images/brands/. Brands without a logo show their initials.
+// Colour logos in /images/brands/<id>.webp (brand trademarks, used only to name the car). No logo: initials.
 const BRANDS = [
-  ['Acura','acura'],['Adess'],['Alpine'],['Aston Martin','astonmartin'],['Audi','audi'],['BMW','bmw'],
-  ['Cadillac','cadillac'],['Chevrolet','chevrolet'],['Corvette','chevrolet','Chevrolet'],['Dallara'],['Duqueine'],
-  ['Ferrari','ferrari'],['Ford','ford'],['Genesis'],['Ginetta'],['Glickenhaus'],['Global Mazda','mazda','Mazda'],
-  ['Honda','honda'],['HPD','honda','Honda'],['Hyundai','hyundai'],['Isotta Fraschini',null,'Isotta Fraschini'],
-  ['Lamborghini','lamborghini'],['Lexus'],['Ligier'],['McLaren','mclaren'],['Mercedes',null,'Mercedes-AMG'],
-  ['Nissan','nissan'],['Oreca'],['Peugeot','peugeot'],['Porsche','porsche'],['Renault','renault'],
-  ['Supercars Chevrolet','chevrolet','Chevrolet'],['Supercars Ford','ford','Ford'],['Toyota','toyota'],['Vanwall']
+  ['Acura','acura'],['Adess'],['Alpine','alpine'],['Aston Martin','astonmartin'],['Audi','audi'],['BMW','bmw'],
+  ['Cadillac','cadillac'],['Chevrolet','chevrolet'],['Corvette','corvette','Chevrolet Corvette'],['Dallara','dallara'],['Duqueine','duqueine'],
+  ['Ferrari','ferrari'],['Ford','ford'],['Genesis','genesis'],['Ginetta','ginetta'],['Glickenhaus','glickenhaus'],['Global Mazda','mazda','Mazda'],
+  ['Honda','honda'],['HPD','honda','Honda'],['Hyundai','hyundai'],['Isotta Fraschini'],
+  ['Lamborghini','lamborghini'],['Lexus','lexus'],['Ligier','ligier'],['McLaren','mclaren'],['Mercedes','mercedes','Mercedes-AMG'],
+  ['Nissan','nissan'],['Oreca','oreca'],['Peugeot','peugeot'],['Porsche','porsche'],['Renault','renault'],
+  ['Supercars Chevrolet','chevrolet','Chevrolet'],['Supercars Ford','ford','Ford'],['Toyota','toyota'],['Vanwall','vanwall']
 ].sort((a,b) => b[0].length - a[0].length);
 
 const initials = name => { const words = name.split(/\s+/).filter(Boolean); return (words.length > 1 ? words[0][0] + words[1][0] : name.slice(0,2)).toUpperCase(); };

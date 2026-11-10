@@ -75,7 +75,7 @@ export function logo(category) {
 export function carLogo(car) {
   const brand = carBrand(car);
   if(!brand) return '';
-  return brand.logo ? `<span class="car-brand" style="--car-brand:url('/images/brands/${brand.logo}.svg')" role="img" aria-label="${esc(brand.name)}"></span>` : `<span class="car-brand car-brand-text" aria-hidden="true">${esc(brand.initials)}</span>`;
+  return brand.logo ? `<img class="car-brand" src="/images/brands/${brand.logo}.webp" alt="${esc(brand.name)}" title="${esc(brand.name)}" width="40" height="24" loading="lazy" decoding="async">` : `<span class="car-brand car-brand-text" aria-hidden="true">${esc(brand.initials)}</span>`;
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
