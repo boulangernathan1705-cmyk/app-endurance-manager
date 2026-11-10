@@ -77,7 +77,6 @@
   border-bottom:1px solid var(--border);
 }
 .crew-inline-management.is-readonly{justify-content:flex-end}
-.crew-inline-management .coverage-summary{margin-left:auto;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
 .crew-state-control{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0}
 .crew-state-label{display:inline-flex;align-items:center;gap:5px;color:#dce8e5;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}
 .crew-state-lock{display:inline-grid;place-items:center;width:18px;height:18px;font-size:13px;line-height:1}
@@ -164,7 +163,7 @@
 .crew-action-hint{margin:0;color:var(--muted);font-size:11px;line-height:1.4}
 
 /* Legacy management styles kept harmless for old cached markup. */
-.crew-card-header>.crew-card-status[hidden],.crew-card [data-crew-lock-toggle][hidden]{display:none!important}
+.crew-card-header>.crew-card-status[hidden]{display:none!important}
 .crew-list{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
 .crew-management-accordion{padding:0!important;overflow:hidden;opacity:1!important}
 .crew-member-action{min-width:76px;flex:0 0 auto;text-align:center}
@@ -183,7 +182,6 @@
   .crew-card-shell{margin:8px 0;border-left-width:4px}
   .crew-unified-body{gap:9px;padding:9px!important}
   .crew-inline-management,.crew-inline-management.is-readonly{align-items:flex-start;flex-direction:column;justify-content:flex-start}
-  .crew-inline-management .coverage-summary{margin-left:0;white-space:normal}
   .crew-state-control{align-items:center;flex-direction:row;width:auto}
   .crew-state-select-wrap,.crew-state-select{width:auto}
   .crew-member-grid{grid-template-columns:1fr;gap:7px}

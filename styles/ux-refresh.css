@@ -121,8 +121,7 @@ html[data-game="lmu"] { --game-accent: #d8322c; }
 }
 
 /* Compte : la phrase de confiance et « Aide » restent sur l'accueil et dans le pied de page. */
-html[data-game] .site-nav-shell .account-oauth-trust,
-html[data-game] .site-nav-shell .account-help-link { display: none !important; }
+html[data-game] .site-nav-shell .account-oauth-trust { display: none !important; }
 .site-nav-shell .account-disconnected-wrap,
 .site-nav-shell .account-disconnected-actions { margin: 0 !important; gap: 0 !important; }
 .site-nav-shell .account-discord-login { min-height: 36px !important; padding: 0 14px !important; }
@@ -390,7 +389,6 @@ html[data-game] #app .crew-compact-pilots,
 html[data-game] #app .crew-compact-car { font-size: 13.5px !important; }
 html[data-game] #app .crew-owner-badge,
 html[data-game] #app .crew-compact-status { font-size: 11px !important; padding: 3px 8px !important; }
-html[data-game] #app .coverage-summary { font-size: 12.5px !important; }
 html[data-game] #app .crew-unified-card button,
 html[data-game] #app .crew-unified-card select { font-size: 13px !important; min-height: 36px !important; }
 html[data-game] #app .pilot-row { padding-top: 10px !important; padding-bottom: 10px !important; }
@@ -560,15 +558,6 @@ html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-bu
 }
 
 /* En-tête de course : les chiffres sur une ligne. */
-html[data-game] #app p.event-header-stats {
-  display: block !important;
-  margin: 0 !important;
-  color: #c7d0d4;
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-@media (max-width: 760px) { html[data-game] #app p.event-header-stats { white-space: normal; } }
 
 /* Liste des courses : équipages en tuiles. */
 html[data-game] .event-card .crew-summary-list {
@@ -604,7 +593,6 @@ html[data-game] .event-card .crew-summary-pilots {
 
 /* Moins de gras : le gras reste pour les titres et les noms. */
 html[data-game] #app .fold-meta,
-html[data-game] #app .coverage-summary,
 html[data-game] #app .pilot-car,
 html[data-game] #app .pilot-preference,
 html[data-game] #app .ux-departure-date,
@@ -697,7 +685,6 @@ html[data-game] #app .crew-card-shell > details[open] .crew-tile-summary .crew-c
 
 html[data-game] #app .crew-unified-body { display: flex !important; flex-direction: column; gap: 6px; padding: 2px 16px 12px !important; }
 html[data-game] #app .crew-unified-body .crew-inline-management { display: flex !important; align-items: center; gap: 8px; padding: 4px 0 !important; font-size: 13px; }
-html[data-game] #app .crew-unified-body .crew-inline-management .coverage-summary { display: none !important; }
 html[data-game] #app .crew-unified-body .crew-state-select { min-height: 32px !important; padding: 0 26px 0 10px !important; font-size: 13px !important; }
 
 /* Une ligne par pilote : nom, puis sa frise avec les heures. */
@@ -856,11 +843,6 @@ html[data-game] #app .race-header .race-head { flex: 1; min-width: 0; display: f
 html[data-game] #app .race-header .event-title { margin: 0 !important; font-size: 34px !important; line-height: 1.08 !important; }
 html[data-game] #app .race-header .race-meta { font-size: 16px; color: #c7d0d4; }
 html[data-game] #app .race-header .race-badges { display: flex; flex-wrap: wrap; gap: 6px; }
-html[data-game] #app .race-header .event-header-countdown {
-  margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; background: none !important;
-  font-size: 14px !important; color: #aab3b6 !important;
-}
-html[data-game] #app .race-header .event-header-countdown strong { color: #7fe0a8; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual {
   position: static !important; flex: none; width: 220px !important; height: 150px !important; margin: 0 !important; transform: none !important;
 }
@@ -869,7 +851,6 @@ html[data-game] #app .race-header .race-starts { display: flex; flex-direction: 
 html[data-game] #app .race-header .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 html[data-game] #app .race-header .race-day em { width: 70px; font-style: normal; font-size: 14px; color: #aab3b6; }
 html[data-game] #app .race-header .race-start { min-width: 46px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 7px; text-align: center; font-size: 14px; font-weight: 600; color: #e6ecea; }
-html[data-game] #app .race-header .event-header-stats { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; white-space: normal !important; }
 @media (max-width: 760px) {
   html[data-game] #app .race-header { padding: 14px !important; }
   html[data-game] #app .race-header .race-card-top { gap: 12px; }
@@ -897,20 +878,6 @@ html[data-game] #app .departure-fold.is-mine { outline: 2px solid rgba(255, 255,
 }
 .departure-mine-badge.is-crew { border-color: rgba(49, 184, 107, .7); background: rgba(49, 184, 107, .14); color: #8ff0b6; }
 html[data-game] #app .departure-fold .fold-date { display: flex !important; flex-direction: column; align-items: flex-start; }
-html[data-game] #app .race-header .event-header-stats .event-category-badge {
-  display: inline-flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 6px 12px !important;
-  width: auto !important;
-  min-width: 0 !important;
-  text-align: left !important;
-}
-html[data-game] #app .race-header .event-header-stats .event-category-copy { display: flex !important; flex-direction: column; align-items: flex-start; }
-html[data-game] #app .race-header .event-header-countdown { display: inline !important; }
-html[data-game] #app .race-header .event-header-countdown strong { display: inline !important; margin: 0 0 0 4px !important; font-size: inherit !important; }
-html[data-game] #app .race-header .event-header-countdown { text-align: left !important; width: auto !important; }
 
 /* Carte plus basse : carré de date à la hauteur du bloc nom / circuit / type, circuit calé dessus. */
 html[data-game] .race-card .race-card-body { gap: 10px !important; padding: 14px 16px !important; }
@@ -961,17 +928,6 @@ html[data-game] .race-card .race-card-circuit > .circuit-visual img { width: 100
 
 
 html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-0) .pilot-name { color: #8fb6c9 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-1) .pilot-name { color: #aa9fc2 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-2) .pilot-name { color: #91bca8 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-3) .pilot-name { color: #c3a08d !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-4) .pilot-name { color: #bd98a5 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-5) .pilot-name { color: #a8b996 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-6) .pilot-name { color: #8fb8b6 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-7) .pilot-name { color: #99a7c7 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-8) .pilot-name { color: #c5b887 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-9) .pilot-name { color: #b397b4 !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-10) .pilot-name { color: #c1a48c !important; }
-html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-11) .pilot-name { color: #94adc3 !important; }
 
 /* =====================================================================
    Équipage ouvert : la frise de chaque pilote, et un avertissement pour les heures sans pilote.
@@ -1114,11 +1070,6 @@ html[data-game] #app .departure-fold > summary > .fold-index { align-self: cente
 html[data-game] #app .departure-fold .fold-date-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 
 /* Accueil : le prochain départ est présenté comme une carte de course. */
-.hub-race-top { display: flex; align-items: flex-start; gap: 14px; margin: 8px 0 18px; }
-.hub-race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.hub-race-top .hub-next-race h3,
-.hub-race-head h3 { margin: 0 !important; }
-.hub-race-head .hub-race-meta { margin: 0 !important; }
 html[data-game] #app .departure-fold .race-date.is-compact { align-items: center !important; text-align: center !important; }
 /* Un compte à rebours ne se coupe jamais en deux lignes. */
 [data-countdown] { white-space: nowrap; }
@@ -1141,14 +1092,9 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .members-help { margin: 0 0 14px; color: var(--muted, #92979c); font-size: 14px; }
 .members-panel .members-row { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) 150px !important; }
 .members-panel .members-row[hidden] { display: none !important; }
-.members-row-status { font-size: 13px; font-weight: 700; color: var(--muted, #92979c); }
-.members-row-status.is-saved { color: #7fe0a8; }
-.members-row-status.is-error { color: #ff8a8a; }
 .members-empty { margin: 12px 0 0; color: var(--muted, #92979c); }
 @media (max-width: 760px) {
   .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
-  .members-panel .members-role-select { grid-column: 1 !important; }
-  .members-panel .members-row-status:empty { display: none; }
 }
 
 /* Accueil : équipages avec la même couleur et le même statut que sur la page course. */
@@ -1183,10 +1129,6 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-weather-chip span[aria-hidden] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 42px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); font-size: 22px; filter: grayscale(.7); opacity: .6; }
 .solo-weather-chip input:checked + span { filter: none; opacity: 1; border-color: #52d3d8; box-shadow: inset 0 -3px #52d3d8; }
 .solo-weather-chip input:focus-visible + span { outline: 2px solid #52d3d8; outline-offset: 2px; }
-.solo-event-info { display: grid; gap: 4px; margin: 0; font-size: 13.5px; }
-.solo-event-info div { display: flex; gap: 10px; }
-.solo-event-info dt { min-width: 96px; color: var(--muted, #9aa5aa); font-weight: 700; }
-.solo-event-info dd { margin: 0; color: #e7ecee; }
 .solo-event-form .solo-round { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border, #2b3236); border-radius: 10px; background: rgba(0, 0, 0, .18); }
 .solo-event-form .solo-round-head { display: flex; align-items: center; justify-content: space-between; }
 .solo-event-form .solo-round-title { color: #7fe3ea; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
@@ -1224,13 +1166,10 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-fill-bar > span { display: block; height: 100%; background: #52d3d8; }
 .solo-fill.is-full .solo-fill-bar > span { background: #f3b33d; }
 html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.solo-card-categories { display: inline-flex; gap: 6px; }
-.solo-card-categories .category-logo { width: 26px; height: auto; }
 .departure-mine-badge.is-waiting { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; }
 .solo-blocked { font-size: 13.5px; font-weight: 700; color: #f3b33d; }
 .solo-participants { display: flex; flex-direction: column; gap: 8px; }
 .solo-subtitle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 16px; }
-.solo-help { margin: 0; color: var(--muted, #92979c); font-size: 13.5px; }
 .solo-entries { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px 14px; }
 .solo-entry { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .025); }
 .solo-entry.is-mine { border-color: rgba(82, 211, 216, .55); }
@@ -1240,14 +1179,12 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-entry-name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .solo-entry .solo-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
 .solo-entry .solo-category .category-logo { width: 24px; height: auto; }
-.solo-muted { color: #8a9396; }
 .solo-any-logo { display: inline-grid; place-items: center; width: 40px; height: 28px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 18px; color: #c7d0d4; flex: none; }
 .solo-wait-notice { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid #f3b33d; border-radius: 0 8px 8px 0; background: rgba(243, 179, 61, .08); color: #f1e3c4; font-size: 14px; }
 /* Formulaire : format, accès et manches */
 .format-contents { display: contents; }
 /* Gestion des membres : case « Pilote SAFE » */
 .members-panel .members-row { grid-template-columns: minmax(0, 1fr) auto minmax(160px, 220px) 150px !important; }
-.members-safe { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #f3b33d; cursor: pointer; white-space: nowrap; }
 @media (max-width: 760px) {
   .solo-entries { grid-template-columns: minmax(0, 1fr); }
   .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
@@ -1267,9 +1204,6 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .hub-main .hub-intro { margin: 30px 0 14px; text-align: center; }
 .hub-main .hub-intro h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); }
 .hub-main .hub-intro p { margin: 6px 0 0; color: var(--muted, #92979c); font-size: 14px; }
-.hub-next-solo { border-top: 1px dashed rgba(255, 255, 255, .12); }
-.hub-solo-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.hub-solo-places { font-size: 13.5px; color: #c7d0d4; }
 .hub-steps { max-width: 980px; margin: 34px auto 10px; }
 .hub-steps h2 { margin: 0 0 14px; text-align: center; font-size: clamp(20px, 2.6vw, 26px); }
 .hub-steps-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: hub-step; }
@@ -1342,7 +1276,6 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .community-gate { max-width: 620px; margin: 40px auto; padding: 28px 26px; border: 1px solid var(--border, #292d31); border-top: 4px solid #52d3d8; border-radius: 16px; background: var(--panel, #111315); text-align: center; }
 .community-gate h1 { margin: 0 0 12px; font-size: 28px; font-weight: 850; color: #f4f6f5; }
 .community-gate p { margin: 0 0 20px; color: #c7d0d4; font-size: 16px; line-height: 1.6; }
-.community-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 /* Welcome screen for visitors (home of the main address and of each community). */
 .community-gate.welcome { max-width: 1080px; margin: 34px auto 20px; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
 /* The navigation bar is of no use before signing in: the welcome screen has the Discord button. */
@@ -1405,30 +1338,12 @@ html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-preference { font-
 html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-self: flex-end; }
 
 /* Members page: tabs, member cards, settings cards. */
-.members-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.members-tabs button { min-height: 42px; padding: 0 18px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel, #111315); color: #c7d0d4; font: inherit; font-weight: 800; cursor: pointer; }
-.members-tabs button span { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 12px; }
-.members-tabs button[aria-selected="true"] { border-color: var(--community-accent, #52d3d8); color: #f4f6f5; box-shadow: inset 0 -3px 0 var(--community-accent, #52d3d8); }
-.member-grid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-.members-panel .member-card, .member-grid .member-card { display: flex !important; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; }
-.member-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.member-head .members-identity { flex: 1; }
-.member-avatar { flex: 0 0 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: rgba(82,211,216,.14); border: 1px solid rgba(82,211,216,.45); color: var(--community-accent, #52d3d8); font-size: 13px; font-weight: 900; }
-.member-badge { flex: 0 0 auto; padding: 3px 8px; border-radius: 999px; background: var(--community-accent, #52d3d8); color: #06181a; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
-.members-discord-roles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.members-discord-role { padding: 2px 8px; border: 1px solid rgba(88,101,242,.55); border-radius: 999px; background: rgba(88,101,242,.12); color: #d6dafe; font-size: 12.5px; font-weight: 700; }
-.members-discord-role.is-empty { border-color: var(--border, #292d31); background: transparent; color: #99a3a0; }
-.member-rights { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 10px; border-top: 1px solid var(--border, #292d31); }
-.member-right { padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.05); color: #c7d0d4; font-size: 12px; }
-.member-right.is-all { background: rgba(127,224,168,.12); color: #7fe0a8; font-weight: 700; }
-.member-right.is-none { color: #99a3a0; }
 
 /* Community settings (members page, « Réglages » tab). */
 .community-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
 .community-settings[hidden] { display: none; }
 .settings-card { padding: 20px; border: 1px solid var(--border, #292d31); border-radius: 16px; background: var(--panel, #111315); }
 .settings-card h2 { margin: 0 0 12px; font-size: 17px; color: var(--community-accent, #52d3d8); }
-.settings-roles-card { grid-column: 1 / -1; }
 .settings-appearance { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .settings-appearance label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
 .settings-appearance label small { font-weight: 400; color: #99a3a0; }
@@ -1438,27 +1353,6 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .settings-appearance input[type="color"] { width: 64px; height: 38px; padding: 0; border: 1px solid var(--border, #292d31); border-radius: 9px; background: none; cursor: pointer; }
 .settings-actions { display: flex; align-items: center; gap: 12px; }
 .settings-status { color: #7fe0a8; font-size: 13px; font-weight: 700; }
-.settings-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border, #292d31); cursor: pointer; }
-.settings-switch:first-of-type { border-top: 0; padding-top: 0; }
-.settings-switch small { display: block; margin-top: 2px; color: #99a3a0; font-size: 13px; }
-.settings-switch input { position: absolute; opacity: 0; pointer-events: none; }
-.settings-switch i { position: relative; flex: 0 0 44px; height: 24px; border-radius: 999px; background: #2b3034; transition: background .15s; }
-.settings-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #f4f6f5; transition: transform .15s; }
-.settings-switch input:checked + i { background: var(--community-accent, #52d3d8); }
-.settings-switch input:checked + i::after { transform: translateX(20px); }
-.settings-switch input:focus-visible + i { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
-.settings-switch input:disabled + i { opacity: .5; }
-.role-legend-wrap { margin: 0 0 14px; }
-.role-legend-wrap > summary { cursor: pointer; margin-bottom: 8px; color: var(--community-accent, #52d3d8); font-size: 14px; font-weight: 800; }
-.role-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,.03); }
-.role-legend dt { font-size: 13px; font-weight: 800; color: #f4f6f5; }
-.role-legend dd { margin: 1px 0 0; font-size: 12.5px; color: #99a3a0; }
-.role-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; }
-.role-card { padding: 12px 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel2, #16191c); }
-.role-card .role-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
-.role-card .role-head small { color: #99a3a0; font-size: 12px; }
-.role-card .role-head .settings-status { margin-left: auto; }
-.role-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .role-pill { position: relative; display: inline-flex; cursor: pointer; }
 .role-pill input { position: absolute; opacity: 0; pointer-events: none; }
 .role-pill span { padding: 5px 11px; border: 1px solid var(--border, #292d31); border-radius: 999px; color: #99a3a0; font-size: 12.5px; font-weight: 700; transition: background .12s, color .12s, border-color .12s; }
@@ -1467,7 +1361,7 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .role-pill input:focus-visible + span { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
 .role-pill input:disabled + span { opacity: .6; cursor: default; }
 @media (max-width: 760px) {
-  .community-settings, .role-list, .member-grid { grid-template-columns: minmax(0, 1fr); }
+  .community-settings { grid-template-columns: minmax(0, 1fr); }
   .settings-appearance { grid-template-columns: minmax(0, 1fr); }
   .settings-card { padding: 14px; }
 }
@@ -1493,52 +1387,17 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 
 /* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
 .setup { max-width: 920px; }
-.setup-intro { margin: 0 0 14px; color: #c7d0d4; font-size: 15px; }
-.setup-steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.setup-step > details { border: 1px solid var(--border, #292d31); border-radius: 14px; background: var(--panel, #111315); }
-.setup-step.is-todo > details { border-left: 4px solid #f3b33d; }
-.setup-step.is-done > details { border-left: 4px solid #7fe0a8; }
-.setup-step.is-info > details { border-left: 4px solid var(--community-accent, #52d3d8); }
-.setup-step > details > summary { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; list-style: none; }
-.setup-step > details > summary::-webkit-details-marker { display: none; }
-.setup-step > details > summary::after { content: "▾"; margin-left: auto; color: #99a3a0; transition: transform .15s; }
-.setup-step > details[open] > summary::after { transform: rotate(180deg); }
-.setup-check { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(243,179,61,.14); color: #f3b33d; font-weight: 900; }
-.setup-step.is-done .setup-check { background: rgba(127,224,168,.14); color: #7fe0a8; }
-.setup-step.is-info .setup-check { background: rgba(82,211,216,.14); color: var(--community-accent, #52d3d8); }
-.setup-title { display: grid; gap: 2px; min-width: 0; }
-.setup-title strong { color: #f4f6f5; font-size: 16px; }
-.setup-title small { color: #99a3a0; font-size: 13px; overflow-wrap: anywhere; }
-.setup-body { padding: 0 18px 18px 64px; color: #c7d0d4; font-size: 14.5px; line-height: 1.6; }
-.setup-body p { margin: 0 0 10px; }
-.setup-howto, .setup-tips { margin: 0 0 12px; padding-left: 20px; }
-.setup-howto li, .setup-tips li { margin: 4px 0; }
 .setup-note { padding: 8px 12px; border-radius: 8px; background: rgba(243,179,61,.08); color: #e8d3a6; font-size: 13.5px; }
-.setup-guide { margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: rgba(255,255,255,.02); }
-.setup-guide summary { cursor: pointer; color: #f4f6f5; font-weight: 800; }
-.setup-guide .setup-howto { margin-top: 10px; }
 .setup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .setup-actions .welcome-discord { min-height: 44px; font-size: 15px; }
 .crew-module-rights { display: grid; gap: 8px; margin: -4px 0 12px; }
 .setup-error { color: #ffb4a8; }
 .setup-form { display: grid; gap: 12px; }
 .setup-form label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
-.setup-form input:not([type=radio]), .setup-form select, .setup-inline input, .setup-message textarea, .setup-created textarea, .platform-slug input { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }
-.setup-modes { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
-.setup-modes legend { margin-bottom: 6px; color: #f4f6f5; font-weight: 800; }
-.setup-mode { display: flex !important; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; cursor: pointer; }
-.setup-mode:has(input:checked) { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.07); }
-.setup-mode input { flex: 0 0 auto; width: auto !important; min-height: 0 !important; margin: 3px 0 0; accent-color: var(--community-accent, #52d3d8); }
-.setup-mode > span { flex: 1 1 auto; text-align: left; }
-.setup-mode small { display: block; color: #99a3a0; font-weight: 400; }
-.setup-mode-block { display: none; gap: 12px; }
-.setup-form[data-mode="one"] [data-mode-block="one"], .setup-form[data-mode="two"] [data-mode-block="two"] { display: grid; }
-.setup-hook { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
-.setup-hook .settings-status { grid-column: 1 / -1; }
+.setup-form input:not([type=radio]), .setup-form select, .setup-inline input, .setup-created textarea, .platform-slug input { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }
 .setup-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 .setup-inline input { flex: 1 1 260px; width: auto; }
-.setup-message { display: grid; gap: 6px; font-weight: 700; color: #c7d0d4; }
-.setup-message textarea, .setup-created textarea { resize: vertical; line-height: 1.5; }
+.setup-created textarea { resize: vertical; line-height: 1.5; }
 .setup-created { margin-top: 16px; padding: 14px; border: 1px solid rgba(127,224,168,.45); border-radius: 12px; background: rgba(127,224,168,.06); }
 .setup-created strong { color: #7fe0a8; }
 .platform-list { display: grid; gap: 8px; }
@@ -1552,40 +1411,24 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .platform-slug input { flex: 1 1 auto; min-width: 0; }
 .platform-slug span { color: #99a3a0; font-weight: 400; white-space: nowrap; }
 @media (max-width: 760px) {
-  .setup-body { padding: 0 14px 14px; }
-  .setup-hook, .platform-row { grid-template-columns: minmax(0, 1fr); }
+  .platform-row { grid-template-columns: minmax(0, 1fr); }
   .platform-slug { flex-wrap: wrap; }
 }
 
 /* Recap step: example of the Discord message, switch, « Où le publier ? » cards. */
-.recap-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; align-items: start; margin-bottom: 14px; }
-.recap-intro p { margin: 0; }
 .recap-preview { margin: 0; padding: 12px; border-radius: 10px; background: #313338; color: #dbdee1; font-size: 12.5px; }
 .recap-preview figcaption { margin-bottom: 8px; color: #949ba4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
-.recap-preview-bot { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.recap-preview-bot strong { color: #f2f3f5; font-size: 13px; }
-.recap-preview-avatar { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: #5865f2; color: #fff; font-size: 10px; font-weight: 900; }
-.recap-preview-tag { padding: 0 4px; border-radius: 3px; background: #5865f2; color: #fff; font-size: 9.5px; font-weight: 800; }
 .recap-preview-embed { display: grid; gap: 3px; margin-left: 34px; padding: 8px 10px; border-left: 4px solid #2563eb; border-radius: 4px; background: #2b2d31; }
 .recap-preview-embed strong { color: #f2f3f5; }
 .recap-preview-embed b { margin-top: 4px; color: #f2f3f5; }
 .recap-preview-embed em { margin-top: 4px; color: #949ba4; font-size: 11px; font-style: normal; }
-.setup-form .recap-switch { display: flex !important; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px !important; border: 1px solid var(--border, #292d31) !important; border-radius: 12px; font-weight: 400; }
-.setup-form .recap-switch > span { display: grid; gap: 2px; }
-.setup-form .recap-switch strong { color: #f4f6f5; font-size: 15px; }
-.setup-form .recap-switch i { flex: 0 0 44px; width: 44px; }
-.recap-options { display: grid; gap: 12px; }
-.setup-form[data-mode="none"] .recap-options { display: none; }
-.recap-question { margin: 4px 0 0 !important; color: #f4f6f5; font-size: 15px; font-weight: 800; }
 .recap-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .recap-card { display: flex !important; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; cursor: pointer; }
 .recap-card:has(input:checked) { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.07); }
 .recap-card input { flex: 0 0 auto; width: auto !important; min-height: 0 !important; margin: 3px 0 0; accent-color: var(--community-accent, #52d3d8); }
 .recap-card strong { display: block; color: #f4f6f5; font-size: 14.5px; }
 .recap-card small { display: block; margin-top: 2px; color: #99a3a0; font-weight: 400; }
-.recap-sims { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.recap-sims > span { margin-right: 4px; color: #c7d0d4; font-size: 13px; font-weight: 700; }
-@media (max-width: 760px) { .recap-intro, .recap-cards { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .recap-cards { grid-template-columns: minmax(0, 1fr); } }
 
 /* Showcase of the main address: banner on every page, reset card of the managers. */
 .showcase-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 18px 8px; padding: 10px 16px; border: 1px solid rgba(243,179,61,.45); border-radius: 12px; background: rgba(243,179,61,.08); color: #e8d3a6; font-size: 14px; }
@@ -1686,10 +1529,7 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-tag { align-self: center; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .planning-tag.is-mine { background: var(--community-accent, #52d3d8); color: #062a2c; }
 .planning-tag.is-live { background: #2f6e3f; color: #e6ffec; }
-.planning-start-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: #dfe6e4; font-size: 14px; }
-.planning-free { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: #92999c; font-size: 13.5px; }
 .planning-free-pill { padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--category-color, #8e9996) 65%, transparent); background: color-mix(in srgb, var(--category-color, #8e9996) 12%, transparent); color: color-mix(in srgb, var(--category-color, #c7d0d4) 55%, #fff); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
-.planning-crews { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .planning-crew { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--crew-color, #c7d0d4); font-size: 14px; font-weight: 700; }
 .planning-crew .category-logo { width: 24px; height: auto; flex: none; }
 .planning-crew .category-text-logo { font-size: 10px; color: #c7d0d4; }
@@ -1699,12 +1539,9 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-crew.crew-palette-6, .planning-row.crew-palette-6 { --crew-color: #ffd45e; } .planning-crew.crew-palette-7, .planning-row.crew-palette-7 { --crew-color: #66e0b1; }
 .planning-crew.crew-palette-8, .planning-row.crew-palette-8 { --crew-color: #ff7777; } .planning-crew.crew-palette-9, .planning-row.crew-palette-9 { --crew-color: #b99cff; }
 .planning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
-.planning-row .planning-free-pill + .planning-free-pill, .planning-free-icon + .planning-free-pill { margin-left: -8px; }
-.planning-free-icon { display: inline-flex; color: #92999c; }
+.planning-row .planning-free-pill + .planning-free-pill { margin-left: -8px; }
 .planning-row[data-free-pilots] { cursor: pointer; border-radius: 6px; }
-.planning-row[data-free-pilots]:hover .planning-free-icon { color: var(--community-accent, #52d3d8); }
 .planning-row[data-free-pilots]:hover .planning-free-pill { filter: brightness(1.25); }
-.planning-free-icon svg { width: 17px; height: 17px; }
 .planning-row + .planning-row { padding-top: 8px; border-top: 1px solid #343e41; }
 .planning-start[open] .planning-row { display: none; }
 /* Quick actions of a start (« Inscription », « Créer un équipage »): small squares with an icon and a +. */
@@ -1737,11 +1574,7 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
 html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
-.planning-actions { padding: 12px 0 14px; border-top: 1px solid #262e31; }
 /* The three buttons on one line (the opened day is wide enough for them). */
-html[data-game] #app .planning-actions .ux-summary-registration-actions { display: flex !important; flex-wrap: nowrap !important; align-items: center; justify-content: flex-start !important; gap: 16px !important; margin: 0 !important; width: auto !important; grid-template-columns: none !important; }
-html[data-game] #app .planning-actions .ux-summary-registration-actions > * { flex: none !important; width: auto !important; min-width: 0 !important; margin: 0 !important; grid-column: auto !important; white-space: nowrap; }
-html[data-game] #app .planning-actions .ux-summary-registration-toggle { padding: 0 16px !important; }
 html[data-game] #app .planning-body .departure-fold-body { padding: 0 !important; }
 html[data-game] #app .planning-body .ux-course-crews-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 /* Pilots without a crew on the same grid as the crews above: same left edge, same columns, same gap. */
@@ -1763,9 +1596,6 @@ html[data-game] #app .race-header .race-date.is-range strong { font-size: 28px; 
 .race-date.is-range small { white-space: nowrap; }
 
 /* Race header: a shortcut to the pilot's own start */
-html[data-game] #app .race-header .race-my-start { display: grid; gap: 6px; justify-items: end; align-self: center; margin-left: auto; text-align: right; }
-.race-my-start small { color: #92999c; font-size: 12.5px; }
-html[data-game] #app .race-my-start .secondary-button { border-color: var(--community-accent, #52d3d8) !important; }
 
 @media (prefers-reduced-motion: reduce) { .planning-days, .planning-start, .planning-chevron { transition: none; } }
 
@@ -1780,7 +1610,6 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
   html[data-game] #app .planning-race-actions .race-header-actions { flex-wrap: wrap; gap: 6px 16px; }
   html[data-game] #app .planning-race-actions .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; }
   html[data-game] #app .planning-race-actions .race-header-actions > .secondary-button { padding: 0 10px !important; }
-  html[data-game] #app .planning-actions .ux-summary-registration-actions { flex-wrap: wrap !important; }
   .planning-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .planning-tab { flex: 1 0 70px; position: relative; display: grid; gap: 1px; padding: 8px 4px; border: 1px solid #343c3f; border-radius: 11px; background: #111617; color: #f4f6f5; line-height: 1.2; cursor: pointer; }
   .planning-tab small { color: #92999c; font-size: 11px; }
@@ -1793,7 +1622,6 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
   .planning-day.is-active { display: grid; }
   .planning-day-head { display: none; }
   html[data-game] #app .race-header .race-card-top { flex-wrap: wrap; }
-  html[data-game] #app .race-header .race-my-start { order: 5; flex: 1 1 100%; justify-items: stretch; margin-left: 0; text-align: left; }
 }
 
 html[data-game] #app .race-header { gap: 10px !important; padding: 14px 18px !important; }
@@ -1805,7 +1633,6 @@ html[data-game] #app .race-header .race-date.is-range strong { font-size: 23px; 
 html[data-game] #app .race-header .race-head { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start !important; gap: 4px 12px; text-align: left; }
 html[data-game] #app .race-header .event-title { flex-basis: 100%; font-size: 28px !important; }
 html[data-game] #app .race-header .race-meta { font-size: 15px; }
-html[data-game] #app .race-header .event-header-countdown { margin: 0 !important; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 150px !important; height: 84px !important; }
 html[data-game] #app .race-header .race-header-footer { padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .07); }
 html[data-game] #app .race-header .race-header-actions .secondary-button { min-height: 34px !important; padding: 0 12px !important; font-size: 13.5px !important; }
@@ -1815,8 +1642,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   html[data-game] #app .race-header { padding: 12px !important; }
   html[data-game] #app .race-header .event-title { font-size: 22px !important; }
   html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
-  html[data-game] #app .race-header .race-my-start small { display: none; }
-  html[data-game] #app .race-header .race-my-start .secondary-button { min-height: 38px !important; font-size: 14px !important; }
   html[data-game] #app .race-header .race-header-actions { flex-wrap: wrap; gap: 8px 16px; justify-content: flex-start; }
   html[data-game] #app .race-header .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; white-space: nowrap; }
   html[data-game] #app .race-header .race-header-actions > .secondary-button { padding: 0 10px !important; }
@@ -1863,7 +1688,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   html[data-game] #app .event-category-copy { min-width: 0; }
   html[data-game] #app .event-category-copy strong { display: block; font-size: 11.5px !important; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html[data-game] #app .event-category-copy small { font-size: 10.5px !important; white-space: nowrap; }
-  html[data-game] #app .race-header .event-category-badges.event-header-stats { display: grid !important; width: 100% !important; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)) !important; gap: 4px !important; }
 
   /* Race page: the date block keeps its size; crew cards only as tall as their drivers. */
   html[data-game] #app .race-header .race-date { align-self: flex-start !important; height: auto !important; }
@@ -1878,8 +1702,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   html[data-game] #app .ux-unassigned-grid .presence-timeline { width: 100% !important; }
   html[data-game] #app .ux-course-pilots-body, html[data-game] #app .ux-unassigned-section { padding: 4px 0 !important; }
   /* Administration: the tabs on two columns (never out of the screen). */
-  .members-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  .members-tabs button { min-height: 40px; padding: 0 8px; font-size: 14px; white-space: nowrap; }
 }
 
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
@@ -2043,24 +1865,14 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 
 /* EVENT TDZ page: every detail as an icon tile; several rounds side by side. */
 .solo-event-details { display: grid; gap: 10px; width: 100%; }
-.solo-detail-rounds { display: grid; gap: 10px; }
-.solo-detail-rounds.is-multi { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.solo-detail-round.is-card { padding: 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .02); }
-.solo-detail-round-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.solo-detail-round-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; color: #f2f5f7; }
-.solo-detail-round-head em { margin-left: auto; flex: none; font-style: normal; font-size: 12px; font-weight: 700; color: #9aa6b0; }
-.solo-round-index { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--community-accent, #7fe3ea); color: #061014; font-size: 12px; font-weight: 900; }
 .solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .solo-detail { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
 .solo-detail.is-wide { grid-column: 1 / -1; }
 .solo-detail-icon { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: rgba(127, 227, 234, .1); }
 .solo-detail-icon svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.solo-detail-emoji { font-size: 18px; line-height: 1; }
 .solo-detail-copy { display: grid; min-width: 0; }
 .solo-detail-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8c98a2; }
 .solo-detail-copy strong { overflow-wrap: anywhere; font-size: 15px; font-weight: 800; color: #f2f5f7; }
-.solo-detail-logos { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.solo-detail-logos .category-logo, .solo-detail-logos img { height: 20px; width: auto; }
 
 /* EVENT TDZ card, several rounds: one aligned line per round. */
 .solo-round-lines { display: grid; grid-template-columns: auto minmax(0, max-content) auto auto; align-items: center; justify-content: start; gap: 6px 10px; }
@@ -2075,15 +1887,9 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 /* EVENT TDZ in rounds: the rounds as starts (« Manche 1 »), opened on their details and pilots. */
 .solo-round-starts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .solo-round-start .solo-detail-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-bottom: 12px; }
-.solo-round-pilots { font-size: 13px; color: #9aa6b0; }
 .solo-round-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); white-space: nowrap; }
 .planning-quick-button.is-labelled.is-active { border-color: rgba(46, 204, 113, .6); color: #6fe3a1; }
 /* Solo pilots: small cards, by category (rank within its category). */
-.solo-entry-groups { display: grid; gap: 10px; }
-.solo-entry-group { display: grid; gap: 6px; }
-.solo-entry-group-head { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #dfe5ea; }
-.solo-entry-group-head .category-logo, .solo-entry-group-head img { width: auto; height: 18px; }
-.solo-entry-group-head em { font-style: normal; color: #8c98a2; }
 .solo-entries { grid-template-columns: repeat(auto-fill, minmax(140px, 180px)); gap: 6px; }
 .solo-entry { grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 6px; padding: 4px 8px 4px 5px; border-radius: 999px; }
 .solo-entry-rank { width: 20px; height: 20px; font-size: 11px; }
@@ -2094,7 +1900,6 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-entry-edit:hover { background: rgba(255, 255, 255, .08); color: #f2f5f7; }
 .solo-entry-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.solo-entry-group-head .solo-any-logo { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: rgba(255, 255, 255, .1); font-size: 11px; }
 /* A round's format: one small frame per item, its icon on the left, then label and value. */
 .round-info { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 14px; }
 .round-item { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
@@ -2119,12 +1924,7 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 @media (max-width: 600px) { .solo-entries { display: flex; } }
 /* A round's head: « Manche 1 » small, the circuit large (what the pilots look for first). */
 .solo-round-head { align-items: center; }
-.round-start-title { display: grid; min-width: 0; line-height: 1.15; }
-.round-start-title small { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); }
-.round-start-title strong { font-size: 20px; font-weight: 800; color: #f4f6f7; overflow-wrap: anywhere; }
 .solo-round-name { font-size: 14px; }
-@media (max-width: 600px) { .round-start-title strong { font-size: 18px; } }
-.solo-round-pilots strong { color: #eef2f4; }
 
 /* EVENT TDZ: single-round event, the circuit name is the header's main info. */
 .race-meta .solo-header-circuit { font-size: 24px; font-weight: 800; color: var(--text, #fff); letter-spacing: 0; }
@@ -2165,7 +1965,6 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 /* Site tour (2026-10-06). A duration (« 6 h ») never leaves its unit on the next line. */
 .nowrap { white-space: nowrap; }
 /* Countdown of a race header: « 4 j 8 h » stays together. */
-.event-header-countdown strong { white-space: nowrap; }
 /* Entry window: the note under the categories is not glued to the last one. */
 .registration-category-list + .registration-step-help { margin-top: 10px; }
 /* Race list filters on a phone: each on one line (« Mes courses » no longer wraps). */
@@ -2279,13 +2078,6 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-start-hours .presence-scale { height: 18px; font-size: 11px; }
 .ce-start-hours .presence-track > .presence-segment { height: 26px; min-height: 26px; }
 .ce-start-hours .presence-edges { display: none; }
-.ce-concerned { margin: 14px 0 6px; padding-top: 12px; border-top: 1px solid #2b3336; font-size: 14px; color: var(--muted, #b7bfbc); }
-.ce-concerned summary { cursor: pointer; font-weight: 700; }
-.ce-concerned ul { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-.ce-concerned li { display: flex; justify-content: space-between; gap: 10px; text-transform: capitalize; }
-.ce-concerned li strong { color: var(--text, #f2f5f4); font-weight: 600; }
-.ce-concerned li span { text-transform: none; font-weight: 700; }
-.ce-concerned li span.is-whole { color: #4fd1c5; } .ce-concerned li span.is-part { color: #f3b33d; }
 .category-entry-sheet .registration-workspace-head { position: sticky; top: -18px; z-index: 3; margin: -18px -20px 0; padding: 16px 20px 10px; background: #111315; align-items: center; }
 .ce-footer { position: sticky; bottom: 0; margin: 12px -20px 0; padding: 14px 20px 12px; border-top: 1px solid #2b3336; background: var(--panel, #111315); }
 .category-entry-sheet[data-step="3"] .ce-footer { position: static; }
@@ -2306,7 +2098,6 @@ body:has([data-category-entry]) { overflow: hidden; }
 .category-entry-categories .category-button .category-logo, .category-entry-categories .category-button img { height: 38px !important; width: auto !important; }
 .category-entry-categories .registration-category-copy strong { font-size: 17px !important; color: var(--text, #f2f5f4); }
 .category-entry-categories .registration-category-copy em { font-size: 14px !important; }
-.registration-step .ce-range { margin-top: 12px; }
 .ce-subtitle { margin: 18px 0 8px; font-size: 15px; color: var(--text, #f2f5f4); }
 .ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 .ce-concerned-list li { display: grid; grid-template-columns: minmax(130px, 210px) minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 5px 10px; border-radius: 6px; background: #121718; font-size: 12px; }
@@ -2422,8 +2213,6 @@ html[data-game] #app .race-header .race-card-top { display: grid; grid-template-
 html[data-game] #app .race-header .race-head { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: flex-start !important; gap: 8px; }
 html[data-game] #app .race-header .event-title { flex-basis: auto; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 145px !important; }
-html[data-game] #app .race-header .race-my-start { margin: 2px 0 0; text-align: left; justify-items: start; }
-html[data-game] #app .race-header .race-my-start small { display: none; }
 html[data-game] #app .race-header .race-header-actions { display: flex; align-self: flex-start; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
 .race-actions-menu { position: relative; }
 .race-actions-menu > summary { display: grid; place-items: center; width: 36px; height: 30px; border: 1px solid #343c3f; border-radius: 8px; cursor: pointer; list-style: none; font-size: 24px; }
@@ -2434,8 +2223,6 @@ html[data-game] #app .race-header .race-header-actions { display: flex; align-se
   html[data-game] #app .race-header .race-card-top { grid-template-columns: 88px minmax(0, 1fr); gap: 12px; }
   html[data-game] #app .race-header .race-card-top > .circuit-visual { grid-column: 1 / -1; width: 100% !important; height: 115px !important; }
   html[data-game] #app .race-header .race-card-top > .event-type-panel { grid-column: 1 / -1; }
-  html[data-game] #app .race-header .race-my-start { flex: none; order: initial; }
-  html[data-game] #app .race-header .race-my-start .secondary-button { white-space: normal; text-align: left; }
 }
 
 html[data-game] #app .race-header .race-info-chips { display: flex; flex-wrap: wrap; align-items: center; align-self: flex-start; gap: 6px; }
@@ -2478,16 +2265,10 @@ html[data-game] #app .race-header .round-item-categories .category-logo { height
 .solo-password-near-entry { display: flex; margin: 8px 0 12px; }
 
 html[data-game] #app .race-header .solo-header-circuit { font-size: 16px; font-weight: 400; color: #c7d0d4; }
-.solo-header-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-html[data-game] #app .race-header .solo-header-summary .race-header-time { margin: 0; font-size: 15px; padding: 5px 10px; }
 
 /* Shared endurance / SOLO header positions and dimensions. */
 html[data-game] #app .race-header .race-side .event-badge-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 0; border: 0; background: none; }
 html[data-game] #app .race-header .race-side .event-badge-row > * { box-sizing: border-box; width: 100%; justify-content: center; text-align: center; }
-.solo-header-settings { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-html[data-game] #app .race-header .solo-header-settings .race-header-time { margin: 0; padding: 5px 10px; font-size: 14px; line-height: 1.2; }
-html[data-game] #app .race-header .solo-header-settings .race-header-time svg { width: 18px; height: 18px; }
-html[data-game] #app .race-header .solo-header-settings .round-info { display: contents; }
 html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { display: flex; justify-content: flex-end; height: 145px !important; }
 html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: auto; height: 145px; max-height: 145px; max-width: 100%; }
 @media(max-width:760px){

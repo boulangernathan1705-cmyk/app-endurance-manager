@@ -146,7 +146,6 @@ body.live-body .site-nav-shell #navigation { top: 9px; }
 .lw-who { font-size: 26px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .lw-who i { width: 12px; height: 12px; border-radius: 3px; }
 .lw-meta { color: var(--muted); font-size: 16px; }
-.lw-age { margin-left: auto; color: var(--muted); font-size: 12px; }
 .lw-big { font-size: 62px; font-weight: 700; line-height: 1; }
 .lw-big small { font-size: 26px; color: var(--muted); font-weight: 600; margin-left: 2px; }
 .lw-meter { height: 10px; border-radius: 6px; background: var(--lw-panel2); border: 1px solid var(--lw-line); overflow: hidden; position: relative; }
@@ -185,7 +184,7 @@ body.live-body .site-nav-shell #navigation { top: 9px; }
 .lw-cond dd { margin: 0; font-size: 24px; font-weight: 600; }
 .lw-stint { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 16px; color: var(--muted); }
 .lw-stint b { color: var(--text); font-size: 22px; margin-right: 4px; }
-@media (max-width: 520px) { .lw-cond { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-big { font-size: 48px; } .lw-lap { font-size: 40px; } .lw-tyre-main { font-size: 26px; } .lw-tyre-main small { font-size: 13px; } .lw-tyre dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-tyre dd { font-size: 16px; } .lw-kv dd { font-size: 21px; } .lw-age { margin-left: 0; width: 100%; } .lw-tyres { gap: 8px 12px; } .lw-tyre { padding: 8px; } .lw-tyre dt { font-size: 10px; letter-spacing: .02em; } .lw-tyre dd { font-size: 15px; white-space: nowrap; } }
+@media (max-width: 520px) { .lw-cond { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-big { font-size: 48px; } .lw-lap { font-size: 40px; } .lw-tyre-main { font-size: 26px; } .lw-tyre-main small { font-size: 13px; } .lw-tyre dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-tyre dd { font-size: 16px; } .lw-kv dd { font-size: 21px; } .lw-tyres { gap: 8px 12px; } .lw-tyre { padding: 8px; } .lw-tyre dt { font-size: 10px; letter-spacing: .02em; } .lw-tyre dd { font-size: 15px; white-space: nowrap; } }
 
 /* Map */
 .lw-mapbox { width: 100%; display: block; max-height: 78vh; }

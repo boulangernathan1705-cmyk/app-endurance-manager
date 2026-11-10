@@ -129,18 +129,13 @@ main { position: relative; }
 .departure-fold,
 .event-header,
 .empty,
-.my-entry-card,
-.crew-card,
-.pilot-name-panel,
-.member-row,
-.recovery-panel {
+.crew-card {
   background-color: rgba(12,17,19,.92);
   border-color: rgba(73,118,123,.52);
   box-shadow: 0 12px 30px rgba(0,0,0,.16), inset 0 1px rgba(255,255,255,.025);
 }
 .event-card:hover,
-.departure-fold[open],
-.my-entry-card[open] {
+.departure-fold[open] {
   border-color: rgba(90,205,211,.62);
   background-color: rgba(15,22,24,.96);
 }
@@ -154,17 +149,13 @@ main { position: relative; }
 .event-title,
 .form-title,
 .creation-intro h2,
-.creation-card h2,
-.my-entry-title h2 {
+.creation-card h2 {
   color: var(--brand-cream);
   text-shadow: 0 1px 16px rgba(232,181,82,.05);
 }
-.page-subtitle,
-.event-subtitle,
 .creation-help,
 .muted { color: var(--muted); }
-.creation-kicker,
-.my-entry-kicker { color: var(--brand-gold); }
+.creation-kicker { color: var(--brand-gold); }
 
 /* Buttons and controls */
 .primary-button,
@@ -178,7 +169,6 @@ main { position: relative; }
 .save-button:hover { filter: brightness(1.08) saturate(1.05); }
 .secondary-button,
 .edit-button,
-.event-section-tab,
 .event-filter-button {
   border-color: rgba(71,111,116,.72);
   background: linear-gradient(180deg,rgba(25,34,37,.96),rgba(15,21,23,.96));
@@ -186,9 +176,7 @@ main { position: relative; }
 }
 .secondary-button:hover,
 .edit-button:hover,
-.event-section-tab:hover,
 .event-filter-button:hover { border-color: rgba(89,207,212,.62); background: #192528; }
-.event-section-tab[aria-pressed="true"],
 .event-filter-button[aria-pressed="true"],
 .registration-nav-button[aria-pressed="true"] {
   border-color: rgba(91,213,218,.72);
@@ -212,8 +200,7 @@ textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,
 /* Accent treatments */
 .event-period-heading,
 .fold-section > h2,
-.crew-heading,
-.my-entries-group-heading {
+.crew-heading {
   border-color: rgba(76,129,134,.42);
 }
 .event-period-heading::after {
@@ -229,21 +216,12 @@ textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,
 .event-header-compact {
   background-image: linear-gradient(120deg,rgba(89,211,216,.035),transparent 34%,rgba(231,182,83,.025));
 }
-.event-header-summary,
 .departure-fold > summary,
-.crew-card-header,
-.my-entry-header {
+.crew-card-header {
   border-color: rgba(67,107,112,.48);
 }
-.category-group-header {
-  background: rgba(7,11,12,.78);
-  border-top: 1px solid rgba(255,255,255,.025);
-  border-bottom: 1px solid rgba(255,255,255,.025);
-}
 .pilot-row,
-.crew-roster li,
-.my-entry-pilot,
-.my-entry-compact-pilot {
+.crew-roster li {
   background-color: rgba(18,25,28,.88);
   border-color: rgba(255,255,255,.04);
 }
@@ -264,9 +242,7 @@ textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,
 .special-availability { border-color: rgba(66,102,107,.48); }
 
 /* Small metallic details that echo the banner. */
-.event-type-badge,
-.my-entry-pill,
-.coverage-summary {
+.event-type-badge {
   box-shadow: inset 0 1px rgba(255,255,255,.06);
 }
 .form-label { color: #a5b5b6; }

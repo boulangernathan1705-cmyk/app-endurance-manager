@@ -7,11 +7,6 @@
     padding-bottom: 10px;
   }
 
-  .event-header-compact .event-heading-line {
-    grid-template-columns: minmax(300px,.78fr) minmax(360px,1.22fr);
-    gap: 18px;
-  }
-
   .event-header-compact .circuit-visual {
     height: 282px;
     align-items: center;
@@ -24,10 +19,5 @@
     max-width: 499px;
     max-height: 269px;
     object-fit: contain;
-  }
-
-  .event-header-summary {
-    margin-top: -4px;
-    padding-top: 7px;
   }
 }

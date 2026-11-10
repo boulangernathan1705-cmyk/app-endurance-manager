@@ -26,14 +26,6 @@
   align-items: stretch;
 }
 
-.crew-pilot-accordion-body[data-pilot-columns="2"] {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.crew-pilot-accordion-body[data-pilot-columns="3"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .crew-pilot-accordion-body > .crew-capacity-message,
 .crew-pilot-accordion-body > .empty {
   grid-column: 1 / -1;
@@ -54,9 +46,6 @@
 }
 
 /* Course: le contrôle d'inscription reste accessible même quand le départ est fermé. */
-.departure-fold[id^="departure-"] > .departure-fold-body > .fold-toolbar {
-  display: none !important;
-}
 
 .departure-fold[id^="departure-"] > summary {
   grid-template-columns: 46px minmax(0, 1fr) auto minmax(155px, max-content) 32px;
@@ -76,12 +65,6 @@
 .departure-fold[id^="departure-"] > summary > .fold-meta {
   grid-column: 3;
   grid-row: 1 / span 2;
-}
-
-.departure-fold[id^="departure-"] > summary > .fold-countdown {
-  grid-column: 4;
-  grid-row: 1;
-  justify-self: end;
 }
 
 .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
@@ -116,16 +99,8 @@
   background: color-mix(in srgb, var(--crew-color) 12%, #151c1f) !important;
 }
 
-@media (max-width: 900px) {
-  .crew-pilot-accordion-body[data-pilot-columns="3"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
-  .crew-pilot-accordion-body,
-  .crew-pilot-accordion-body[data-pilot-columns="2"],
-  .crew-pilot-accordion-body[data-pilot-columns="3"] {
+  .crew-pilot-accordion-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -148,15 +123,6 @@
   .departure-fold[id^="departure-"] > summary > .fold-meta {
     grid-column: 2;
     grid-row: 2;
-  }
-
-  .departure-fold[id^="departure-"] > summary > .fold-countdown {
-    display: block;
-    grid-column: 2;
-    grid-row: 3;
-    justify-self: start;
-    min-width: 0;
-    text-align: left;
   }
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {

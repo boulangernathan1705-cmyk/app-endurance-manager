@@ -6,8 +6,6 @@
 .grindfest-column .solo-entries {display:grid;grid-template-columns:minmax(0,1fr)}
 .grindfest-streamer-form {display:grid;grid-template-columns:2fr 3fr 1fr;gap:12px;border-bottom:1px solid var(--border,#39404a);padding:16px 0}
 .grindfest-streamer-form input {min-width:0;width:100%}
-.grindfest-choice {margin-bottom:20px}
-.grindfest-choice p {font-size:.9rem;color:var(--muted,#b4bdca)}
 @media(max-width:1000px) {.grindfest-grid {grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px) {.grindfest-grid,.grindfest-streamer-form {grid-template-columns:1fr}}
 
@@ -58,7 +56,7 @@ html[data-game] #app .race-header.is-gridfest::after {content:"";position:absolu
 html[data-game] #app .race-header.is-gridfest > * {position:relative;z-index:1}
 html[data-game] #app .race-header.is-gridfest .event-type-panel {border:0;background:radial-gradient(circle,rgba(255,123,0,.35),transparent 70%)}
 html[data-game] #app .race-header.is-gridfest .event-type-panel span {font-size:30px}
-html[data-game] #app .race-header.is-gridfest .event-type-panel span,.gridfest-wordmark {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900;font-style:italic;letter-spacing:.06em;filter:drop-shadow(0 0 10px rgba(255,61,0,.45))}
+html[data-game] #app .race-header.is-gridfest .event-type-panel span {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900;font-style:italic;letter-spacing:.06em;filter:drop-shadow(0 0 10px rgba(255,61,0,.45))}
 
 .solo-round-starts.is-gridfest .grindfest-column {border-color:rgba(255,123,0,.45);background:linear-gradient(180deg,rgba(255,123,0,.12),transparent 120px),var(--surface,#171c25)}
 .solo-round-starts.is-gridfest .grindfest-column:nth-child(3n+2) {border-color:rgba(255,61,0,.45);background:linear-gradient(180deg,rgba(255,61,0,.12),transparent 120px),var(--surface,#171c25)}
@@ -68,16 +66,14 @@ html[data-game] #app .race-header.is-gridfest .event-type-panel span,.gridfest-w
 html[data-game] #app .race-card.is-gridfest .event-name {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 html[data-game] #app .race-card.is-gridfest {border:1px solid transparent;background:radial-gradient(circle at 85% 50%,rgba(255,123,0,.22),transparent 45%),linear-gradient(#17120c,#17120c) padding-box,var(--gf-grad) border-box}
 html[data-game] #app .race-card .gridfest-card-panel {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
-.gridfest-card-panel .gridfest-wordmark {font-size:24px}
 .gridfest-avatars {display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
 .gridfest-avatars .gridfest-avatar {width:38px;height:38px;border-radius:50%;font-size:16px;box-shadow:0 0 0 2px #17120c}
 @media(max-width:600px) {
   .grindfest-streamer-head .gridfest-avatar {width:60px;height:60px}
   .gridfest-streamer-cards {grid-template-columns:1fr}
   html[data-game] #app .race-card .race-card-type-logo.gridfest-card-panel {display:flex}
-  .gridfest-card-panel .gridfest-wordmark {font-size:15px}
 }
-@media(prefers-reduced-motion:no-preference) {.gridfest-wordmark,html[data-game] #app .race-header.is-gridfest .event-type-panel span {background-size:200% 100%;animation:gf-shine 6s ease-in-out infinite alternate}}
+@media(prefers-reduced-motion:no-preference) {html[data-game] #app .race-header.is-gridfest .event-type-panel span {background-size:200% 100%;animation:gf-shine 6s ease-in-out infinite alternate}}
 @keyframes gf-shine {to {background-position:100% 0}}
 
 /* Official Gridfest artwork, preserving each logo's proportions. */

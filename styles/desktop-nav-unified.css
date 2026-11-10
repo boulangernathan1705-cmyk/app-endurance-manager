@@ -1,6 +1,3 @@
-.desktop-nav-center,
-.desktop-nav-right { display:none; }
-
 @media (min-width: 761px) {
   .site-nav-shell {
     position: relative !important;
@@ -21,112 +18,6 @@
   }
 
   .site-nav-shell .game-space-bar { display:none !important; }
-
-  .desktop-home-toolbar {
-    grid-column: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-  }
-
-  .desktop-home-title {
-    flex: 0 0 auto;
-    color: var(--text);
-    font-size: 15px;
-    font-weight: 950;
-    letter-spacing: .045em;
-    white-space: nowrap;
-  }
-
-  .desktop-home-toolbar .home-create-event,
-  .desktop-home-toolbar .event-filter { margin:0 !important; }
-  .desktop-home-toolbar .home-create-event { display:contents; }
-
-  .desktop-home-toolbar .home-create-event .primary-button,
-  .desktop-home-toolbar > [data-action="home"] {
-    min-height: 42px;
-    padding: 8px 15px;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .desktop-home-toolbar .event-filter {
-    display:flex;
-    gap:5px;
-    padding:4px;
-    border:1px solid rgba(70,108,113,.5);
-    border-radius:10px;
-    background:rgba(255,255,255,.018);
-  }
-
-  .desktop-home-toolbar .event-filter-button {
-    min-height:34px;
-    padding:6px 11px;
-    font-size:12px;
-    white-space:nowrap;
-  }
-
-  .desktop-nav-center {
-    grid-column: 2;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    min-width:0;
-  }
-
-  .desktop-nav-center .nav-game-switcher {
-    display:grid;
-    grid-template-columns:repeat(2,minmax(165px,1fr));
-    gap:10px;
-    width:100%;
-    max-width:410px;
-    margin:0;
-    padding:0;
-  }
-
-  .desktop-nav-center .nav-game-switcher-button {
-    min-width:165px;
-    min-height:46px;
-    padding:9px 16px;
-    border-radius:10px;
-    font-size:14px;
-    letter-spacing:.01em;
-    white-space:nowrap;
-  }
-
-  .desktop-nav-right {
-    grid-column:3;
-    display:flex;
-    align-items:center;
-    justify-content:flex-end;
-    gap:10px;
-    min-width:0;
-  }
-
-  .desktop-nav-right-controls {
-    display:flex;
-    align-items:center;
-    gap:8px;
-    min-width:0;
-  }
-
-  .desktop-nav-right-controls > [data-action="my-entries"] {
-    min-width:170px;
-    min-height:44px;
-    margin:0 !important;
-    padding:9px 16px !important;
-    white-space:nowrap;
-  }
-
-  .desktop-nav-right .account-bar {
-    flex:0 0 auto;
-    max-width:none;
-    margin:0;
-    padding:0;
-    justify-content:flex-end;
-  }
 
   .site-nav-shell #navigation {
     display:none !important;
@@ -153,11 +44,4 @@
     grid-template-columns:minmax(0,1fr) minmax(300px,340px) minmax(0,1fr) !important;
     column-gap:12px !important;
   }
-
-  .desktop-home-title { display:none; }
-  .desktop-home-toolbar { gap:6px; }
-  .desktop-home-toolbar .home-create-event .primary-button { padding-inline:10px; }
-  .desktop-nav-center .nav-game-switcher { gap:6px; }
-  .desktop-nav-center .nav-game-switcher-button { min-width:140px; padding-inline:10px; font-size:13px; }
-  .desktop-nav-right-controls > [data-action="my-entries"] { min-width:145px; padding-inline:12px !important; }
 }

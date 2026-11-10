@@ -31,7 +31,7 @@
 .cal-ev small strong{color:var(--text)}
 .cal-me{color:var(--cal-open);font-weight:800}
 .cal-live{grid-column:1/-1;font-size:11.5px;font-weight:700;color:var(--cal-stream);background:color-mix(in srgb,var(--cal-stream) 14%,transparent);border-radius:6px;padding:3px 6px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cal-go,.cal-tap,.cal-open{display:none}
+.cal-go,.cal-tap{display:none}
 /* Everything on one screen (Nathan 2026-11-07): the month fills the window's height, the chosen day beside it. */
 .cal-body{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;height:max(460px,calc(100dvh - 370px))}
 .cal-main{display:flex;flex-direction:column;min-height:0;min-width:0}
@@ -66,8 +66,6 @@
 .cal-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;color:var(--muted);font-size:12.5px}
 .cal-legend span[class^="t-"]::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
 .cal-legend-me b{color:var(--cal-open)}
-.cal-later{margin-top:18px}
-.cal-later-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
 @media (max-width:700px){
   .cal-head{flex-wrap:wrap}
   .cal-long{display:none}.cal-short{display:inline}
@@ -92,8 +90,6 @@
   .cal-line{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent);mask-image:linear-gradient(90deg,#000 78%,transparent)}
   .cal-dots em{font-weight:700;font-size:9.5px;line-height:12px;color:var(--muted);font-style:normal;padding-left:6px}
   .cal-day.past .cal-line{opacity:.45}
-
-  .cal-later-list{grid-template-columns:1fr}
 }
 
 /* The week's cards on the home page: the frame and the band take the type's colour too (option A, 2026-11-03). */
