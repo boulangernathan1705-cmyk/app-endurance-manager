@@ -315,7 +315,8 @@ function otherStartsField(event,departure,stateDraft){
 // « Je streame ce départ » (Nathan 2026-11-02): an admin entering himself says he streams this start, from the start to
 // the finish by default; the morning poster then pings @everyone, and the week shows 📺 with the community's link.
 const paris=at=>new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(at);
-const canStream=(event,stateDraft)=>Boolean(state.user&&isAdmin()&&!stateDraft.forOther&&!isSolo(event));
+// The community's streamer (« Nom du streamer » in Admin › Discord) too, admin or not.
+const canStream=(event,stateDraft)=>Boolean(state.user&&(isAdmin()||state.mayStream)&&!stateDraft.forOther&&!isSolo(event));
 export function defaultStream(event,departure){
   const start=Number(departure.startsAt);
   return Number.isFinite(start)?{start:paris(start),end:paris(raceFinishAt(start,eventMinutes(event)))}:{start:'21:00',end:''};

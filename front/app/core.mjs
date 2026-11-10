@@ -258,6 +258,7 @@ export async function load() {
   // EVENT TDZ: the season chosen by the organisers (first month, length), for the calendar.
   state.tdzSeason=session.tdzSeason&&typeof session.tdzSeason==='object'?session.tdzSeason:null;
   // The community's stream link (Discord setting « Annonce du jour »): the events it streams link to it.
+  state.mayStream=session.mayStream===true;
   state.communityStreamUrl=typeof session.communityStreamUrl==='string'?session.communityStreamUrl:'';
   state.combos=session.combos===true;
   state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
