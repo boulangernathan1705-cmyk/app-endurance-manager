@@ -1,30 +1,32 @@
-import {communitySeason,saveCommunitySeason} from './season.mjs';
-import {discordDiagnostic} from './discord-diagnostic.mjs';
+import {communitySeason} from './season.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
-import {discordRequest} from './recap-discord.mjs';
-import {siteOf} from './discord-weekly.mjs';
-import {announceStream,sendAnnouncementPreview} from './discord-announce.mjs';
+import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal,
-  registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
+  LEGACY_CAR_ALIASES, DAY, HttpError, fail, now, id, token, hash, cookie, SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel,
+  baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal, registrationSelect,
+  registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
-import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
+import {communityRequestsApi} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
 import {eventListTag, matchesEventTag} from './event-revision.mjs';
 import {measureRequest} from './request-metrics.mjs';
-import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
-import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
+import {simForEvent, TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
+import {
+  soloRacesEnabled, currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow
+} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {STREAM_SIM} from '../shared/stream.mjs';
 import {streamCrews} from './stream-crew.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships, crewOrganisers} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, ALL_PERMISSIONS, memberPermissions, discoverMemberships, crewOrganisers} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
-import {iracingSoloEnabled,importedIracingSolo,iracingSoloSql} from './iracing-visibility.mjs';
-const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
+import {iracingSoloEnabled, iracingSoloSql} from './iracing-visibility.mjs';
+import {communityApi} from './api-community.mjs';
+import {platformApi} from './api-platform.mjs';
+import {crewsApi, canManageCrew} from './api-crews.mjs';
+import {OFFICIAL, eventById, actingCommunity, departureById, slotFor, can} from './api-shared.mjs';
 // « EVENT SOLO » (every community but the TDZ): no type, no SAFE access.
 const plainSoloInput = (env, community, input) => {
   if (input?.format !== 'solo' || tdzOnly(community, isDevelopment(env))) return input;
@@ -32,54 +34,11 @@ const plainSoloInput = (env, community, input) => {
   delete details.type;
   return {...input, access:'open', details};
 };
-import {syncIracingEvents} from './iracing-import.mjs';
 import {combosApi, combosPlugin, combosEnabled} from './combos.mjs';
-import {resetShowcase, makeOfficial} from './demo.mjs';
-import {setupOfficialServer} from './official-discord.mjs';
 
 
-import {postCrewRequestCard, decideCrewRequestCard, deleteCrewRequestCard} from './crew-request-discord.mjs';
-import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
-import {parseLayout} from './discord-layout.mjs';
+import {botRecapSettings} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {checkCrewAccess, validateCrewAccess, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
-// Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
-const OFFICIAL = 'official';
-// A race of the current community, or an official race: any id from another community answers "introuvable".
-async function eventById(env, eventId, community) {
-  const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND (community_id=? OR community_id=?)').bind(eventId, community.id, OFFICIAL).first();
-  // A solo race does not exist where solo races are off (production): no entry, edit or crew through its id.
-  if (!row || (row.format === 'solo' && !soloRacesEnabled(env, community))) fail(404, 'Événement introuvable.');
-  if (importedIracingSolo(row) && !iracingSoloEnabled(env,community)) fail(404, 'Événement introuvable.');
-  if (isGrindfest(row) && !grindfestEnabled(community, isDevelopment(env))) fail(404, 'Événement introuvable.');
-  return row;
-}
-// On an official race, a player acts for one of his communities (chosen at the first step of an entry or a crew;
-// the one of an existing entry or crew), not only for the site's one: his membership and the rights of his
-// Discord roles there are checked. Returns that community and the actor with his permissions in it.
-async function actingCommunity(env, actor, site, communityId, event = null) {
-  if (importedIracingSolo(event) && !iracingSoloEnabled(env,site)) fail(404, 'Événement introuvable.');
-  if (!communityId || communityId === site.id) return {community:site, actor};
-  if (event && event.community_id !== OFFICIAL) fail(404, 'Événement introuvable.');
-  const target = await communityById(env, communityId);
-  if (!target) fail(404, 'Communauté introuvable.');
-  if (importedIracingSolo(event) && !iracingSoloEnabled(env,target)) fail(404, 'Événement introuvable.');
-  const access = await communityAccess(env, actor, target);
-  if (access.status !== 'member') fail(403, `Tu n’es pas membre de la communauté ${target.name}.`);
-  return {community:target, actor:{...actor, permissions:access.permissions, manager:access.manager}};
-}
-// Car of a crew: none, or one of the catalog's cars of its category (older names accepted and renamed).
-function crewCar(input,event) {
-  if (input.car==null || input.car==='') return '';
-  const car=LEGACY_CAR_ALIASES.get(input.car) || text(input.car,100,'Voiture');
-  if (!catalogForGame(gameForEvent(event)).cars[input.category]?.includes(car)) fail(400,'Choisis une voiture proposée pour cette catégorie.');
-  return car;
-}
-function departureById(event, departureId) {
-  const departure = JSON.parse(event.departures).find(d => d.id === departureId);
-  if (!departure) fail(404, 'Départ introuvable.');
-  return departure;
-}
 // Real starts were added next to the common "Horaire à définir" start: nobody is on it (no entry, no
 // crew), so it is not needed any more and is left out.
 async function dropEmptyCommonStart(env, eventId, data) {
@@ -162,14 +121,6 @@ async function askToChooseStart(env, event, waitingId) {
   await notify(env, alone, 'choose_departure', event, {skip:told});
   return [...told, ...alone.map(row => row.user_id)];
 }
-// An official slot for pilots leaving the common "Horaire à définir" start of the same race.
-function slotFor(event, from, departureId) {
-  if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
-  const target = JSON.parse(event.departures).find(d => d.id === departureId);
-  if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
-  if (target.startsAt <= Date.now()) fail(409, 'Ce départ est passé.');
-  return target;
-}
 // "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
 // each site. A feature of the platform (not a community module): empty unless the player has several communities.
 async function myCommunities(env, actor, community, all = false) {
@@ -197,67 +148,6 @@ async function myCommunities(env, actor, community, all = false) {
   // all: every one (a visitor without access here is shown where he can go).
   return all || allowed.length >= 2 ? allowed : [];
 }
-// Body of an image upload (the banner), read up to `limit` bytes.
-async function imageBody(request, limit) {
-  const reader = request.body?.getReader();
-  if (!reader) fail(400, 'Image manquante.');
-  let size = 0; const chunks = [];
-  while (true) { const {value, done} = await reader.read(); if (done) break; size += value.length; if (size > limit) { await reader.cancel(); fail(413, 'Image trop lourde (600 Ko au plus).'); } chunks.push(value); }
-  const all = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
-  return all;
-}
-// Type of an image from its first bytes (never from what the browser says).
-function imageType(bytes) {
-  const text = (start, end) => String.fromCharCode(...bytes.slice(start, end));
-  if (text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP') return 'image/webp';
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
-  if (text(1, 4) === 'PNG' && bytes[0] === 0x89) return 'image/png';
-  return null;
-}
-// Invitation of the bot (the site's Discord application) to a community's server: it only reads members and roles.
-// Without permissions the bot only reads the members and their roles; the crews on Discord need more
-// (server/crew-discord.mjs): the admins invite it again with them.
-function botInvite(env, guildId, permissions = '0') {
-  if (!env.DISCORD_CLIENT_ID) return null;
-  return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${permissions}${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
-}
-// « Modules »: whether the bot may make the crews' channels, its invite link with those rights, what last
-// stopped it, and where the voice channels are made (the server's categories to choose from).
-async function crewDiscordState(env, community) {
-  const saved = await env.DB.prepare('SELECT last_error, last_error_at, voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
-  const on = community.modules.crewChannels === true;
-  const failedChannelId = saved?.last_error?.match(/salon (\d{15,22})/)?.[1] || null;
-  const bot = await checkCrewAccess(env,community,{includeCategories:on,failedChannelId});
-  return {botReady:bot.ready, botProblem:bot.why, botMissing:bot.missing || [], botChannelName:bot.channelName || null, botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
-    lastError:on ? saved?.last_error || null : null, voiceCategoryId:saved?.voice_category_id || null,
-    categories:on ? bot.categories || null : null};
-}
-// Crews on Discord (server/crew-discord.mjs): turned on only once the bot has the rights to make the channels;
-// crewCategory: where their voice channels are made, a category of the server or '' for the top of the server.
-async function crewModuleStatements(env, community, modules, input) {
-  const statements = [];
-  if (typeof input.crewChannels === 'boolean') {
-    if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined, layout:input.layout === true});
-    modules.crewChannels = input.crewChannels;
-    if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
-      ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
-  }
-  if (typeof input.crewCategory === 'string') {
-    const category = input.crewCategory.trim();
-    await assertCrewAccess(env,community,{categoryId:category, layout:input.layout === true});
-    if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
-    statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
-      ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
-  }
-  return statements;
-}
-async function assertCrewAccess(env,community,options) {
-  try { return await validateCrewAccess(env,community,options); }
-  catch (error) { if (error.status === 400) fail(400,error.message); throw error; }
-}
-// Permissions of the actor in the current community (server/access.mjs).
-const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
 // « Je streame ce départ »: {stream:{start:'20:00', end:'23:00'}} or {stream:null}. An end before the start is the next
 // morning until 6h, otherwise a mistake.
 function registrationStream(input) {
@@ -273,43 +163,6 @@ function isRegistrationManager(actor) {
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
-function canManageCrew(crew, actor) {
-  return can(actor, 'crews') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
-}
-// `community`: the site's community. An entry of another of the player's communities (on an official race) is shown
-// with its community, and is changed on that community's site only.
-// `perms`: the player's permissions in each of his other communities; `official`: ids of the official races, whose
-// entries all show their community (logo or short name).
-// Placed in a crew, the pilot leaves his other categories on that start, and his other starts of the race on the same
-// day where he has no crew (Nathan 2026-11-09: a pilot stayed entered on the other start of the day); with
-// « Inscription par catégorie », all his other starts. Run in a batch right after the crew_members insert.
-const leaveOtherStarts=`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND participant_id=? AND (departure_id=?
-  OR (departure_id IN (SELECT value FROM json_each(?)) AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=registrations.id)))`;
-const parisDay = timestamp => new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Paris', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(Number(timestamp)));
-function startsToLeave(event, departure, community) {
-  const all = community?.modules?.categoryEntry === true;
-  return JSON.stringify(JSON.parse(event.departures || '[]').filter(item => item.id !== departure.id && (all || parisDay(item.startsAt) === parisDay(departure.startsAt))).map(item => item.id));
-}
-
-// « Demander un équipage »: a pilot's request is answered as soon as he is placed in a crew, whatever the way
-// (« Créer cet équipage », pilots ticked on the « Équipages » page, « Ajouter à… »): he is told and the Discord card
-// turns green. Returns true when a request was answered.
-async function acceptCrewRequests(env, community, registrationId, crewId, actor) {
-  // Never blocks placing the pilot (a database without migration 0091 has no request to answer).
-  const rows = (await env.DB.prepare(`SELECT * FROM crew_requests WHERE community_id=? AND status='pending' AND json_extract(registration_ids,'$[0]')=?`).bind(community.id, registrationId).all().catch(() => null))?.results || [];
-  let answered = false;
-  for (const row of rows) {
-    const done = await env.DB.prepare(`UPDATE crew_requests SET status='accepted',decided_by=?,decided_at=? WHERE id=? AND status='pending'`).bind(actor.user.id, now(), row.id).run();
-    if (!done.meta.changes) continue;
-    answered = true;
-    const [event, crew] = await Promise.all([env.DB.prepare('SELECT * FROM events WHERE id=?').bind(row.event_id).first(), env.DB.prepare('SELECT name FROM crews WHERE id=?').bind(crewId).first()]);
-    if (event) await notify(env, [{user_id:row.user_id, community_id:community.id}], 'crew_request_accepted', event,
-      {departure:JSON.parse(event.departures).find(item => item.id===row.departure_id)||null, skip:[actor.user.id], crewName:crew?.name || row.name, by:actor.user.name});
-    await decideCrewRequestCard(env, community, row, {status:'accepted', by:actor.user.name, crewId});
-  }
-  return answered;
-}
-
 function publicRegistration(reg, actor, userNames = new Map(), community = null, names = new Map(), perms = new Map(), official = new Set(), pilotNames = new Map()) {
   let cars = [];
   try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
@@ -684,224 +537,9 @@ async function api(request, env) {
       WHERE m.community_id=? AND m.status='member'
       ORDER BY lower(COALESCE(NULLIF(m.nickname,''),u.name)),u.id`).bind(community.id).all()).results});
   }
-  // « Demander un équipage » (migration 0091): a pilot without « Équipages » proposes a crew on his start; the
-  // organisers see the requests on the « Équipages » page, create the crew or refuse it.
-  const requestCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crew-requests$/);
-  const requestRoute = path.match(/^\/api\/crew-requests\/([a-f0-9-]{36})\/(accept|refuse|cancel)$/);
-  if (path === '/api/crew-requests' && method === 'GET') {
-    if (!actor.user) return json({requests:[]});
-    const organiser = can(actor,'crews');
-    const rows = (await env.DB.prepare(`SELECT q.*, COALESCE(NULLIF(m.nickname,''),u.name) AS requester, e.name AS event_name, e.circuit AS event_circuit, e.sim AS event_sim, e.departures AS event_departures
-      FROM crew_requests q JOIN events e ON e.id=q.event_id JOIN users u ON u.id=q.user_id
-      LEFT JOIN memberships m ON m.community_id=q.community_id AND m.user_id=q.user_id
-      WHERE q.community_id=? AND q.status='pending' AND (?=1 OR q.user_id=?)
-        AND EXISTS (SELECT 1 FROM registrations r WHERE r.id=json_extract(q.registration_ids,'$[0]') AND r.status!='unavailable'
-          AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id))
-      ORDER BY q.created_at`).bind(community.id, organiser?1:0, actor.user.id).all()).results || [];
-    // Still useful: its start is to come and its pilot is still entered without a crew.
-    const open = rows.filter(row => Number(JSON.parse(row.event_departures || '[]').find(item => item.id===row.departure_id)?.startsAt) > Date.now());
-    return json({requests:open.map(row => ({id:row.id, eventId:row.event_id, departureId:row.departure_id, eventName:row.event_name,
-      game:gameForEvent({circuit:row.event_circuit, sim:row.event_sim}), name:row.name, category:row.category, car:row.car || '',
-      registrationIds:JSON.parse(row.registration_ids || '[]'), requester:row.requester, mine:row.user_id===actor.user.id, createdAt:row.created_at}))});
-  }
-  if (requestCreate && method === 'POST') {
-    if (!actor.user) fail(401,'Connecte-toi avec Discord pour demander un équipage.');
-    const input = await body(request);
-    const event = await eventById(env, requestCreate[1], community);
-    if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
-    const departure = departureById(event, requestCreate[2]);
-    if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé.');
-    if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-    const name = text(input.name,60,'Nom de l’équipage'), car = crewCar(input,event);
-    const regs = (await env.DB.prepare(registrationSelect+` WHERE r.event_id=? AND r.departure_id=? AND r.community_id=? AND r.status!='unavailable'
-      AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id)`).bind(event.id, departure.id, community.id).all()).results || [];
-    const own = regs.find(reg => personal(reg,actor) && reg.category===input.category);
-    if (!own) fail(409,'Inscris-toi d’abord sur ce départ dans cette catégorie, sans équipage.');
-    const wanted = Array.isArray(input.registrationIds) ? input.registrationIds.slice(0,12) : [];
-    const mates = wanted.map(item => regs.find(reg => reg.id===item && reg.category===input.category && reg.id!==own.id)).filter(Boolean);
-    if (mates.length !== wanted.filter(item => item!==own.id).length) fail(409,'Un coéquipier choisi n’est plus libre dans cette catégorie. Actualise la page.');
-    const requestId = id();
-    // A new request replaces the pilot's last one on this start: its Discord card goes too.
-    const replaced = await env.DB.prepare(`SELECT * FROM crew_requests WHERE user_id=? AND departure_id=? AND status='pending'`).bind(actor.user.id, departure.id).first();
-    await env.DB.batch([
-      env.DB.prepare(`DELETE FROM crew_requests WHERE user_id=? AND departure_id=? AND status='pending'`).bind(actor.user.id, departure.id),
-      env.DB.prepare(`INSERT INTO crew_requests(id,community_id,event_id,departure_id,user_id,name,category,car,registration_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
-        .bind(requestId, community.id, event.id, departure.id, actor.user.id, name, input.category, car || null, JSON.stringify([own.id, ...mates.map(reg => reg.id)]), now())
-    ]);
-    await notify(env, await crewOrganisers(env, community), 'crew_request', event, {departure, skip:[actor.user.id], pilot:own.participant_name||own.name, crewName:name, departureId:departure.id});
-    await deleteCrewRequestCard(env, replaced);
-    await postCrewRequestCard(env, community, requestId);
-    return json({id:requestId},201);
-  }
-  if (requestRoute && method === 'POST') {
-    if (!actor.user) fail(401,'Connecte-toi avec Discord.');
-    const input = await body(request);
-    const row = await env.DB.prepare(`SELECT * FROM crew_requests WHERE id=? AND community_id=?`).bind(requestRoute[1], community.id).first();
-    const action = requestRoute[2];
-    // Already accepted when its pilot joined the crew (acceptCrewRequests): the Discord card shows the full crew.
-    if (row?.status === 'accepted' && action === 'accept' && can(actor,'crews')) {
-      await decideCrewRequestCard(env, community, row, {status:'accepted', by:actor.user.name, crewId:input.crewId});
-      return json({ok:true});
-    }
-    if (row?.status !== 'pending') fail(404,'Cette demande a déjà été traitée. Actualise la page.');
-    if (action === 'cancel') {
-      if (row.user_id !== actor.user.id) fail(403,'Seul le pilote qui l’a faite annule sa demande.');
-      await env.DB.prepare('DELETE FROM crew_requests WHERE id=?').bind(row.id).run();
-      await deleteCrewRequestCard(env, row);
-      return json({ok:true});
-    }
-    requirePermission(actor,'crews','Seuls les organisateurs traitent les demandes d’équipage.');
-    const event = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(row.event_id).first();
-    let crewName = row.name;
-    if (action === 'accept') {
-      const crew = /^[a-f0-9-]{36}$/.test(input.crewId || '') ? await env.DB.prepare('SELECT name FROM crews WHERE id=? AND event_id=? AND community_id=?').bind(input.crewId, row.event_id, community.id).first() : null;
-      if (!crew) fail(409,'Crée d’abord l’équipage de cette demande.');
-      crewName = crew.name;
-    }
-    await env.DB.prepare(`UPDATE crew_requests SET status=?,decided_by=?,decided_at=? WHERE id=? AND status='pending'`).bind(action==='accept'?'accepted':'refused', actor.user.id, now(), row.id).run();
-    if (event) await notify(env, [{user_id:row.user_id, community_id:community.id}], action==='accept'?'crew_request_accepted':'crew_request_refused', event,
-      {departure:JSON.parse(event.departures).find(item => item.id===row.departure_id)||null, skip:[actor.user.id], crewName, by:actor.user.name});
-    await decideCrewRequestCard(env, community, row, {status:action==='accept'?'accepted':'refused', by:actor.user.name, crewId:input.crewId});
-    return json({ok:true});
-  }
-  const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
-  const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);
-  if ((crewCreate && method==='POST') || (crewRoute && ['POST','PATCH','DELETE'].includes(method))) {
-    if (!actor.user) fail(401,'Connecte-toi avec Discord pour gérer un équipage.');
-    const input=await body(request);
-    // A crew of the site's community, or of another of the player's communities on an official race (a new one:
-    // the community chosen at its first step). Its community's rights apply.
-    const crew=crewRoute ? await env.DB.prepare(`SELECT * FROM crews c WHERE id=? AND (community_id=? OR EXISTS (SELECT 1 FROM events oe WHERE oe.id=c.event_id AND oe.community_id='official'))`).bind(crewRoute[1],community.id).first() : null;
-    if (crewRoute && !crew) fail(404,'Équipage introuvable.');
-    const event=await eventById(env,crew?.event_id || crewCreate[1],community);
-    const {community:here, actor:who} = await actingCommunity(env, actor, community, crew ? crew.community_id : input.communityId, event);
-    if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
-    const departure=departureById(event,crew?.departure_id || crewCreate[2]);
-    if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
-    if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
-    const membership=crewRoute && path.includes('/members');
-    if (membership) {
-      if (method==='POST' && !crewRoute[2]) {
-        if (crew.locked) fail(409,'Cet équipage est complet. Son responsable doit le rouvrir avant de pouvoir le rejoindre.');
-        if (!/^[a-f0-9-]{36}$/.test(input.registrationId || '')) fail(400,'Sélectionne un pilote inscrit.');
-        const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=? AND r.community_id=?').bind(input.registrationId,here.id).first();
-        if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
-        if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
-        const selfJoin=input.selfJoin===true && personal(selected,actor);
-        if (!canManageCrew(crew,who) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
-        // Joining never makes a pilot the crew's manager: the organisers (« Équipages ») manage crews (2026-11-01).
-        const crewUpdate=env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
-        const results=await env.DB.batch([
-          crewUpdate,
-          env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(input.registrationId,crew.id),
-          env.DB.prepare(leaveOtherStarts).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,startsToLeave(event,departure,here))
-        ]);
-        if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-        const pilot=selected.participant_name||selected.name;
-        await notify(env,await crewPilots(env,crew.id),'crew_join',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot,crewName:crew.name});
-        const answered=await acceptCrewRequests(env,here,selected.id,crew.id,actor);
-        if (!selfJoin && !answered && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
-        return json({ok:true,removedRegistrations:results[2].meta.changes});
-      }
-      if (method==='DELETE' && crewRoute[2]) {
-        const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=? AND r.community_id=?').bind(crewRoute[2],here.id).first();
-        if (!selected) fail(404,'Inscription introuvable.');
-        const member=await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=? AND registration_id=?').bind(crew.id,selected.id).first();
-        if (!member) fail(409,'Ce pilote ne fait plus partie de cet équipage. Actualise la page.');
-        const selfLeave=personal(selected,actor);
-        if (!canManageCrew(crew,who) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
-        let nextOwner=crew.owner_user_id;
-        if (crew.owner_user_id && selected.participant_user_id===crew.owner_user_id) {
-          const replacement=await env.DB.prepare(`SELECT p.user_id
-            FROM crew_members cm
-            JOIN registrations r ON r.id=cm.registration_id
-            JOIN participants p ON p.id=r.participant_id
-            WHERE cm.crew_id=? AND cm.registration_id!=? AND p.user_id IS NOT NULL
-            ORDER BY r.created_at,r.id LIMIT 1`).bind(crew.id,selected.id).first();
-          nextOwner=replacement?.user_id || null;
-        }
-        const crewUpdate=Object.prototype.hasOwnProperty.call(crew,'owner_user_id')
-          ? env.DB.prepare('UPDATE crews SET version=version+1,locked=0,owner_user_id=? WHERE id=? AND version=?').bind(nextOwner,crew.id,input.version)
-          : env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
-        const results=await env.DB.batch([
-          crewUpdate,
-          env.DB.prepare('DELETE FROM crew_members WHERE crew_id=? AND registration_id=? AND changes()=1').bind(crew.id,selected.id)
-        ]);
-        if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-        await notify(env,await crewPilots(env,crew.id),'crew_leave',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot:selected.participant_name||selected.name,crewName:crew.name});
-        if (!selfLeave && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_removed',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
-        return json({ok:true,unlocked:Boolean(crew.locked)});
-      }
-      fail(404,'Action introuvable.');
-    }
-    if (crew) {
-      if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un pilote qui gère les équipages peut le modifier.');
-      if (method==='DELETE') {
-        const told = await crewPilots(env,crew.id);
-        const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
-        if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
-        await closeDeletedCrewDiscord(env,crew.id).catch(error => console.error('Deleted crew Discord cleanup failed', error instanceof Error ? error.message : 'unknown'));
-        await notify(env,told,'crew_deleted',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
-        return json({ok:true});
-      }
-      if (method!=='PATCH') fail(404,'Action introuvable.');
-      // Common "Horaire à définir" start: once the official slots are known, the crew picks its start and
-      // moves there with its pilots.
-      if (input.departureId!==undefined) {
-        const target=slotFor(event,departure,input.departureId);
-        // One atomic batch: the crew assignment guards forbid moving an assigned entry, so the members leave
-        // the crew, their entries and the crew move, then they join it again. Every step checks the crew
-        // version, so a crew changed in the meantime is left untouched.
-        const members=((await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=?').bind(crew.id).all()).results||[]).map(row=>row.registration_id);
-        const current='EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)';
-        const results=await env.DB.batch([
-          env.DB.prepare(`DELETE FROM crew_members WHERE crew_id=? AND ${current}`).bind(crew.id,crew.id,input.version),
-          ...members.map(registrationId=>env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id=? AND ${current}`).bind(target.id,registrationId,crew.id,input.version)),
-          env.DB.prepare('UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=?').bind(target.id,crew.id,input.version),
-          ...members.map(registrationId=>env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE EXISTS(SELECT 1 FROM crews WHERE id=? AND version=? AND departure_id=?)').bind(registrationId,crew.id,crew.id,input.version+1,target.id))
-        ]);
-        if (!results[1+members.length].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
-        await notify(env,await crewPilots(env,crew.id),'crew_start',event,{departure:target,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
-        return json({ok:true,departureId:target.id});
-      }
-      if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
-        const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
-        if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
-        return json({ok:true,locked:input.locked});
-      }
-      const name=text(input.name,60,'Nom de l’équipage');
-      if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-      const car=crewCar(input,event);
-      const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
-      if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
-      // A new car: the crew's pilots are told (not a change of name or category alone).
-      if ((crew.car||'')!==(car||'')) await notify(env,await crewPilots(env,crew.id),'crew_car',event,{departure,skip:[actor.user.id],crewName:name,car:car||'',by:actor.user.name});
-      return json({id:crew.id});
-    }
-    const name=text(input.name,60,'Nom de l’équipage');
-    if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-    const car=crewCar(input,event);
-    const crewId=id();
-    // « Équipages »: a crew is created by whoever has that permission. Entered on this start and category, they
-    // lead it and join it; otherwise (or as an administrator) the crew starts empty, to be composed.
-    requirePermission(who,'crews','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
-    // An organiser composing a crew for others (« Équipages » page, input.join false) is not put in it.
-    const ownRows=can(who,'manage_registrations')||input.join===false?[]:(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
-    const selected=ownRows.find(reg=>personal(reg,actor));
-    if (!selected) {
-      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id).run();
-      if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
-      return json({id:crewId,joined:false},201);
-    }
-    const results=await env.DB.batch([
-      env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
-      env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
-      env.DB.prepare(leaveOtherStarts).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,startsToLeave(event,departure,here))
-    ]);
-    if (!results[0].meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
-    await acceptCrewRequests(env,here,selected.id,crewId,actor);
-    return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
-  }
+  // Crews and crew requests (server/api-crews.mjs).
+  const crewAnswer = await crewsApi({path, method, request, env, actor, community});
+  if (crewAnswer) return crewAnswer;
   if (path === '/api/events' && method === 'POST') {
     requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
     // Allow twelve inline logos (6000 base64 characters each) plus event fields.
@@ -1108,348 +746,9 @@ async function api(request, env) {
     }
     return json({ok:true});
   }
-  // Admins can run the daily import of official iRacing endurances at once.
-  if (path === '/api/admin/iracing-import' && method === 'POST') {
-    requirePermission(actor,'admin');
-    // Manual update from the iRacing space (admins), e.g. to repair after a change of the schedule data.
-    try { return json(await syncIracingEvents(env)); }
-    catch (error) { fail(502, 'Le calendrier iRacing est momentanément indisponible. Réessaie plus tard.'); }
-  }
-  // Members of the community: the players found on its Discord server, with their Discord roles and what
-  // these roles allow here. Roles and access are managed on Discord; the role settings page comes with step 4.
-  if (path === '/api/members/refresh' && method === 'POST') {
-    requirePermission(actor,'admin');
-    return json({ok:true, checked:await refreshCommunityMembers(env, community)});
-  }
-  if (path === '/api/members' && method === 'GET') {
-    requirePermission(actor,'admin');
-    const rows = (await env.DB.prepare(`SELECT m.*, u.name FROM memberships m JOIN users u ON u.id=m.user_id
-      WHERE m.community_id=? AND m.status='member' ORDER BY lower(u.name) LIMIT 500`).bind(community.id).all()).results || [];
-    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
-    const roleNames = new Map((discord?.roles || []).map(role => [role.id, role.name]));
-    const members = [];
-    for (const row of rows) members.push({id:row.user_id, name:row.name, nickname:row.nickname, discordAdmin:Boolean(row.discord_admin),
-      manager:administrators(env).includes(row.user_id),
-      roles:JSON.parse(row.discord_roles || '[]').map(roleId => ({id:roleId, name:roleNames.get(roleId) || roleId})),
-      permissions:[...await memberPermissions(env, community, row)], checkedAt:row.checked_at});
-    return json({community:{name:community.name, discordServer:discord?.name || null}, members, permissions:PERMISSIONS});
-  }
-  // Community settings (admins): what each Discord role allows, and the enabled modules.
-  if (path === '/api/community/season' && method === 'PUT') {
-    if (!tdzOnly(community, isDevelopment(env)) || !soloRacesEnabled(env, community)) fail(403, 'Le calendrier des events n’est pas activé.');
-    return json(await saveCommunitySeason(env, actor, community, await body(request)));
-  }
-  if (path === '/api/community/settings' && method === 'GET') {
-    requirePermission(actor,'admin');
-    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
-    const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
-    const saved = new Map(rows.map(row => [row.discord_role_id, JSON.parse(row.permissions || '[]')]));
-    const roles = (discord?.roles || []).sort((a, b) => b.position - a.position).map(role => ({id:role.id, name:role.id === community.discordGuildId ? '@everyone' : role.name,
-      administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
-    await keepDiscordLook(env, community, discord);
-    return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community), botAvatarUrl:community.appearance?.botAvatarUrl || null}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true, combos:combosEnabled(community), combosManager:actor.manager === true},
-      crews:await crewDiscordState(env, community)});
-  }
-  // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
-  if (path === '/api/community/banner' && ['PUT','DELETE'].includes(method)) {
-    requirePermission(actor,'admin');
-    const appearance = {...community.appearance};
-    if (method === 'DELETE') {
-      delete appearance.bannerVersion;
-      await env.DB.batch([env.DB.prepare('DELETE FROM community_banners WHERE community_id=?').bind(community.id),
-        env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(appearance), community.id)]);
-      return json({ok:true});
-    }
-    const image = await imageBody(request, 600000);
-    const type = imageType(image);
-    if (!type) fail(400, 'Envoie une image WebP, JPEG ou PNG.');
-    appearance.bannerVersion = now();
-    await env.DB.batch([
-      env.DB.prepare(`INSERT INTO community_banners(community_id,image,content_type,updated_at) VALUES(?,?,?,?)
-        ON CONFLICT(community_id) DO UPDATE SET image=excluded.image,content_type=excluded.content_type,updated_at=excluded.updated_at`).bind(community.id, image, type, now()),
-      env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(appearance), community.id)]);
-    return json({ok:true, bannerUrl:`/api/community/banner?v=${appearance.bannerVersion}`});
-  }
-  // Logo of the bot on this community's Discord server only (Discord: Modify Current Member, avatar as a data URI,
-  // PNG or JPEG). Without one, the bot keeps its own logo, the same everywhere.
-  if (path === '/api/community/bot-avatar' && ['PUT','DELETE'].includes(method)) {
-    requirePermission(actor,'admin');
-    if (!community.discordGuildId) fail(400, 'Aucun serveur Discord n’est relié à cette communauté.');
-    let avatar = null;
-    if (method === 'PUT') {
-      const image = await imageBody(request, 1000000);
-      const type = imageType(image);
-      if (!['image/png','image/jpeg'].includes(type)) fail(400, 'Envoie une image PNG ou JPEG.');
-      let binary = ''; for (let i = 0; i < image.length; i += 0x8000) binary += String.fromCharCode(...image.subarray(i, i + 0x8000));
-      avatar = `data:${type};base64,${btoa(binary)}`;
-    }
-    let member;
-    try { member = await discordRequest(env, 'PATCH', `/guilds/${community.discordGuildId}/members/@me`, {avatar}); }
-    catch (error) { fail(502, error.status === 429 ? 'Discord limite les changements de logo : réessaie dans quelques minutes.' : error.status === 403 || error.status === 404 ? 'Le bot n’est pas sur le serveur Discord.' : 'Discord a refusé ce logo. Réessaie avec une autre image.'); }
-    const url = member?.avatar && member?.user?.id ? `https://cdn.discordapp.com/guilds/${community.discordGuildId}/users/${member.user.id}/avatars/${member.avatar}.png?size=256` : null;
-    await (url ? env.DB.prepare("UPDATE communities SET appearance=json_set(COALESCE(appearance,'{}'),'$.botAvatarUrl',?) WHERE id=?").bind(url, community.id)
-      : env.DB.prepare("UPDATE communities SET appearance=json_remove(COALESCE(appearance,'{}'),'$.botAvatarUrl') WHERE id=?").bind(community.id)).run();
-    return json({ok:true, botAvatarUrl:url});
-  }
-  if (path === '/api/community/appearance' && method === 'PATCH') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
-    if (input.accent !== null && !/^#[0-9a-f]{6}$/i.test(input.accent || '')) fail(400, 'Choisis une couleur valide.');
-    const appearance = {...community.appearance, accent:input.accent || null};
-    delete appearance.palette;
-    delete appearance.defaultMode;
-    await env.DB.prepare('UPDATE communities SET name=?, short_name=?, appearance=? WHERE id=?').bind(name, shortName, JSON.stringify(appearance), community.id).run();
-    return json({ok:true});
-  }
-  const roleSetting = path.match(/^\/api\/community\/roles\/(\d{15,22})$/);
-  if (roleSetting && method === 'PUT') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
-    if (!discord?.roles.some(role => role.id === roleSetting[1])) fail(404, 'Ce rôle n’existe pas sur le serveur Discord de la communauté.');
-    if (!Array.isArray(input.permissions) || input.permissions.some(permission => !PERMISSIONS.includes(permission))) fail(400, 'Autorisations invalides.');
-    await env.DB.prepare(`INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)
-      ON CONFLICT(community_id,discord_role_id) DO UPDATE SET permissions=excluded.permissions,updated_at=excluded.updated_at`)
-      .bind(community.id, roleSetting[1], JSON.stringify([...new Set(input.permissions)]), now()).run();
-    return json({ok:true});
-  }
-  if (path === '/api/community/modules' && method === 'PATCH') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const modules = {...community.modules};
-    if (typeof input.grindfest === 'boolean') {
-      if (!grindfestAvailable(community, isDevelopment(env))) fail(403, 'Le module Gridfest est réservé aux TDZ.');
-      modules.grindfest = input.grindfest;
-      if (input.grindfest) modules.soloRaces = true;
-    }
-    if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Gridfest avant de désactiver les événements solo.');
-    // The Discord recap is configured through the guided bot module.
-    for (const key of ['iracingImport','soloRaces','raceReminders','categoryEntry']) if (typeof input[key] === 'boolean') modules[key] = input[key];
-    // Fiches combo: a private module, opened for a team by the platform managers only.
-    if (typeof input.combos === 'boolean') {
-      if (!actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme ouvrent les fiches combo.');
-      modules.combos = input.combos;
-    }
-    // EVENT TDZ: the Discord channel that explains how to become SAFE (a button for the pilots who are not).
-    if (typeof input.safeGuideUrl === 'string') {
-      const url = input.safeGuideUrl.trim();
-      if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
-      modules.safeGuideUrl = url;
-    }
-    const statements = await crewModuleStatements(env, community, modules, {...input, layout:false});
-    statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
-    await env.DB.batch(statements);
-    return json({ok:true, modules});
-  }
-  // « Mise en place » (admins): where the community stands, step by step (members page).
-  if (path === '/api/community/setup' && method === 'GET') {
-    requirePermission(actor,'admin');
-    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
-    const legacy = await env.DB.prepare('SELECT scope FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all();
-    const legacyScopes = (legacy.results || []).map(row=>row.scope);
-    const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
-    const savedBotRecap = await botRecapSettings(env, community);
-    const botRecap = savedBotRecap;
-    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,lmuId:botRecap.destination_id,lmuName:botRecap.destination_name,
-        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error,
-        layout:parseLayout(botRecap.layout), leftovers:!botRecap.enabled && botRecap.bot_categories !== '{}'} : null,
-      recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
-      // Administrator: the only right that also opens the hidden categories (no exception to add there).
-      recapBotAdminInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=8&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
-      community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recapSetupRequired:!savedBotRecap, recapSuggestedScope:legacyScopes.length === 1 ? legacyScopes[0] : 'all',
-      guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
-      discordInviteUrl:community.discordInviteUrl});
-  }
-  // Guided bot recaps: preview is read-only; only explicit activation/test publishes.
-  if (path === '/api/community/recap/destinations' && method === 'GET') {
-    requirePermission(actor,'admin');
-    try { const [destinations, server] = await Promise.all([recapDestinations(env, community), serverRights(env, community)]); return json({destinations, server}); }
-    catch (error) { fail(400, recapError(error)); }
-  }
-  if (path === '/api/community/recap/preview' && method === 'POST') {
-    requirePermission(actor,'admin');
-    try {
-      const input = await body(request);
-      const settings = input.layout ? await validateDiscordLayout(env,community,input.layout) : await validateRecapDestinations(env,community,input);
-      const saved = await botRecapSettings(env, community);
-      return json({previews:await previewBotRecap(env,Date.now(),community,{...settings, bot_categories:saved?.bot_categories || '{}'})});
-    } catch (error) { fail(400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
-  }
-  if(path==='/api/community/discord/announcement-test'&&method==='POST'){
-    requirePermission(actor,'admin');
-    await rateLimit(request,env,'discord-announcement-test',3);
-    const input=await body(request),destinations=await recapDestinations(env,community);
-    const matches=destinations.filter(channel=>channel.type===0&&(channel.id===input.channel||channel.name===input.channel));
-    if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
-    const channel=matches[0];
-    if(channel.announceMissing?.some(right=>!['Mentionner @everyone','Voir les anciens messages'].includes(right)))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
-    // The poster of a stream day with example data, as sent at 7h30 (the text when Cloudflare's browser is not set up).
-    const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))||'https://www.twitch.tv/lapraline_tdz'};
-    const sent=await sendAnnouncementPreview(env,community,channel.id,site);
-    return json({ok:true,poster:sent.poster,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
-  }
-  // Everything the bot made for « Discord » taken off: the messages, channels and categories, the crews' voice channels.
-  const removeDiscord = async () => {
-    requirePermission(actor,'admin');
-    const modules = {...community.modules, crewChannels:false, raceReminders:false};
-    let result;
-    try { result = await removeBotDiscord(env,Date.now(),community); }
-    catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
-    await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
-    community.modules = modules;
-    return json({ok:true, done:!result?.more && !result?.partial});
-  };
-  // « Discord » (Modules): the recaps, the crews' voice channels and the reminders, saved together.
-  if (path === '/api/community/discord' && method === 'PUT') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const modules = {...community.modules};
-    if (input.enabled === false) return removeDiscord();
-    try {
-      // The setting asked question by question (input.layout), or the one of the previous page.
-      const settings = input.layout ? await validateDiscordLayout(env,community,input.layout) : await validateRecapDestinations(env,community,input);
-      const layout = parseLayout(settings.layout);
-      const reminders = layout ? layout.reminders : input.raceReminders;
-      if (typeof reminders === 'boolean') modules.raceReminders = reminders;
-      const voices = layout ? layout.voices : input.crewChannels === true;
-      // « Récap de la semaine »: the voice channels go to the category chosen for them (« Pit talk », made by the bot, gets
-      // its id at the sync); « une catégorie par course »: to the race's.
-      const crewCategory = layout ? (voices && layout.mode === 'general' && layout.pit === 'existing' ? (layout.pitAt === 'top' ? '' : layout.pitAt) : undefined)
-        : voices && settings.mode === 'general' && typeof input.crewCategory === 'string' ? input.crewCategory : undefined;
-      const crewInput = {crewChannels:voices, layout:Boolean(layout), ...(crewCategory !== undefined ? {crewCategory} : {})};
-      const statements = await crewModuleStatements(env, community, modules, crewInput);
-      await saveBotRecap(env,community,settings);
-      await env.DB.batch([...statements, env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
-      community.modules = modules;
-      const publication = await syncBotRecaps(env,Date.now(),community).catch(error => ({ok:false,error:error.message}));
-      return json({ok:true,published:publication.ok,error:publication.error});
-    } catch (error) {
-      if (error instanceof HttpError) throw error;
-      fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message);
-    }
-  }
-  // « Tout retirer »: the bot takes off what it made (a few requests per pass, the next ones every 2 minutes).
-  if (path === '/api/community/discord' && method === 'DELETE') {
-    requirePermission(actor,'admin');
-    return removeDiscord();
-  }
-  if (path === '/api/community/discord/diagnostic' && method === 'GET') {
-    requirePermission(actor,'admin');
-    const live = new URL(request.url).searchParams.get('live') === '1';
-    if (live) await rateLimit(request,env,'discord-diagnostic',6);
-    return json(await discordDiagnostic(env,community,{live}));
-  }
-  if (path === '/api/community/recap/repair' && method === 'POST') {
-    requirePermission(actor,'admin');
-    await rateLimit(request,env,'recap-repair',10);
-    try { return json(await repairBotRecap(env,Date.now(),community)); }
-    catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
-  }
-  // Retired endpoints cannot write or publish historical webhook configurations.
-  if ((path === '/api/community/recaps' && method === 'PUT') || (path === '/api/community/recaps/test' && method === 'POST') || (path === '/api/community/recap/legacy-preview' && method === 'GET')) {
-    requirePermission(actor,'admin');
-    fail(410,'Les récaps sont désormais gérés par le bot. Configure le récap dans Administration → Modules.');
-  }
-  // Invitation to the community's Discord server, shown to the players who are not members yet.
-  if (path === '/api/community/invite' && method === 'PATCH') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const url = input.url == null || input.url === '' ? null : String(input.url).trim();
-    if (url && !/^https:\/\/(?:discord\.gg|discord\.com\/invite)\/[\w-]{2,64}$/.test(url)) fail(400, 'Colle un lien d’invitation Discord (https://discord.gg/…).');
-    await env.DB.prepare('UPDATE communities SET discord_invite_url=? WHERE id=?').bind(url, community.id).run();
-    return json({ok:true});
-  }
-  // Platform managers: the communities, and a new one (its admins then set it up on its « Mise en place » page).
-  // Showcase of the main address: its data replaced by fictional races, crews and pilots (server/demo.mjs).
-  if (path === '/api/platform/showcase' && method === 'POST') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    if (!mainAddress) fail(400, 'La vitrine se réinitialise depuis l’adresse principale du site.');
-    const input = await body(request);
-    if (input.confirm !== 'VITRINE') fail(400, 'Tape VITRINE pour confirmer.');
-    const result = await resetShowcase(env, community);
-    // The official iRacing calendar comes back with the next scheduled import (within 15 minutes).
-    return json({ok:true, ...result});
-  }
-  // The showcase becomes the official community, linked to the official Discord server (its fictional data goes).
-  if (path === '/api/platform/official' && method === 'POST') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    if (!openSite) fail(400, 'Seule la vitrine de l’adresse principale devient la communauté officielle.');
-    const input = await body(request), guildId = String(input.guildId || '').trim();
-    if (input.confirm !== 'OFFICIEL') fail(400, 'Tape OFFICIEL pour confirmer.');
-    if (!/^\d{15,22}$/.test(guildId)) fail(400, 'L’ID du serveur Discord : un nombre de 17 à 20 chiffres (clic droit sur le serveur → Copier l’identifiant du serveur).');
-    if (await env.DB.prepare('SELECT 1 FROM communities WHERE discord_guild_id=?').bind(guildId).first()) fail(409, 'Ce serveur Discord est déjà relié à une communauté.');
-    await makeOfficial(env, community, guildId);
-    return json({ok:true, botInviteUrl:botInvite(env, guildId)});
-  }
-  // The official Discord server: the bot makes the categories, channels, forums and roles that are missing.
-  if (path === '/api/platform/official/setup' && method === 'POST') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    if (!mainAddress || !community.discordGuildId) fail(400, 'Relie d’abord le Discord officiel à l’adresse principale.');
-    try {
-      const result = await setupOfficialServer(env, community.discordGuildId);
-      // The races' categories go right under « 📌 INFOS » (anchor of the recap in « une catégorie par course »).
-      if (result.anchor) await env.DB.prepare(`UPDATE community_recap_settings SET destination_id=CASE WHEN destination_id<>'' THEN ?1 ELSE '' END,
-        destination_name=CASE WHEN destination_id<>'' THEN ?2 ELSE '' END,iracing_destination_id=CASE WHEN iracing_destination_id<>'' THEN ?1 ELSE '' END,
-        iracing_destination_name=CASE WHEN iracing_destination_id<>'' THEN ?2 ELSE '' END,revision=revision+1 WHERE community_id=?3 AND mode='events' AND guild_id=?4`)
-        .bind(result.anchor, '📌 INFOS', community.id, community.discordGuildId).run();
-      // What @everyone, the Staff and the Organisateur may do on the site.
-      await env.DB.batch(Object.entries(result.site).map(([role, permissions]) => env.DB.prepare(`INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)
-        ON CONFLICT(community_id,discord_role_id) DO UPDATE SET permissions=excluded.permissions,updated_at=excluded.updated_at`)
-        .bind(community.id, role, JSON.stringify(permissions), now())));
-      const {site, ...shown} = result;
-      return json({ok:true, ...shown});
-    }
-    catch (error) { return json({error:error.message, made:error.made || [], kept:error.kept || []}, error.status || 502); }
-  }
-  // A community with no race and no pilot yet (made by mistake): its settings and members go with it. Never the
-  // community of the main address.
-  const platformCommunity = path.match(/^\/api\/platform\/communities\/([a-z0-9-]{3,40})$/);
-  if (platformCommunity && method === 'DELETE') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    const row = await env.DB.prepare('SELECT id, slug FROM communities WHERE slug=?').bind(platformCommunity[1]).first();
-    if (!row) fail(404, 'Communauté introuvable.');
-    if (row.slug === communitySlug(env, null)) fail(400, 'La communauté de l’adresse principale ne se supprime pas.');
-    const used = await env.DB.prepare('SELECT (SELECT COUNT(*) FROM events WHERE community_id=?) + (SELECT COUNT(*) FROM participants WHERE community_id=?) AS n').bind(row.id, row.id).first();
-    if (Number(used?.n) > 0) fail(409, 'Cette communauté a déjà des courses ou des pilotes : elle ne peut pas être supprimée.');
-    await env.DB.batch([...['iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps', 'discord_weekly_state', 'community_banners']
-      .map(table => env.DB.prepare(`DELETE FROM ${table} WHERE community_id=?`).bind(row.id)), env.DB.prepare('DELETE FROM communities WHERE id=?').bind(row.id)]);
-    return json({ok:true});
-  }
-  if (path === '/api/platform/communities' && method === 'GET') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    const list = [];
-    for (const item of await allCommunities(env)) {
-      const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
-      list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
-    }
-    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite, testSite:isDevelopment(env),
-      official:mainAddress && community.discordGuildId ? list.find(item => item.guildId === community.discordGuildId) || null : null});
-  }
-  if (path === '/api/platform/communities' && method === 'POST') {
-    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    // The test site has its own database: a community made there could never be reached at its address.
-    if (isDevelopment(env)) fail(403, 'Ce site est la version de test : une communauté créée ici n’est pas accessible. Crée-la depuis endurance-manager.app.');
-    const input = await body(request);
-    const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
-    const slug = String(input.slug || '').trim().toLowerCase();
-    if (!/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) fail(400, 'L’adresse : 3 à 40 caractères, lettres minuscules, chiffres et tirets (pas au début ni à la fin).');
-    const guildId = String(input.guildId || '').trim();
-    if (!/^\d{15,22}$/.test(guildId)) fail(400, 'L’ID du serveur Discord : un nombre de 17 à 20 chiffres (clic droit sur le serveur → Copier l’identifiant du serveur).');
-    if (await env.DB.prepare('SELECT 1 FROM communities WHERE discord_guild_id=?').bind(guildId).first()) fail(409, 'Ce serveur Discord est déjà relié à une communauté.');
-    try {
-      await env.DB.prepare('INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), slug, name, shortName, guildId, now()).run();
-    } catch (error) {
-      if (/UNIQUE|CHECK|constraint/i.test(String(error?.message))) fail(409, 'Cette adresse est déjà prise ou réservée : choisis-en une autre.');
-      throw error;
-    }
-    // Created from a request of the page « Demander un espace »: that request is done.
-    await closeCommunityRequest(env, input.requestId);
-    const created = {slug};
-    return json({ok:true, url:communityUrl(env, created), botInviteUrl:botInvite(env, guildId)}, 201);
-  }
+  // The community's settings (server/api-community.mjs), then the platform managers' actions (server/api-platform.mjs).
+  const settings = await communityApi({path, method, request, env, actor, community}) || await platformApi({path, method, request, env, actor, community, mainAddress, openSite});
+  if (settings) return settings;
   if (path.startsWith('/api/members/')) fail(410, 'Les rôles se gèrent maintenant sur le serveur Discord de la communauté.');
   fail(404, 'Action introuvable.');
 }
