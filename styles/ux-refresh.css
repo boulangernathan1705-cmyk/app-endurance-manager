@@ -2782,3 +2782,8 @@ html body .presence-day-grid .presence-hour.is-present { border-color: var(--em-
   :has(> .crews-line .community-tag) .crews-coverage-text { margin-left: 136px; }
 }
 .crews-pick .community-tag, .crew-builder-pilot-head .community-tag { margin-right: var(--em-space-2); vertical-align: middle; }
+
+/* Category logo and community mark side by side: same box, same height, centred. */
+.crews-cat { flex: none; width: 22px; height: 22px; align-items: center; justify-content: center; }
+.crews-cat img, .crews-cat .category-logo { width: 100%; height: 100%; object-fit: contain; }
+html[data-game] #app .crew-tile-head .crew-compact-category .category-logo { width: 30px; height: 30px; object-fit: contain; }
