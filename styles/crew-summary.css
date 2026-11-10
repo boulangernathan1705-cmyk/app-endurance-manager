@@ -129,3 +129,28 @@
     text-align: left;
   }
 }
+
+/* Car brand logo before the car name (Simple Icons, coloured by the text). */
+.car-brand {
+  display: inline-block;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: var(--em-space-1);
+  vertical-align: -0.2em;
+  background: currentColor;
+  -webkit-mask: var(--car-brand) center / contain no-repeat;
+  mask: var(--car-brand) center / contain no-repeat;
+}
+.car-brand-text {
+  width: auto;
+  height: auto;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--em-faint);
+  vertical-align: 0.05em;
+}

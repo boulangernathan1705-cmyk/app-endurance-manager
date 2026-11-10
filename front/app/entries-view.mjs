@@ -1,4 +1,4 @@
-import {contextHelpMarker as helpContext} from './core.mjs';
+import {contextHelpMarker as helpContext,carLogo} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
@@ -51,7 +51,7 @@ function compactCrew(departure,crew) {
     .map(id => departure.availability.find(reg => String(reg.id) === String(id))?.name)
     .filter(Boolean);
   return `<article class="ux-my-other-crew ${categories[crew.category]?.css||''}">
-    <div class="ux-my-other-crew-main">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à définir')}</span></div></div>
+    <div class="ux-my-other-crew-main">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${carLogo(crew.car)}${esc(crew.car||'Voiture à définir')}</span></div></div>
     <small>${names.length?esc(names.join(' · ')):'Aucun pilote affecté'}</small>
   </article>`;
 }
@@ -94,7 +94,7 @@ function card({event,departure,reg}, grouped=false) {
 
   const ownCrewBody = crew?`<article class="ux-my-own-crew ${categories[crew.category]?.css||''}">
     <div class="ux-my-own-crew-head">
-      <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à définir')}</span></div></div>
+      <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${carLogo(crew.car)}${esc(crew.car||'Voiture à définir')}</span></div></div>
       <span class="ux-my-crew-state">${crew.locked?'Équipage complet':'Équipage ouvert'}</span>
     </div>
     ${crewAvailability(event,departure,members,{editable:false})}

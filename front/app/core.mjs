@@ -3,6 +3,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
+import {carBrand} from '../../shared/car-brands.mjs';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -69,6 +70,12 @@ export function notifyNav() { queueMicrotask(() => document.dispatchEvent(new Cu
 export function logo(category) {
   const config = categories[category];
   return config?.image ? `<img class="category-logo" src="/images/${esc(config.image)}" alt="">` : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
+}
+// Small brand logo (or initials) before a car name; nothing when the car is not chosen.
+export function carLogo(car) {
+  const brand = carBrand(car);
+  if(!brand) return '';
+  return brand.logo ? `<span class="car-brand" style="--car-brand:url('/images/brands/${brand.logo}.svg')" role="img" aria-label="${esc(brand.name)}"></span>` : `<span class="car-brand car-brand-text" aria-hidden="true">${esc(brand.initials)}</span>`;
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
