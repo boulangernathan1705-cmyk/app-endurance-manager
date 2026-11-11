@@ -5,7 +5,7 @@ import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails, streamDuringEndurance} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -253,6 +253,10 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const endurances = await streamerEndurances(env, community, timestamp);
   // A stream announced during a streamed endurance start is that endurance's stream: shown once (Nathan, 2026-11-08).
   const streamed = endurances.filter(item => item.endurance.info.streamTime);
+  // An event of the calendar for the same race as one of these endurances (same name, same start): told once, by the endurance.
+  const sameRace = item => !isStream(item.row) && endurances.some(endu => nameKey(endu.row.name) === nameKey(item.row.name) && Math.abs(endu.startsAt - item.startsAt) < 3600000);
+  for (let index = starts.length - 1; index >= 0; index--) if (sameRace(starts[index])) starts.splice(index, 1);
+  const link = (parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {}).stream || '';
   const crews = new Map();
   for (let index = starts.length - 1; index >= 0; index--) {
     const {row, startsAt} = starts[index];
@@ -261,15 +265,20 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
     // The streamer's own endurance that day (his crew in it): the stream goes into its entry (Nathan, 2026-11-11).
     const crew = await streamCrew(env, community.id, row);
     const own = crew && endurances.find(item => item.row.id === crew.eventId && parisDay(item.startsAt) === parisDay(startsAt));
-    if (!own) { crews.set(row.id, crew); continue; }
     const details = streamDetails({details:parseJson(row.details, {})});
+    if (!own) {
+      // A stream of an event of the calendar (a race): the same race, told once, with its stream (Nathan, 2026-11-11).
+      const race = starts.find(item => !isStream(item.row) && !item.streamed
+        && streamIsRace({name:row.name, startsAt, time:starts[index].start.time, raceSim:details.raceSim, raceTime:details.raceTime}, {name:item.row.name, sim:simForEvent(item.row), startsAt:item.startsAt}));
+      if (!race) { crews.set(row.id, crew); continue; }
+      race.streamed = {time:details.streamTime || details.raceTime || '', url:details.streamUrl || link};
+      starts.splice(index, 1);
+      continue;
+    }
     if (!own.endurance.info.streamTime) own.endurance.info.streamTime = details.streamTime || details.raceTime || '';
     if (details.streamUrl && !own.endurance.info.streamUrl) own.endurance.info.streamUrl = details.streamUrl;
     starts.splice(index, 1);
   }
-  // An event of the calendar for the same race as one of these endurances (same name, same start): told once, by the endurance.
-  const sameRace = item => endurances.some(endu => nameKey(endu.row.name) === nameKey(item.row.name) && Math.abs(endu.startsAt - item.startsAt) < 3600000);
-  for (let index = starts.length - 1; index >= 0; index--) if (sameRace(starts[index])) starts.splice(index, 1);
   starts.push(...endurances.filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
   // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
   // once its events are over, the week stays shown until then.
@@ -291,12 +300,14 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
     for (const row of result) counts.set(`${row.event_id}:${row.departure_id}`, Number(row.entered) || 0);
   }
   for (const {row} of selected) if (isStream(row) && !crews.has(row.id)) crews.set(row.id, await streamCrew(env, community.id, row));
-  return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt, endurance}) => {
+  return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt, endurance, streamed}) => {
     if (endurance) return {id:row.id, name:row.name, sim:endurance.sim, circuits:[row.circuit], startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, endurance:endurance.info};
     const rounds = parseJson(row.rounds, []);
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
       entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || '',
+      // A streamed event: the stream it was announced with, or the stream time given on the event.
+      ...(streamed || parseJson(row.details, {})?.streamTime ? {streamed:streamed || {time:parseJson(row.details, {}).streamTime, url:link}} : {}),
       ...(isStream(row) ? {stream:{...streamDetails({details:parseJson(row.details, {})}), crew:crews.get(row.id) || null}} : {})};
   })};
 }

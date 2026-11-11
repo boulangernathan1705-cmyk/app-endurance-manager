@@ -1210,7 +1210,7 @@ test('the events calendar lists the endurances of the community streamer, with h
   const {buildCalendarPayload}=await import('../server/discord-weekly-format.mjs');
   const text=JSON.stringify(buildCalendarPayload(snap,{url:'https://site.example'},monday));
   assert.match(text,/Équipage A\*\* · La Praline, Pilote 2/);
-  assert.match(text,/📺 Stream 19h45 → 23h00 sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
+  assert.match(text,/📺 \*\*Stream 19h45 → 23h00\*\* sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
   assert.match(text,/https:\/\/site.example\/lmu\/#event=spa/);
   assert.doesNotMatch(text,/Imola/);
 });
@@ -1236,6 +1236,26 @@ test('the streamer’s stream of his own endurance, and an event for the same ra
   const {buildCalendarPayload}=await import('../server/discord-weekly-format.mjs');
   const text=JSON.stringify(buildCalendarPayload(snap,{url:'https://site.example'},monday));
   assert.match(text,/\*\*01\*\* · La Praline/);
-  assert.match(text,/📺 Stream 14h00 sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
+  assert.match(text,/📺 \*\*Stream 14h00\*\* sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
   assert.doesNotMatch(text,/🎙/);
+});
+
+test('a stream of an event of the calendar (a race) is told once, by the event, its stream under its name (Nathan, 2026-11-11)',async t=>{
+  const {DB,env}=setup(t);
+  const monday=Date.parse('2090-11-06T06:30:00Z');
+  DB.db.prepare(`INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name,layout) VALUES(?,1,'events','lmu',?,'600000000000000007','Endurance Manager',?)`)
+    .run(DEV_COMMUNITY,GUILD,JSON.stringify({mode:'events',sims:'all',stream:'https://twitch.tv/lapraline'}));
+  // An OPEN race Wednesday 21h00 Paris, and « Annoncer un stream » at 20h45 for its 21h00 start (another title).
+  solo(DB,'open','OPEN AC EVO',Date.parse('2090-11-08T20:00:00Z'));
+  solo(DB,'live','Soirée OPEN',Date.parse('2090-11-08T19:45:00Z'));
+  DB.db.prepare("UPDATE events SET sim='stream',details=?,departures=? WHERE id='live'").run(JSON.stringify({streamTime:'20:45',raceSim:'lmu',raceTime:'21:00'}),JSON.stringify([{id:'d-live',startsAt:Date.parse('2090-11-08T19:45:00Z'),time:'20:45'}]));
+  // A stream of something else that evening stays.
+  solo(DB,'other','Discussion',Date.parse('2090-11-09T19:00:00Z'));
+  DB.db.prepare("UPDATE events SET sim='stream',details=? WHERE id='other'").run(JSON.stringify({streamTime:'20:00',isRace:false,activity:'Discussion'}));
+  const snap=await loadCalendarSnapshot(env,monday,COMMUNITY);
+  assert.deepEqual(snap.events.map(event=>event.id),['open','other']);
+  const {buildCalendarPayload}=await import('../server/discord-weekly-format.mjs');
+  const box=buildCalendarPayload(snap,{url:'https://site.example'},monday).embeds[0].fields[0];
+  assert.match(box.name,/^📺 /);
+  assert.match(box.value,/^\*\*\[OPEN AC EVO\][^\n]*\n📺 \*\*Stream 20h45\*\* sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
 });

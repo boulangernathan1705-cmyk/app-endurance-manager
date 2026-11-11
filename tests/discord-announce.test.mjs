@@ -698,3 +698,16 @@ test('a stream the streamer announced for his own endurance today is that endura
   assert.match(live,/6h de Spa/);assert.doesNotMatch(live,/Le stream du 6h/);assert.match(live,/20h30/);
   assert.ok(!posts.slice(1).some(post=>/6h de Spa/.test(JSON.stringify(post.body))),'the endurance once');
 });
+
+test('a stream announced for an event of today (a race) is that event’s stream, told once (Nathan, 2026-11-11)',async t=>{
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
+  // Coupe GT3 (AMS2, 21h00): « Annoncer un stream » with another title, the stream at 20h30 and the race at 21h00.
+  DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,duration_minutes,categories,departures,created_by,created_at,community_id,format,sim,rounds,access,details,event_type)
+    VALUES('stream-1','Soirée Coupe','',1,60,'[]',?,'111111111111111111',0,?,'solo','stream','[]','open',?,'special')`)
+    .run(JSON.stringify([{id:'s1',startsAt:Date.parse('2026-10-28T19:30:00Z'),time:'20:30'}]),DEV_COMMUNITY,JSON.stringify({streamTime:'20:30',activity:'Automobilista 2',isRace:true,raceTime:'21:00'}));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const posts=sent(calls),live=JSON.stringify(posts[0].body);
+  assert.equal(posts[0].body.content,'@everyone');
+  assert.match(live,/Coupe GT3/);assert.doesNotMatch(live,/Soirée Coupe/);assert.match(live,/20h30/);
+  assert.ok(!posts.slice(1).some(post=>/Coupe GT3/.test(JSON.stringify(post.body))),'the event once');
+});

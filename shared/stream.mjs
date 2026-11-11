@@ -62,3 +62,16 @@ export function streamPlatform(url) {
 const MERGE_BEFORE = 3 * 3600000;
 export const streamDuringEndurance = (startsAt, starts) => Number.isFinite(Number(startsAt))
   && starts.some(start => Number(startsAt) >= Number(start.startsAt) - MERGE_BEFORE && Number(startsAt) <= Number(start.endsAt || start.startsAt));
+
+// « Annoncer un stream » of a race shown elsewhere (an event of the calendar): the same race, told once, with its stream
+// (Nathan, 2026-11-11). stream: {name, startsAt, time ('HH:MM' of startsAt), raceSim, raceTime}; race: {name, sim, startsAt}.
+// Same race: the same name that day, the same sim with a start within an hour of the stream's race (or stream) time,
+// or any race starting at the stream's race time (± 15 min).
+const clock = time => { const [hours, mins] = String(time || '').split(':').map(Number); return hours * 60 + mins; };
+export function streamIsRace(stream, race) {
+  const at = Number(stream.startsAt), shift = stream.raceTime && stream.time ? (clock(stream.raceTime) - clock(stream.time)) * 60000 : 0;
+  const target = at + (Number.isFinite(shift) ? shift : 0), near = Math.abs(Number(race.startsAt) - target);
+  const key = value => String(value || '').trim().toLowerCase();
+  return Number.isFinite(near) && ((key(stream.name) && key(stream.name) === key(race.name) && near <= 12 * 3600000)
+    || (Boolean(stream.raceSim) && stream.raceSim === race.sim && near <= 3600000) || (Boolean(stream.raceTime) && near <= 15 * 60000));
+}
