@@ -12,7 +12,7 @@ import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails, streamDuringEndurance} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 
 const MINUTE = 60000;
@@ -92,7 +92,7 @@ async function eventSnapshot(env, community, id, timestamp) {
     && (isStream(row) || announcedEmpty(row) || entries.some(entry => entry.departure_id === item.id)));
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
-  if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
+  if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), time:start.time || '', stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
   const startEntries = entries.filter(entry => entry.departure_id === start.id);
   const entered = startEntries.reduce((total, item) => total + Number(item.entered || 0), 0);
   if (!entered && !announcedEmpty(row)) return null;
@@ -356,6 +356,17 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   // A stream announced during an endurance start the community streams is that endurance's stream: told once.
   const streamedStarts = items.filter(item => item.kind === 'race' && streams.some(stream => stream.item === item.row.item)).flatMap(item => item.data.departures || []);
   const merged = new Set(items.filter(item => item.kind === 'stream' && streamDuringEndurance(item.data.startsAt, streamedStarts)).map(item => item.row.item));
+  // A stream of a race shown today (Nathan, 2026-11-11): the race's stream, at the stream's time, told once.
+  for (const item of items) {
+    // His endurance (his crew in it), or an event of today for the same race.
+    const race = stream && item.kind === 'stream' && !merged.has(item.row.item) && (items.find(other => other.kind === 'race' && other.row.item === item.data.stream?.crew?.eventId)
+      || items.find(other => other.kind === 'event' && !streams.some(entry => entry.item === other.row.item)
+        && streamIsRace({name:item.data.name, startsAt:item.data.startsAt, time:item.data.time, ...item.data.stream}, other.data)));
+    if (!race) continue;
+    merged.add(item.row.item);
+    const time = streams.find(entry => entry.item === item.row.item)?.time;
+    if (time && !streams.some(entry => entry.item === race.row.item)) streams.push({item:race.row.item, name:'', time});
+  }
   if (merged.size) { items.splice(0, items.length, ...items.filter(item => !merged.has(item.row.item))); streams = streams.filter(stream => !merged.has(stream.item)); }
   const streamed = new Set(streams.map(item => item.item));
   site.streams = streams;
