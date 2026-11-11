@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13 — 11 novembre 2026
+
+### 🐛 Corrections
+
+- **Streams sur Discord** : quand le streamer annonce le stream d'une course ou d'une endurance, le calendrier et l'affiche du jour n'en montrent plus qu'un seul bloc, avec « 📺 Stream » en gras sous le nom de la course.
+
 ## v2.12 — 10 novembre 2026
 
 ### 🐛 Corrections
