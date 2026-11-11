@@ -369,7 +369,8 @@ function calendarBox(event,siteUrl){
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
-export const CALENDAR_FORMAT = 'calendar-v3:';
+// Bumped whenever the calendar's content changes: a release then redraws every calendar at once (v4: streams merged, 2026-11-11).
+export const CALENDAR_FORMAT = 'calendar-v4:';
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   // One title (Nathan, 2026-11-01): « 📅 Events du 26 octobre au 1 novembre 2026 ».
