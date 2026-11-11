@@ -356,6 +356,14 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   // A stream announced during an endurance start the community streams is that endurance's stream: told once.
   const streamedStarts = items.filter(item => item.kind === 'race' && streams.some(stream => stream.item === item.row.item)).flatMap(item => item.data.departures || []);
   const merged = new Set(items.filter(item => item.kind === 'stream' && streamDuringEndurance(item.data.startsAt, streamedStarts)).map(item => item.row.item));
+  // A stream of the streamer's own endurance today (his crew in it): the endurance's stream, at the stream's time (Nathan, 2026-11-11).
+  for (const item of items) {
+    const race = stream && item.kind === 'stream' && !merged.has(item.row.item) && items.find(other => other.kind === 'race' && other.row.item === item.data.stream?.crew?.eventId);
+    if (!race) continue;
+    merged.add(item.row.item);
+    const time = streams.find(entry => entry.item === item.row.item)?.time;
+    if (time && !streams.some(entry => entry.item === race.row.item)) streams.push({item:race.row.item, name:'', time});
+  }
   if (merged.size) { items.splice(0, items.length, ...items.filter(item => !merged.has(item.row.item))); streams = streams.filter(stream => !merged.has(stream.item)); }
   const streamed = new Set(streams.map(item => item.item));
   site.streams = streams;

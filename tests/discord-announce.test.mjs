@@ -682,3 +682,19 @@ test('a stream announced during an endurance the streamer streams is one stream,
   assert.match(live,/6h de Spa/);assert.doesNotMatch(live,/Le stream du 6h/);
   assert.match(live,/Stream à 19h45/);assert.doesNotMatch(live,/19h30/);
 });
+
+test('a stream the streamer announced for his own endurance today is that endurance’s stream, told once (Nathan, 2026-11-11)',async t=>{
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
+  t.mock.timers.enable({apis:['Date'],now:MORNING});
+  // Pilote 1 is in Équipage A of the 6h (20h) and announced his stream at 20h30 for it.
+  DB.db.prepare("UPDATE registrations SET user_id='111111111111111111',guest_hash=NULL WHERE id='r1'").run();
+  DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,duration_minutes,categories,departures,created_by,created_at,community_id,format,sim,rounds,access,details,event_type)
+    VALUES('stream-1','Le stream du 6h','',1,60,'[]',?,'111111111111111111',0,?,'solo','stream','[]','open',?,'special')`)
+    .run(JSON.stringify([{id:'s1',startsAt:Date.parse('2026-10-28T19:30:00Z'),time:'20:30'}]),DEV_COMMUNITY,JSON.stringify({streamTime:'20:30',raceSim:'lmu'}));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const posts=sent(calls);
+  assert.equal(posts[0].body.content,'@everyone');
+  const live=JSON.stringify(posts[0].body);
+  assert.match(live,/6h de Spa/);assert.doesNotMatch(live,/Le stream du 6h/);assert.match(live,/20h30/);
+  assert.ok(!posts.slice(1).some(post=>/6h de Spa/.test(JSON.stringify(post.body))),'the endurance once');
+});

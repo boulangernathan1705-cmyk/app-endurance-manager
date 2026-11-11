@@ -1,6 +1,6 @@
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
-import {CALENDAR_FORMAT, isInParisWeek, parisWeek, lastWeekTurn} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, isInParisWeek, parisWeek, lastWeekTurn, parisDay} from './discord-weekly-format.mjs';
 import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
@@ -253,7 +253,23 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const endurances = await streamerEndurances(env, community, timestamp);
   // A stream announced during a streamed endurance start is that endurance's stream: shown once (Nathan, 2026-11-08).
   const streamed = endurances.filter(item => item.endurance.info.streamTime);
-  for (let index = starts.length - 1; index >= 0; index--) if (isStream(starts[index].row) && streamDuringEndurance(starts[index].startsAt, streamed)) starts.splice(index, 1);
+  const crews = new Map();
+  for (let index = starts.length - 1; index >= 0; index--) {
+    const {row, startsAt} = starts[index];
+    if (!isStream(row)) continue;
+    if (streamDuringEndurance(startsAt, streamed)) { starts.splice(index, 1); continue; }
+    // The streamer's own endurance that day (his crew in it): the stream goes into its entry (Nathan, 2026-11-11).
+    const crew = await streamCrew(env, community.id, row);
+    const own = crew && endurances.find(item => item.row.id === crew.eventId && parisDay(item.startsAt) === parisDay(startsAt));
+    if (!own) { crews.set(row.id, crew); continue; }
+    const details = streamDetails({details:parseJson(row.details, {})});
+    if (!own.endurance.info.streamTime) own.endurance.info.streamTime = details.streamTime || details.raceTime || '';
+    if (details.streamUrl && !own.endurance.info.streamUrl) own.endurance.info.streamUrl = details.streamUrl;
+    starts.splice(index, 1);
+  }
+  // An event of the calendar for the same race as one of these endurances (same name, same start): told once, by the endurance.
+  const sameRace = item => endurances.some(endu => nameKey(endu.row.name) === nameKey(item.row.name) && Math.abs(endu.startsAt - item.startsAt) < 3600000);
+  for (let index = starts.length - 1; index >= 0; index--) if (sameRace(starts[index])) starts.splice(index, 1);
   starts.push(...endurances.filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
   // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
   // once its events are over, the week stays shown until then.
@@ -274,7 +290,6 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
       .bind(...ids, community.id).all()).results || [];
     for (const row of result) counts.set(`${row.event_id}:${row.departure_id}`, Number(row.entered) || 0);
   }
-  const crews = new Map();
   for (const {row} of selected) if (isStream(row) && !crews.has(row.id)) crews.set(row.id, await streamCrew(env, community.id, row));
   return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt, endurance}) => {
     if (endurance) return {id:row.id, name:row.name, sim:endurance.sim, circuits:[row.circuit], startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, endurance:endurance.info};
