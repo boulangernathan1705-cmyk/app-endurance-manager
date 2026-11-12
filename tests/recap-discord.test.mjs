@@ -8,7 +8,7 @@ import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
 import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncDueRecaps,syncWeeklyDiscord,loadCalendarSnapshot} from '../server/discord-weekly.mjs';
-import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botRecapSettings,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-12T08:00:00Z'), DAY=86400000;
@@ -884,6 +884,25 @@ test('below a private category, the bot\'s own is private like it when chosen, a
   assert.deepEqual(others(named(channels,'📅・endurances-de-la-semaine')),[]);
   calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'nothing to change: no write');
+});
+
+test('without « Gérer les rôles », the category stays as it is but the races\' cards still follow the entries (SPM, 2026-11-12)',async t=>{
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
+  const {DB,env,channels,messages,setFailure}=setup(t,{rights:String(268520464n|THREADS)});
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  const bot=named(channels,'🏆 Endurance Manager');
+  // The admins change the rights of the category above; the bot has lost « Gérer les rôles ».
+  named(channels,'Accueil').permission_overwrites=[...PRIVATE,{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
+  setFailure((path,method)=>method==='PATCH'&&path===`/channels/${bot.id}`);
+  race(DB,'a','8H BAHRAIN');
+  const result=await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(result.ok,true);
+  assert.ok([...messages.values()].some(item=>JSON.stringify(item.embeds||[]).includes('8H BAHRAIN')),'the race card is published');
+  assert.match((await botRecapSettings(env,COMMUNITY)).last_error,/Gérer les rôles/,'the admins still see what is missing');
+  // The right is back: the message goes.
+  setFailure(null);await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal((await botRecapSettings(env,COMMUNITY)).last_error,null);
 });
 
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
