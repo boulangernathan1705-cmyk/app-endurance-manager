@@ -31,7 +31,7 @@ function sentence(item) {
     case 'crew_request': return `${b(item.pilot)} demande un équipage : ${crew}`;
     case 'crew_request_accepted': return `Ta demande est acceptée : tu roules avec l’équipage ${crew}`;
     case 'crew_request_refused': return `Ta demande d’équipage ${crew} n’a pas été retenue`;
-    case 'discord_error': return `Le bot Discord ne peut plus publier${item.message ? ` : ${esc(item.message)}` : ''}`;
+    case 'discord_error': return item.rights ? `Il manque un droit au bot Discord : ${esc(item.message || '')}` : `Le bot Discord ne peut plus publier${item.message ? ` : ${esc(item.message)}` : ''}`;
     case 'race_reminder': return `Rappel : ta course commence dans moins de 24 h${item.crewName ? ` avec ton équipage ${crew}` : ''}${discordChannel(item) ? ' · ouvre le salon de l’équipage sur Discord' : ''}`;
     default: return 'Du nouveau sur une de tes courses';
   }

@@ -8,7 +8,7 @@ import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
 import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncDueRecaps,syncWeeklyDiscord,loadCalendarSnapshot} from '../server/discord-weekly.mjs';
-import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botRecapSettings,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botRecapSettings,checkBotRights,missingRights,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-12T08:00:00Z'), DAY=86400000;
@@ -24,14 +24,14 @@ class D1 {
 function setup(t,{rights=RECAP_BOT_PERMISSIONS,overrides=[],failure=null}={}){
   const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
-  let counter=900000000000000000n, fail=failure;
+  let counter=900000000000000000n, fail=failure, perms=rights;
   const original=globalThis.fetch;
   globalThis.fetch=async(url,options={})=>{
     const path=String(url).replace('https://discord.com/api/v10',''),method=options.method||'GET',body=options.body?JSON.parse(options.body):null;
     calls.push({path,method,body});
     if(fail?.(path,method))return Response.json({code:50013},{status:fail.status||403});
     if(path===`/guilds/${GUILD}`)return Response.json({id:GUILD,name:'Test',owner_id:OWNER});
-    if(path===`/guilds/${GUILD}/roles`)return Response.json([{id:GUILD,permissions:rights}]);
+    if(path===`/guilds/${GUILD}/roles`)return Response.json([{id:GUILD,permissions:perms}]);
     if(path===`/guilds/${GUILD}/members/${BOT}`)return Response.json({roles:[]});
     if(path===`/guilds/${GUILD}/members/${OWNER}`)return Response.json({user:{id:OWNER},roles:[]});
     if(path===`/guilds/${GUILD}/channels`){
@@ -59,7 +59,7 @@ function setup(t,{rights=RECAP_BOT_PERMISSIONS,overrides=[],failure=null}={}){
     return new Response('{}',{status:404});
   };
   t.after(()=>globalThis.fetch=original);
-  return {DB,env,calls,channels,messages,setFailure(value){fail=value;}};
+  return {DB,env,calls,channels,messages,setFailure(value){fail=value;},setRights(value){perms=value;}};
 }
 function race(DB,id='race-a',name='6h de Spa',circuit='spa',departures=[{id:'start-a',startsAt:NOW+DAY}],community=DEV_COMMUNITY){
   DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,6,'["GT3"]',?,?,0,?)`).run(id,name,circuit,JSON.stringify(departures),OWNER,community);
@@ -886,23 +886,51 @@ test('below a private category, the bot\'s own is private like it when chosen, a
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'nothing to change: no write');
 });
 
-test('without « Gérer les rôles », the category stays as it is but the races\' cards still follow the entries (SPM, 2026-11-12)',async t=>{
+test('a right lost on the server is found within the hour: what needs it is skipped, the cards follow, the admins are told once (SPM, 2026-11-12)',async t=>{
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
+  const {DB,env,calls,channels,messages,setRights}=setup(t,{rights:String(268520464n|THREADS)});
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),[]);
+  const bot=named(channels,'🏆 Endurance Manager');
+  // The bot no longer has « Gérer les rôles » (invited before it was in the link) and the admins change the category above.
+  setRights(String((268520464n|THREADS)&~(1n<<28n)));
+  named(channels,'Accueil').permission_overwrites=[...PRIVATE,{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
+  race(DB,'a','8H BAHRAIN');
+  DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES(?,?,0)").run('300000000000000003','Admin SPM');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at,discord_admin) VALUES(?,?,'[]','member',?,0,1)").run(DEV_COMMUNITY,'300000000000000003',Math.floor(Date.now()/1000));
+  const bell=()=>DB.db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE kind='discord_error'").get().n;
+  calls.length=0;
+  const later=NOW+3600000;
+  assert.equal((await syncBotRecaps(env,later,COMMUNITY)).ok,true);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'no request Discord would refuse');
+  assert.ok([...messages.values()].some(item=>JSON.stringify(item.embeds||[]).includes('8H BAHRAIN')),'the race card is published');
+  const saved=await botRecapSettings(env,COMMUNITY);
+  assert.deepEqual(missingRights(saved),['Gérer les rôles']);assert.equal(saved.last_error,null,'not a publication error');
+  assert.equal(bell(),1);
+  await syncBotRecaps(env,later+2*3600000,COMMUNITY);
+  assert.equal(bell(),1,'told once, not every hour');
+  // Invited again: Administration checks at once and the warning goes.
+  setRights(String(268520464n|THREADS));
+  assert.deepEqual(await checkBotRights(env,COMMUNITY,await botRecapSettings(env,COMMUNITY),later+3*3600000,{force:true}),[]);
+  assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),[]);
+});
+
+test('a refusal on the bot\'s category alone is shown without ringing, and never stops the cards',async t=>{
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
   const {DB,env,channels,messages,setFailure}=setup(t,{rights:String(268520464n|THREADS)});
   Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
   const bot=named(channels,'🏆 Endurance Manager');
-  // The admins change the rights of the category above; the bot has lost « Gérer les rôles ».
   named(channels,'Accueil').permission_overwrites=[...PRIVATE,{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
   setFailure((path,method)=>method==='PATCH'&&path===`/channels/${bot.id}`);
   race(DB,'a','8H BAHRAIN');
-  const result=await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.equal(result.ok,true);
-  assert.ok([...messages.values()].some(item=>JSON.stringify(item.embeds||[]).includes('8H BAHRAIN')),'the race card is published');
-  assert.match((await botRecapSettings(env,COMMUNITY)).last_error,/Gérer les rôles/,'the admins still see what is missing');
-  // The right is back: the message goes.
-  setFailure(null);await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.equal((await botRecapSettings(env,COMMUNITY)).last_error,null);
+  DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES(?,?,0)").run('300000000000000003','Admin');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at,discord_admin) VALUES(?,?,'[]','member',?,0,1)").run(DEV_COMMUNITY,'300000000000000003',Math.floor(Date.now()/1000));
+  assert.equal((await syncBotRecaps(env,NOW,COMMUNITY)).ok,true);
+  assert.ok([...messages.values()].some(item=>JSON.stringify(item.embeds||[]).includes('8H BAHRAIN')));
+  assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),['Gérer les rôles']);
+  assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE kind='discord_error'").get().n,0);
 });
 
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
