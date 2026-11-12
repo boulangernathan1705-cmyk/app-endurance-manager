@@ -407,7 +407,8 @@ function categoryRules(env, layout, key, channels) {
   return copy && at && at !== 'top' ? othersRules(env, channels.find(item => item.id === at)?.permission_overwrites) : [];
 }
 // The bot's categories kept private or open as chosen, and what the bot made in them (their channels, voices and the races'
-// categories): changed only where they differ. Discord needs « Gérer les rôles » for it.
+// categories): changed only where they differ. Discord needs « Gérer les rôles » for it. Without it: the message for the admins,
+// and the rest of the pass goes on (the races' cards must keep following the entries; SPM, 2026-11-12).
 async function shareRights(env, community, settings, rows, channels, budget) {
   const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
   const races = rows.filter(row => isRaceRow(row) && row.category_id && !row.closed_at).map(row => row.category_id);
@@ -425,13 +426,15 @@ async function shareRights(env, community, settings, rows, channels, budget) {
       if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted
         && (BigInt(own?.allow || 0) & access) === access && !(BigInt(own?.deny || 0) & access)) continue;
       const permission_overwrites = withBotAccess([...rules, ...mine], env.DISCORD_CLIENT_ID, access);
-      await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget).catch(error => {
-        if ([403].includes(error.status) || error.code === 50013) throw Object.assign(new Error('Pour rendre la catégorie du bot privée ou publique, il lui faut « Gérer les rôles » : invite-le à nouveau avec ses droits.'), {rights:true});
+      try { await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget); }
+      catch (error) {
+        if (error.status === 403 || error.code === 50013) return 'Pour rendre la catégorie du bot privée ou publique, il lui faut « Gérer les rôles » : invite-le à nouveau avec ses droits.';
         throw error;
-      });
+      }
       channel.permission_overwrites = permission_overwrites;
     }
   }
+  return null;
 }
 // The bot's own categories: the missing ones made (with its rights), then their ids kept. channels: the server's, updated.
 async function makeCategories(env, community, settings, channels, budget) {
@@ -796,14 +799,14 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
   const layout = parseLayout(settings.layout), sameServer = settings.guild_id === community.discordGuildId;
-  let channels = null, wanted = [];
+  let channels = null, wanted = [], warning = null;
   budget.moved = false;
   if (layout && sameServer) {
     // The bot's own categories first: the races, the week's channels and the voices go in them.
     channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
     ({wanted} = await makeCategories(env, community, settings, channels, budget));
     if (settings.enabled !== 0) {
-      await shareRights(env, community, settings, rows, channels, budget);
+      warning = await shareRights(env, community, settings, rows, channels, budget);
       const cats = parseCategories(settings.bot_categories), anchors = layoutAnchors(layout, cats);
       if (Object.entries(anchors).some(([column, value]) => settings[column] !== value)) {
         await env.DB.prepare(`UPDATE community_recap_settings SET mode=?,scope=?,destination_id=?,iracing_destination_id=?,calendar_destination_id='' WHERE community_id=?`)
@@ -901,7 +904,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     if (community.modules?.crewChannels === true) await placeVoices(env,community,settings.guild_id,current,budget);
     if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
   }
-  return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {})};
+  return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {}), ...(warning ? {warning} : {})};
 }
 export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {
   const token = crypto.randomUUID(), now = Date.now();
@@ -920,7 +923,8 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
     }
     // Something left for a next pass (a category still holding voice channels…): the next pass, 2 minutes later, goes on.
     if (result?.more) await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
-    await env.DB.prepare('UPDATE community_recap_settings SET last_error=NULL WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
+    // A right missing for a side task (the category's privacy): shown to the admins, the pass itself went through.
+    await env.DB.prepare('UPDATE community_recap_settings SET last_error=? WHERE community_id=? AND lock_token=?').bind(result?.warning || null,community.id,token).run();
     return result;
   } catch (error) {
     // Out of requests for this pass (a new setting can take several): not an error, the next pass goes on.
