@@ -4,7 +4,7 @@ import {discordDiagnostic} from './discord-diagnostic.mjs';
 import {grindfestAvailable, grindfestEnabled} from '../shared/grindfest.mjs';
 import {
   discordRequest, botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap,
-  saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, RECAP_BOT_PERMISSIONS
+  saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, checkBotRights, missingRights, RECAP_BOT_PERMISSIONS
 } from './recap-discord.mjs';
 import {siteOf} from './discord-weekly.mjs';
 import {announceStream, sendAnnouncementPreview} from './discord-announce.mjs';
@@ -225,9 +225,11 @@ export async function communityApi({path, method, request, env, actor, community
     const legacyScopes = (legacy.results || []).map(row=>row.scope);
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
     const savedBotRecap = await botRecapSettings(env, community);
+    // A right was missing: checked again now, so that « Réinviter le bot » goes away as soon as it is done.
+    if (savedBotRecap && missingRights(savedBotRecap).length && discord) await checkBotRights(env, community, savedBotRecap, Date.now(), {force:true});
     const botRecap = savedBotRecap;
     return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,lmuId:botRecap.destination_id,lmuName:botRecap.destination_name,
-        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error,
+        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error,missingRights:missingRights(botRecap),
         layout:parseLayout(botRecap.layout), leftovers:!botRecap.enabled && botRecap.bot_categories !== '{}'} : null,
       recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
       // Administrator: the only right that also opens the hidden categories (no exception to add there).

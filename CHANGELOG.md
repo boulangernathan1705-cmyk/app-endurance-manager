@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.2 — 12 novembre 2026
+
+### 🐛 Corrections
+
+- **Droits du bot Discord** : le site vérifie chaque heure les droits du bot. S’il en manque un, seule la partie concernée attend, et les cartes des fils suivent toujours les inscriptions. Les admins sont prévenus dans la cloche et peuvent réinviter le bot depuis Administration.
+
 ## v2.13 — 11 novembre 2026
 
 ### 🐛 Corrections

@@ -94,6 +94,7 @@ function overviewMarkup(setup, settings, members) {
     `<span class="adm-actions">${setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></span>`));
   if (!setup.rolesConfigured) problems.push(row('warn', 'Aucun rôle n’ouvre le site', 'Choisis quels rôles Discord peuvent entrer sur le site.', goTo('roles', 'Ouvrir les rôles')));
   if (recap?.lastError) problems.push(row('bad', 'Discord : publication en erreur', esc(recap.lastError), goTo('discord', 'Voir')));
+  if (recap?.missingRights?.length) problems.push(rightsRow(setup));
   else if (setup.recapSetupRequired) problems.push(row('warn', 'Discord attend son réglage', 'Choisis comment le bot affiche tes courses sur ton serveur.', goTo('discord', 'Régler Discord')));
   if (voices && crews.botReady !== true) problems.push(row('warn', 'Vocaux d’équipage : le bot n’a pas ses droits', 'Il ne peut pas créer les salons vocaux.', goTo('discord', 'Voir')));
   else if (voices && crews.lastError) problems.push(row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError), goTo('discord', 'Voir')));
@@ -514,6 +515,12 @@ function modulesMarkup(settings, setup) {
     <div class="adm-modules">${items.map(line).join('')}</div>`;
 }
 
+// A right the bot lacks on the server (invited before it was in the link…): inviting it again with the site's link gives it.
+function rightsRow(setup) {
+  return row('warn', 'Il manque un droit au bot', `${esc(setup.botRecap.missingRights.map(right => `« ${right} »`).join(', '))}. Réinvite-le, rien n’est retiré.`,
+    setup.recapBotInviteUrl ? `<span class="adm-actions"><a class="primary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Réinviter le bot</a><button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></span>` : '');
+}
+
 // « Discord »: where it stands, what the bot does (a summary), « Modifier » opens the questions step by step in a window.
 function discordTabMarkup(setup, settings, look) {
   const config = setup.botRecap, crews = settings.crews || {}, guild = setup.guild || {};
@@ -523,7 +530,7 @@ function discordTabMarkup(setup, settings, look) {
     : leaving ? ['warn', 'Retrait en cours'] : ['off', 'Éteint'];
   const sub = config?.lastError ? esc(config.lastError) : config?.enabled ? 'Le bot met ton serveur à jour tout seul, toutes les 2 minutes.' : leaving ? 'Le bot finit de retirer ce qu’il avait créé.' : 'Rien n’est publié sur ton serveur. Touche « Régler Discord » pour commencer.';
   const state = `<ul class="adm-rows"><li class="adm-row is-${tone}" data-discord-state><span><strong>${title}</strong><small>${sub}</small></span>
-    <span class="adm-actions"><span class="settings-status" data-discord-saved aria-live="polite"></span><button type="button" class="primary-button" data-discord-open>${config?.enabled ? 'Modifier' : 'Régler Discord'}</button></span></li></ul>`;
+    <span class="adm-actions"><span class="settings-status" data-discord-saved aria-live="polite"></span><button type="button" class="primary-button" data-discord-open>${config?.enabled ? 'Modifier' : 'Régler Discord'}</button></span></li>${config?.missingRights?.length ? rightsRow(setup) : ''}</ul>`;
   const crewWarn = voices && (crews.botReady !== true || crews.lastError);
   const crewRights = !crewWarn ? '' : crews.botReady === true ? row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError))
     : row('warn', 'Vocaux d’équipage : le bot n’a pas ses droits', esc(crews.botProblem === 'channel' ? `Dans « ${crews.botChannelName || 'le salon'} », un administrateur Discord doit autoriser Endurance Manager : ${(crews.botMissing || []).join(', ')}. Les autres accès restent privés.` : crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants : ${crews.botMissing.join(', ')}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights),
