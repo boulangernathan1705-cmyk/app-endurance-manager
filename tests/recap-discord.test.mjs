@@ -933,6 +933,21 @@ test('a refusal on the bot\'s category alone is shown without ringing, and never
   assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE kind='discord_error'").get().n,0);
 });
 
+test('the bot copies only the rights it holds: a right it lacks on the server is left out, not refused by Discord (SPM, 2026-11-12)',async t=>{
+  // The bot has no « Se connecter »: Discord would refuse a rule allowing it (50013), even with « Gérer les rôles ».
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
+  const {env,channels,calls,setFailure}=setup(t,{rights:String(268520464n|THREADS)});
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  const bot=named(channels,'🏆 Endurance Manager');
+  named(channels,'Accueil').permission_overwrites=[...PRIVATE,{id:'222222222222222222',type:0,allow:String(3072n|(1n<<20n)),deny:'0'}];
+  setFailure((path,method)=>method==='PATCH'&&path===`/channels/${bot.id}`&&calls.at(-1).body.permission_overwrites.some(rule=>rule.id!==BOT&&BigInt(rule.allow)&(1n<<20n)));
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(bot.permission_overwrites.find(rule=>rule.id==='222222222222222222')?.allow,'3072','copied without « Se connecter »');
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'then nothing to change');
+});
+
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
   const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
