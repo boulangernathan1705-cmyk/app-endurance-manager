@@ -62,7 +62,10 @@ function stylesheetPaths(source, sourceName) {
   });
 }
 
+// Classic script, so it runs before every module of the page.
+const compatScriptTag = '<script src="/front/compat.js"></script>';
 function injectI18n(source) {
+  if (!source.includes('/front/compat.js')) source = source.replace(/<head>/i, `<head>\n${compatScriptTag}`);
   if (source.includes('/front/i18n.mjs') && source.includes('/front/i18n-content.mjs') && source.includes('/front/language-toggle-layout.mjs')) return source;
   if (!source.includes('</head>')) throw new Error('Document HTML sans balise </head> pour le sélecteur de langue.');
   return source.replace('</head>', `${i18nScriptTag}\n</head>`);
