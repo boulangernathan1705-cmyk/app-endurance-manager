@@ -92,7 +92,7 @@
 
 /* Stabilise le survol des accordéons d'équipage. */
 .crew-pilot-accordion-summary {
-  transition: none !important;
+  transition: none;
 }
 
 .crew-pilot-accordion-summary:hover {
