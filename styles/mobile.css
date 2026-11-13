@@ -141,7 +141,6 @@
   }
 
   /* Unassigned pilots: keep the edit action useful without making it dominate the card. */
-  .ux-unassigned-grid > .pilot-row,
   .crew-pilot-accordion-body > .pilot-row {
     position: relative;
   }
@@ -262,15 +261,15 @@
   .ux-crew-bucket { border-radius:10px!important; }
   .ux-crew-bucket-body { background:transparent!important; }
 
-  .ux-unassigned-grid>.pilot-row,.crew-pilot-accordion-body>.pilot-row { padding:8px 9px!important; gap:5px!important; }
+  .crew-pilot-accordion-body>.pilot-row { padding:8px 9px!important; gap:5px!important; }
   .pilot-main { gap:3px 7px!important; }
   .pilot-name { font-size:13px!important; line-height:1.2; }
   .pilot-car,.registration-status,.pilot-preference { font-size:10.5px!important; line-height:1.25; }
   .pilot-row>.edit-button { min-width:72px!important; min-height:32px!important; height:32px!important; padding:4px 8px!important; font-size:11px!important; }
-  .ux-unassigned-grid .presence-timeline,.crew-pilot-accordion-body .presence-timeline { margin-top:3px!important; }
-  .ux-unassigned-grid .presence-scale,.crew-pilot-accordion-body .presence-scale { height:21px!important; }
-  .ux-unassigned-grid .presence-track>.presence-segment,.crew-pilot-accordion-body .presence-track>.presence-segment { height:30px!important; min-height:30px!important; }
-  .ux-unassigned-grid .presence-edges,.crew-pilot-accordion-body .presence-edges { margin-top:3px!important; }
+  .crew-pilot-accordion-body .presence-timeline { margin-top:3px!important; }
+  .crew-pilot-accordion-body .presence-scale { height:21px!important; }
+  .crew-pilot-accordion-body .presence-track>.presence-segment { height:30px!important; min-height:30px!important; }
+  .crew-pilot-accordion-body .presence-edges { margin-top:3px!important; }
 
   .crew-pilot-accordion-summary,.crew-management-summary { grid-template-columns:34px minmax(0,1fr) auto 18px!important; grid-template-rows:auto auto auto!important; min-height:0!important; padding:8px 9px!important; gap:3px 7px!important; }
   .crew-compact-car { justify-self:end; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
