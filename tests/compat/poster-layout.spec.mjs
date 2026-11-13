@@ -21,11 +21,13 @@ const cases={
   'long name':[[event({name:'TONDEUZ TRAINING SPÉCIAL HALLOWEEN AVEC UN NOM BEAUCOUP TROP LONG POUR UNE LIGNE'})],false],
   'stream':[[stream],true],
   'two streams':[[event({id:'a',startsAt:at(14)}),event({id:'b',name:'OPEN LMU',type:'OPEN',startsAt:at(21)})],true,[{item:'a',time:'13:45'},{item:'b',time:'20:45'}]],
+  // One poster a day (2026-11-13): the stream, then « Aussi aujourd’hui ».
+  'stream and the other races':[[stream],true,[],[race(),event()]],
 };
-for(const [name,[items,live,streams=[]]] of Object.entries(cases))test(`morning poster « ${name} »: as tall as its content, within its width, nothing under a logo`,async({page},info)=>{
+for(const [name,[items,live,streams=[],rest=[]]] of Object.entries(cases))test(`morning poster « ${name} »: as tall as its content, within its width, nothing under a logo`,async({page},info)=>{
   test.skip(!info.project.name.startsWith('chromium'),'Cloudflare renders the posters with Chromium');
   await page.setViewportSize({width:720,height:100});
-  await page.setContent(posterHtml(posterModel(items,{...site,streams},{live,timestamp:at(8)})).replace('<style>',`<style>${faces}`));
+  await page.setContent(posterHtml(posterModel(items,{...site,streams},{live,timestamp:at(8),rest})).replace('<style>',`<style>${faces}`));
   const shot=await page.screenshot({fullPage:true});
   const layout=await page.evaluate(()=>{
     const card=document.querySelector('.card').getBoundingClientRect();

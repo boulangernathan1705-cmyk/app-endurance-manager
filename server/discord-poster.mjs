@@ -1,9 +1,10 @@
 // The morning announcement as a poster (Nathan, 2026-11-01): one picture per message, made once at 7h30 by Cloudflare's
 // browser (Browser Rendering, free 10 min/day; a poster takes a few seconds), sent as the message's image. Same facts as
 // the text, which stays the fallback when no picture can be made (not set up, quota, outage).
-// - The stream's message: the community's banner, « STREAM 13H45 » in big (both times when two streams), the streamer,
-//   then each streamed race. The banner only goes with a stream: it shows the streamer, who may not race otherwise.
-// - The other message: « AU PROGRAMME AUJOURD'HUI » (« ENDURANCES DU JOUR » with endurances only), no banner.
+// - A day with a stream: the community's banner, « STREAM 13H45 » in big (both times when two streams), the streamer,
+//   each streamed race, then « AUSSI AUJOURD'HUI » and the day's other races, on the same poster (Nathan, 2026-11-13:
+//   one announcement). The banner only goes with a stream: it shows the streamer, who may not race otherwise.
+// - A day without a stream: the day on top, then the races, no banner.
 // - Per race: its sim, OPEN / SAFE / type, its logo (EVENT TDZ), circuit, start, entries (places, waiting list); an
 //   endurance gets one line per crew with its pilots (6 at most, then « + N autres »), a Gridfest its streamers.
 import {catalogForGame, normalizeTdzEventType} from '../shared/catalog.mjs';
@@ -97,25 +98,29 @@ function raceBlock(race, url) {
   return {sim, name:race.name, url, logo:race.logoUrl || '', chips:kind ? [[kind, 'grey']] : [], facts, lines};
 }
 
-// The poster of one message. items: [{kind:'event'|'stream'|'race', data, url}]. site: {name, url, bannerUrl, streamUrl,
-// streamName, streams:[{item, time}]}. live: the stream's message.
-export function posterModel(items, site, {live = false, timestamp = Date.now()} = {}) {
+// The poster of the day. items: [{kind:'event'|'stream'|'race', data, url}]. site: {name, url, bannerUrl, streamUrl,
+// streamName, streams:[{item, time}]}. live: items are the stream's; rest: the day's other races, below them.
+export function posterModel(items, site, {live = false, timestamp = Date.now(), rest = []} = {}) {
   const streamUrl = items.find(item => item.kind === 'stream' && item.data.stream?.streamUrl)?.data.stream.streamUrl || site.streamUrl || '';
   const channel = URL.canParse(streamUrl) ? new URL(streamUrl).pathname.split('/').filter(Boolean)[0] || '' : '';
   const streamer = text(items.find(item => item.kind === 'stream' && item.data.stream?.streamerName)?.data.stream.streamerName || site.streamName || channel);
-  const blocks = items.slice(0, MAX_BLOCKS).map(item => item.kind === 'race' ? raceBlock(item.data, item.url)
-    : item.kind === 'stream' ? streamBlock(item.data, item.url, streamer) : eventBlock(item.data, item.url));
-  const model = {day:longDay.format(timestamp).toUpperCase(), blocks, more:Math.max(0, items.length - MAX_BLOCKS), live};
+  const block = item => item.kind === 'race' ? raceBlock(item.data, item.url)
+    : item.kind === 'stream' ? streamBlock(item.data, item.url, streamer) : eventBlock(item.data, item.url);
+  // A streamed race below the stream keeps its live time (no stream link set: it is not one of the stream's races).
+  const others = list => list.map(item => {
+    const result = block(item), time = timeOf((site.streams || []).find(stream => stream.item === item.data?.id)?.time);
+    if (time && result.sim !== 'stream') result.facts.push(['📺 Stream', time]);
+    return result;
+  });
+  const shown = live ? items.slice(0, MAX_BLOCKS) : [], below = (live ? rest : items).slice(0, MAX_BLOCKS - shown.length);
+  const blocks = live ? shown.map(block) : others(below);
+  const model = {day:longDay.format(timestamp).toUpperCase(), blocks, more:Math.max(0, items.length + (live ? rest.length : 0) - shown.length - below.length), live};
   if (!live) {
-    // A streamed event of this message keeps its live time (no stream link set: it is not on the stream's message).
-    blocks.forEach((block, index) => {
-      const time = timeOf((site.streams || []).find(stream => stream.item === items[index]?.data?.id)?.time);
-      if (time && block.sim !== 'stream') block.facts.push(['📺 Stream', time]);
-    });
     // The day alone: the message is the announcement (Nathan, 2026-11-03: « on sait que c’est une annonce »).
     model.head = `📅 ${model.day}`;
     return model;
   }
+  model.rest = others(below);
   const times = [...new Set(items.map(item => item.kind === 'stream' ? item.data.stream?.streamTime || item.data.stream?.raceTime
     : (site.streams || []).find(stream => stream.item === item.data.id)?.time).map(timeOf).filter(Boolean))].sort();
   const gridfest = items.length === 1 && blocks[0].streamers;
@@ -153,6 +158,8 @@ const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Barl
 .time{background:#fff;color:#0b0d12;font-weight:900;font-size:25px;border-radius:8px;padding:4px 12px;min-width:92px;text-align:center;flex:none}
 .time.same{visibility:hidden}.time.tbd{background:#3a3f4b;color:#fff;font-size:18px;line-height:1.1}
 .cn{font-size:26px;font-weight:800;min-width:120px;flex:none}.pi{font-size:23px;color:#c9ccd6}.pi b{color:#b78bff}
+.also{margin-top:34px;font-weight:800;letter-spacing:2px;font-size:22px;color:#ffb35c}
+.also+.blk{margin-top:8px}
 .more{margin-top:14px;font-size:25px;color:#9aa0b0;font-weight:700}
 .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:18px}
 .st{display:flex;align-items:center;justify-content:space-between;background:rgba(255,123,0,.12);border:2px solid #ff7b00;border-radius:12px;padding:8px 20px 8px 10px}
@@ -184,7 +191,7 @@ export function posterHtml(model) {
 ${model.live && /^https:/.test(model.banner) ? `<img class=ban src="${html(model.banner)}" onerror="this.remove()">` : ''}<div class=in>${logo}
 <div class=top>${top}${model.live ? `<span class=day>· ${html(model.day)}</span>` : ''}</div>
 ${model.big ? `<div class=big>${html(model.big)}</div>` : ''}${model.who ? `<div class=who>${model.who}</div>` : ''}
-${blocks.map(blockHtml).join('')}${model.more ? `<div class=more>+ ${plural(model.more, 'autre rendez-vous')} sur le site</div>` : ''}</div></div></body></html>`;
+${blocks.map(blockHtml).join('')}${model.rest?.length ? `<div class=also>AUSSI AUJOURD’HUI</div>${model.rest.map(blockHtml).join('')}` : ''}${model.more ? `<div class=more>+ ${plural(model.more, 'autre rendez-vous')} sur le site</div>` : ''}</div></div></body></html>`;
 }
 
 // The same poster as text (the fallback): Discord titles, the sim and type as `étiquettes`, the pilots in small.
@@ -203,7 +210,8 @@ export function posterText(model) {
     ? [`# ${model.gridfest ? '🎉' : '📺'} ${model.gridfest ? model.big.replace('GRIDFEST', 'Gridfest') : model.big.replace(/^STREAMS?/, match => match === 'STREAMS' ? 'Streams à' : 'Stream à').replace(' & ', ' et ').toLowerCase().replace(/^streams? à/, match => match[0].toUpperCase() + match.slice(1))}`,
       model.streamer && !model.gridfest ? `**avec ${model.streamUrl ? `[${md(model.streamer)}](${model.streamUrl})` : md(model.streamer)}${model.driving ? ' au volant' : ''}**` : model.gridfest ? '**Pilote pour ton streamer**' : ''].filter(Boolean).join('\n')
     : `## ${model.head.replace(/^(\S+) (.+)$/, (all, icon, words) => `${icon} ${words.charAt(0)}${words.slice(1).toLowerCase()}`)}`;
-  return [head, ...model.blocks.map(block), model.more ? `-# + ${plural(model.more, 'autre rendez-vous')} sur le site` : ''].filter(Boolean).join('\n\n').slice(0, 4000);
+  const rest = model.rest?.length ? ['## Aussi aujourd’hui', ...model.rest.map(block)] : [];
+  return [head, ...model.blocks.map(block), ...rest, model.more ? `-# + ${plural(model.more, 'autre rendez-vous')} sur le site` : ''].filter(Boolean).join('\n\n').slice(0, 4000);
 }
 
 const base64 = bytes => {
