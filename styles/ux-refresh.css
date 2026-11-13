@@ -238,7 +238,6 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
 }
 .registration-sheet {
   width: 100%;
-  max-width: 620px;
   max-height: min(88vh, 860px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -307,7 +306,7 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
 .registration-summary-row.is-static { cursor: default; }
 .registration-summary-row.is-static:hover { background: transparent; }
 .registration-summary-row > span { color: var(--muted, #92979c); font-size: 13px; }
-.registration-summary-row > strong { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.registration-summary-row > strong { align-items: center; min-width: 0; }
 .registration-summary-row > strong .category-logo { width: 28px; height: auto; }
 .registration-summary-row > em { font-style: normal; font-size: 13px; font-weight: 700; color: #52d3d8; }
 .registration-danger-zone { display: flex; justify-content: flex-start; }
@@ -378,7 +377,6 @@ html[data-game] #app .departure-fold > summary { padding: 14px 18px !important; 
 html[data-game] #app .departure-fold .ux-summary-registration-actions > button { font-size: 13px !important; min-height: 40px !important; }
 html[data-game] #app .departure-fold .fold-meta { font-size: 14px !important; }
 html[data-game] #app .departure-fold-body { padding: 4px 18px 20px !important; }
-html[data-game] #app .departure-participation-section { padding: 16px 18px 18px !important; }
 html[data-game] #app .departure-participation-section > * + * { margin-top: 14px; }
 
 /* Cartes d'équipage. */
@@ -417,9 +415,7 @@ html[data-game] #app .pilot-preference { font-size: 13px !important; }
 html[data-game] #app .ux-course-crews-block { border: 0 !important; background: none !important; padding: 0 !important; box-shadow: none !important; }
 html[data-game] #app .ux-course-crews-body {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 10px;
-  align-items: start;
 }
 html[data-game] #app .ux-course-crews-body > .empty { grid-column: 1 / -1; }
 html[data-game] #app .crew-card-shell { margin: 0 !important; border-left-width: 1px !important; border-top: 3px solid var(--crew-color) !important; box-shadow: none !important; }
@@ -438,7 +434,6 @@ html[data-game] #app .crew-tile-summary {
 html[data-game] #app .crew-tile-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 html[data-game] #app .crew-tile-head .crew-compact-team { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 html[data-game] #app .crew-tile-head .crew-compact-team strong { color: var(--crew-color); font-size: 17px !important; }
-html[data-game] #app .crew-tile-head .crew-compact-category .category-logo { width: 34px; height: auto; }
 html[data-game] #app .crew-card-shell details[open] .crew-compact-chevron { transform: rotate(90deg); }
 html[data-game] #app .crew-tile-summary .crew-compact-pilots {
   display: flex !important;
@@ -476,7 +471,7 @@ html[data-game] #app .crew-owner-badge { text-transform: none !important; letter
 .crew-compact-status.is-complete { color: #b7bfbc !important; border-color: #3e4649 !important; background: transparent !important; }
 
 /* Intérieur d'une tuile ouverte : des lignes, plus de cartes dans les cartes. */
-html[data-game] #app .crew-unified-body { padding: 4px 14px 12px !important; border: 0 !important; background: none !important; }
+html[data-game] #app .crew-unified-body { border: 0 !important; background: none !important; }
 html[data-game] #app .crew-unified-body .pilot-row,
 html[data-game] #app .ux-unassigned-grid .pilot-row {
   border: 0 !important;
@@ -562,7 +557,6 @@ html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-bu
 /* Liste des courses : équipages en tuiles. */
 html[data-game] .event-card .crew-summary-list {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)) !important;
   gap: 8px !important;
 }
 html[data-game] .event-card .crew-summary-card {
@@ -739,20 +733,16 @@ html[data-game] .event-list {
 html[data-game] .event-card.race-card { padding: 0 !important; min-height: 0 !important; margin: 0 !important; height: 100%; text-align: left; }
 html[data-game] .race-card .race-card-body {
   display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  padding: 16px 18px !important;
   height: 100%;
   box-sizing: border-box;
 }
-html[data-game] .race-card .race-card-top { display: flex; align-items: flex-start; gap: 14px; }
+html[data-game] .race-card .race-card-top { display: flex; }
 html[data-game] .race-card .race-date {
   width: 62px;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 0 8px;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 10px;
   background: rgba(255, 255, 255, .03);
@@ -762,15 +752,13 @@ html[data-game] .race-card .race-date small { font-size: 12px; color: #aab3b6; t
 html[data-game] .race-card .race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
 html[data-game] .race-card .race-date b { margin-top: 4px; font-size: 14px; color: #7fe3ea; }
 html[data-game] .race-card .race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
-html[data-game] .race-card .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+html[data-game] .race-card .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
 html[data-game] .race-card .event-name { font-size: 22px !important; line-height: 1.15 !important; font-weight: 800 !important; color: #f4f6f5 !important; }
 html[data-game] .race-card .race-meta { font-size: 14px; color: #c7d0d4; }
 html[data-game] .race-card .race-head .event-type-badge { font-size: 10.5px !important; padding: 2px 8px !important; margin-top: 2px; }
 html[data-game] .race-card .race-card-top > .circuit-visual {
   position: static !important;
   flex: none;
-  width: 150px !important;
-  height: 112px !important;
   margin: 0 !important;
   opacity: .85;
   transform: none !important;
@@ -778,7 +766,7 @@ html[data-game] .race-card .race-card-top > .circuit-visual {
 html[data-game] .race-card .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
 
 /* Horaires par jour. */
-html[data-game] .race-card .race-starts { display: flex; flex-direction: column; gap: 6px; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] .race-card .race-starts { display: flex; flex-direction: column; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 html[data-game] .race-card .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 html[data-game] .race-card .race-day em { width: 64px; font-style: normal; font-size: 13px; color: #aab3b6; }
 html[data-game] .race-card .race-start {
@@ -796,14 +784,13 @@ html[data-game] .race-card .race-more { font-size: 13px; color: #aab3b6; }
 /* Ta situation, puis le remplissage. */
 html[data-game] .race-card .race-situation { display: flex; flex-wrap: wrap; gap: 6px; }
 html[data-game] .race-card .race-situation .event-schedule-badge { margin: 0; }
-html[data-game] .race-card .race-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; }
+html[data-game] .race-card .race-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 html[data-game] .race-card .race-fill .event-category-badges { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; }
 html[data-game] .race-card .event-card-status { display: none !important; }
 
 @media (max-width: 600px) {
   html[data-game] .event-list { grid-template-columns: minmax(0, 1fr) !important; }
   html[data-game] .race-card .race-card-body { padding: 14px !important; }
-  html[data-game] .race-card .race-card-top > .circuit-visual { width: 88px !important; height: 68px !important; }
   html[data-game] .race-card .event-name { font-size: 19px !important; }
   html[data-game] .race-card .race-day em { width: 56px; }
 }
@@ -813,7 +800,7 @@ html[data-game] .race-card .event-card-status { display: none !important; }
 .event-creation input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 1; }
 .event-creation .time-picker { display: grid; gap: 6px; }
 .event-creation .time-picker-row { display: flex; align-items: center; gap: 6px; }
-.event-creation .time-picker-row select { flex: 1; min-width: 0; color-scheme: dark; }
+.event-creation .time-picker-row select { flex: 1; color-scheme: dark; }
 .event-creation .departure-field { grid-template-columns: minmax(0, 1fr) minmax(190px, 220px) auto !important; align-items: end; }
 .event-creation .time-picker-row select { min-width: 84px !important; width: auto !important; padding-right: 26px !important; }
 @media (max-width: 600px) {
@@ -827,24 +814,20 @@ html[data-game] .race-card .event-card-status { display: none !important; }
 html[data-game] #app .race-header {
   display: flex !important;
   flex-direction: column !important;
-  gap: 14px !important;
-  padding: 20px 22px !important;
   min-height: 0 !important;
 }
-html[data-game] #app .race-header .race-card-top { display: flex; align-items: flex-start; gap: 18px; }
-html[data-game] #app .race-header .race-date {
-  width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; padding: 8px 0 10px;
+html[data-game] #app .race-header .race-date { flex: none; display: flex; flex-direction: column; align-items: center;
   border: 1px solid rgba(255, 255, 255, .16); border-radius: 12px; background: rgba(255, 255, 255, .03); line-height: 1.15;
 }
-html[data-game] #app .race-header .race-date small { font-size: 13px; color: #aab3b6; }
-html[data-game] #app .race-header .race-date strong { font-size: 32px; font-weight: 800; color: #f4f6f5; }
+html[data-game] #app .race-header .race-date small { color: #aab3b6; }
+html[data-game] #app .race-header .race-date strong { font-weight: 800; color: #f4f6f5; }
 html[data-game] #app .race-header .race-date b { margin-top: 4px; font-size: 16px; color: #7fe3ea; }
-html[data-game] #app .race-header .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-html[data-game] #app .race-header .event-title { margin: 0 !important; font-size: 34px !important; line-height: 1.08 !important; }
-html[data-game] #app .race-header .race-meta { font-size: 16px; color: #c7d0d4; }
+html[data-game] #app .race-header .race-head { flex: 1; min-width: 0; }
+html[data-game] #app .race-header .event-title { margin: 0 !important; line-height: 1.08 !important; }
+html[data-game] #app .race-header .race-meta { color: #c7d0d4; }
 html[data-game] #app .race-header .race-badges { display: flex; flex-wrap: wrap; gap: 6px; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual {
-  position: static !important; flex: none; width: 220px !important; height: 150px !important; margin: 0 !important; transform: none !important;
+  position: static !important; flex: none; margin: 0 !important; transform: none !important;
 }
 html[data-game] #app .race-header .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
 html[data-game] #app .race-header .race-starts { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
@@ -852,13 +835,9 @@ html[data-game] #app .race-header .race-day { display: flex; flex-wrap: wrap; al
 html[data-game] #app .race-header .race-day em { width: 70px; font-style: normal; font-size: 14px; color: #aab3b6; }
 html[data-game] #app .race-header .race-start { min-width: 46px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 7px; text-align: center; font-size: 14px; font-weight: 600; color: #e6ecea; }
 @media (max-width: 760px) {
-  html[data-game] #app .race-header { padding: 14px !important; }
-  html[data-game] #app .race-header .race-card-top { gap: 12px; }
   html[data-game] #app .race-header .race-date { width: 62px; }
   html[data-game] #app .race-header .race-date strong { font-size: 26px; }
-  html[data-game] #app .race-header .event-title { font-size: 24px !important; }
   html[data-game] #app .race-header .race-meta { font-size: 14px; }
-  html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 90px !important; height: 70px !important; }
   html[data-game] #app .race-header .race-day em { width: 56px; font-size: 13px; }
 }
 
@@ -877,10 +856,9 @@ html[data-game] #app .departure-fold.is-mine { outline: 2px solid rgba(255, 255,
   font-weight: 800;
 }
 .departure-mine-badge.is-crew { border-color: rgba(49, 184, 107, .7); background: rgba(49, 184, 107, .14); color: #8ff0b6; }
-html[data-game] #app .departure-fold .fold-date { display: flex !important; flex-direction: column; align-items: flex-start; }
+html[data-game] #app .departure-fold .fold-date { display: flex !important; }
 
 /* Carte plus basse : carré de date à la hauteur du bloc nom / circuit / type, circuit calé dessus. */
-html[data-game] .race-card .race-card-body { gap: 10px !important; padding: 14px 16px !important; }
 html[data-game] .race-card .race-card-top { align-items: stretch !important; gap: 14px; }
 html[data-game] .race-card .race-date { justify-content: center; padding: 4px 0 !important; }
 html[data-game] .race-card .race-head { justify-content: center; gap: 3px !important; }
@@ -890,7 +868,6 @@ html[data-game] .race-card .race-fill { margin-top: 0 !important; }
 
 html[data-game] #app .race-header .race-card-top { align-items: stretch !important; }
 html[data-game] #app .race-header .race-date { justify-content: center; padding: 6px 0 !important; }
-html[data-game] #app .race-header .race-head { justify-content: center; }
 @media (max-width: 600px) {
   html[data-game] .race-card .race-card-top > .circuit-visual { width: 80px !important; height: 60px !important; }
 }
@@ -972,7 +949,7 @@ html[data-game] #app .my-entry-race .race-badges .departure-mine-badge { margin-
 html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { position: static !important; width: 120px !important; height: 78px !important; margin: 0 !important; align-self: center; transform: none !important; }
 html[data-game] #app .my-entry-race .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
 html[data-game] #app .my-entry-race .native-my-entry-open-event { flex: none; width: auto !important; }
-.departure-mine-badge.is-waiting { border-color: rgba(228, 195, 65, .7); background: rgba(228, 195, 65, .1); color: #f0d77a; }
+.departure-mine-badge.is-waiting { background: rgba(228, 195, 65, .1); }
 html[data-game] #app .my-entry-race .ux-my-own-crew .crew-pilot-lines,
 html[data-game] #app .my-entry-race .ux-my-awaiting-crew .crew-pilot-lines { margin-top: 8px; }
 @media (max-width: 760px) {
@@ -1090,12 +1067,8 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .members-search { flex: 1; min-width: 0; }
 .members-search input { width: 100%; min-height: 42px; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: rgba(0, 0, 0, .25); color: inherit; font: inherit; font-size: 15px; }
 .members-help { margin: 0 0 14px; color: var(--muted, #92979c); font-size: 14px; }
-.members-panel .members-row { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) 150px !important; }
 .members-panel .members-row[hidden] { display: none !important; }
 .members-empty { margin: 12px 0 0; color: var(--muted, #92979c); }
-@media (max-width: 760px) {
-  .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
-}
 
 /* Accueil : équipages avec la même couleur et le même statut que sur la page course. */
 .crew-summary-card { grid-template-columns: auto minmax(120px, .8fr) minmax(0, 1.2fr) auto !important; }
@@ -1170,13 +1143,11 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-blocked { font-size: 13.5px; font-weight: 700; color: #f3b33d; }
 .solo-participants { display: flex; flex-direction: column; gap: 8px; }
 .solo-subtitle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 16px; }
-.solo-entries { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px 14px; }
-.solo-entry { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .025); }
-.solo-entry.is-mine { border-color: rgba(82, 211, 216, .55); }
+.solo-entries { list-style: none; margin: 0; padding: 0; }
+.solo-entry { border: 1px solid rgba(255, 255, 255, .1); }
 .solo-entries.is-waiting .solo-entry { border-style: dashed; }
-.solo-entry-rank { font-weight: 800; color: #aab3b6; text-align: center; }
+.solo-entry-rank { font-weight: 800; text-align: center; }
 .solo-entries.is-waiting .solo-entry-rank { color: #f3b33d; }
-.solo-entry-name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .solo-entry .solo-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
 .solo-entry .solo-category .category-logo { width: 24px; height: auto; }
 .solo-any-logo { display: inline-grid; place-items: center; width: 40px; height: 28px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 18px; color: #c7d0d4; flex: none; }
@@ -1474,7 +1445,7 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
    - an opened start grows where it is, and its day widens (three days or fewer);
    - on a phone, one day at a time with a tab per day.
    ===================================================================== */
-html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top: 18px; }
+html[data-game] #app .departure-planning { display: grid; gap: 14px; }
 .planning-heading { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
 .planning-heading h2 { margin: 0; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #c7d0d4; }
 .planning-heading small { color: #92999c; font-size: 13px; }
@@ -1592,7 +1563,6 @@ html[data-game] #app .planning-body .pilot-row * { overflow-wrap: normal; word-b
 /* Date block of a race over several days: "ven. → dim." / "16–18" / "oct." */
 html[data-game] #app .race-card .race-date.is-range, html[data-game] #app .race-header .race-date.is-range { width: auto !important; min-width: 62px; padding-inline: 10px !important; align-self: flex-start; height: auto; }
 html[data-game] #app .race-card .race-date.is-range strong { font-size: 23px; }
-html[data-game] #app .race-header .race-date.is-range strong { font-size: 28px; }
 .race-date.is-range small { white-space: nowrap; }
 
 /* Race header: a shortcut to the pilot's own start */
@@ -1625,15 +1595,14 @@ html[data-game] #app .race-header .race-date.is-range strong { font-size: 28px; 
 }
 
 html[data-game] #app .race-header { gap: 10px !important; padding: 14px 18px !important; }
-html[data-game] #app .race-header .race-card-top { align-items: center; gap: 16px; }
+html[data-game] #app .race-header .race-card-top { align-items: center; }
 html[data-game] #app .race-header .race-date { width: 66px; padding: 5px 0 6px; }
 html[data-game] #app .race-header .race-date strong { font-size: 25px; }
 html[data-game] #app .race-header .race-date small { font-size: 12px; }
 html[data-game] #app .race-header .race-date.is-range strong { font-size: 23px; }
-html[data-game] #app .race-header .race-head { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start !important; gap: 4px 12px; text-align: left; }
-html[data-game] #app .race-header .event-title { flex-basis: 100%; font-size: 28px !important; }
+html[data-game] #app .race-header .race-head { text-align: left; }
+html[data-game] #app .race-header .event-title { font-size: 28px !important; }
 html[data-game] #app .race-header .race-meta { font-size: 15px; }
-html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 150px !important; height: 84px !important; }
 html[data-game] #app .race-header .race-header-footer { padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .07); }
 html[data-game] #app .race-header .race-header-actions .secondary-button { min-height: 34px !important; padding: 0 12px !important; font-size: 13.5px !important; }
 html[data-game] #app .race-header .event-category-badge { padding-block: 4px !important; }
@@ -1641,7 +1610,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
 @media (max-width: 760px) {
   html[data-game] #app .race-header { padding: 12px !important; }
   html[data-game] #app .race-header .event-title { font-size: 22px !important; }
-  html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
   html[data-game] #app .race-header .race-header-actions { flex-wrap: wrap; gap: 8px 16px; justify-content: flex-start; }
   html[data-game] #app .race-header .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; white-space: nowrap; }
   html[data-game] #app .race-header .race-header-actions > .secondary-button { padding: 0 10px !important; }
@@ -1835,9 +1803,8 @@ html[data-game] #app .my-entry-race .race-card-top > .event-access-logo { flex: 
 @media (max-width: 600px) {
   html[data-game] #app .my-entry-race .race-card-top > .event-access-logo { width: 48px; height: 48px; }
 }
-html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; width: 220px; height: 150px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
-html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
-@media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
+html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
+html[data-game] #app .race-header .event-type-panel span { font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
 /* « M'inscrire » is always unfolded: icon and label, one click enters the pilot. */
 .planning-quick-button.is-labelled { width: auto !important; grid-auto-flow: column; gap: 8px; padding: 0 12px 0 9px !important; border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); }
 .planning-quick-button.is-labelled .planning-quick-label { display: inline; font-size: 13px; font-weight: 800; white-space: nowrap; }
@@ -1853,13 +1820,11 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
 }
 
 /* Participants of a solo event: compact cards, several per row. */
-.solo-entries { grid-template-columns: repeat(auto-fill, minmax(190px, 240px)); gap: 8px; }
-.solo-entry { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 10px; padding: 7px 12px 7px 8px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)); }
-.solo-entry-rank { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .08); font-size: 12.5px; color: #dfe5ea; }
-.solo-entry-name { font-size: 14.5px; font-weight: 800; color: #f4f6f5; }
+.solo-entry { background: linear-gradient(135deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)); }
+.solo-entry-rank { display: grid; place-items: center; border-radius: 50%; background: rgba(255, 255, 255, .08); color: #dfe5ea; }
+.solo-entry-name { font-weight: 800; color: #f4f6f5; }
 .solo-entry.is-mine { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, transparent); }
 .solo-entry.is-mine .solo-entry-rank { background: var(--community-accent, #52d3d8); color: #0b1012; }
-@media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 html[data-game] #app .race-header .race-header-time { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 9px; font-size: 18px; font-weight: 800; color: #f4f6f5; }
 html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
 
@@ -1877,7 +1842,7 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 /* EVENT TDZ card, several rounds: one aligned line per round. */
 .solo-round-lines { display: grid; grid-template-columns: auto minmax(0, max-content) auto auto; align-items: center; justify-content: start; gap: 6px 10px; }
 .solo-round-line { display: contents; }
-.solo-round-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: #f2f5f7; }
+.solo-round-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: #f2f5f7; }
 .solo-round-cats { display: inline-flex; gap: 4px; align-items: center; }
 /* Registration, several rounds: « Je la fais » / « Je ne la fais pas ». */
 .solo-round-toggle { display: inline-flex; gap: 0; margin: 4px 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; overflow: hidden; }
@@ -1890,8 +1855,8 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-round-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); white-space: nowrap; }
 .planning-quick-button.is-labelled.is-active { border-color: rgba(46, 204, 113, .6); color: #6fe3a1; }
 /* Solo pilots: small cards, by category (rank within its category). */
-.solo-entries { grid-template-columns: repeat(auto-fill, minmax(140px, 180px)); gap: 6px; }
-.solo-entry { grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 6px; padding: 4px 8px 4px 5px; border-radius: 999px; }
+.solo-entries { grid-template-columns: repeat(auto-fill, minmax(140px, 180px)); }
+.solo-entry { grid-template-columns: 20px minmax(0, 1fr) auto auto; padding: 4px 8px 4px 5px; border-radius: 999px; }
 .solo-entry-rank { width: 20px; height: 20px; font-size: 11px; }
 .solo-entry-name { font-size: 13px; }
 .solo-entry-logo { display: inline-flex; }
@@ -1908,7 +1873,7 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .round-item-emoji { font-size: 16px; line-height: 1; }
 .round-item-copy { display: grid; line-height: 1.15; }
 .round-item-copy small { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8c98a2; }
-.round-item-copy strong { font-size: 15px; font-weight: 700; color: #eef2f4; white-space: nowrap; }
+.round-item-copy strong { font-size: 15px; font-weight: 700; color: #eef2f4; }
 .round-item-categories { gap: 6px; padding: 8px 12px; }
 .round-item-categories .category-logo, .round-item-categories img { display: block; width: auto; height: 24px; }
 @media (max-width: 600px) {
@@ -1936,10 +1901,8 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 /* « Me désinscrire » is red everywhere (endurances and events). */
 .secondary-button.is-leave { border-color: rgba(255, 107, 107, .55) !important; color: #ff8a8a !important; }
 /* Header of an event: the type panel the size of an endurance's circuit, the title and its line kept together. */
-html[data-game] #app .race-header .race-head { align-content: center; }
 html[data-game] #app .race-header .event-type-panel { width: 150px; height: 84px; }
 html[data-game] #app .race-header .event-type-panel.has-access-logo { background: none; border: 0; }
-html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { max-height: 150px; }
 html[data-game] #app .race-header .event-type-panel span { font-size: 22px; }
 @media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
 /* Creating or editing a race or an event: the same step-by-step window as entering a race. */
@@ -2036,7 +1999,7 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .category-entry-gate { display: grid; justify-items: center; gap: 14px; margin: 28px 0; padding: 48px 16px; border: 1px solid #2b3336; border-radius: 14px; background: rgba(13, 17, 18, .82); }
 .category-entry-gate > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .category-entry-gate > div > button { min-width: 180px; min-height: 52px; font-size: 17px; }
-.category-entry-categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+.category-entry-categories { margin-top: 10px; }
 body:has([data-category-entry]) { overflow: hidden; }
 [data-category-entry].crew-builder-overlay { height: 100vh; height: 100dvh; bottom: auto; }
 .category-entry-sheet { max-width: 760px; max-height: min(94vh, 980px); max-height: min(94dvh, 980px); padding-bottom: 0; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -2047,9 +2010,9 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-intro h3 { margin: 10px 0 4px; font-size: 22px; line-height: 1.25; color: var(--text, #f2f5f4); }
 .ce-intro p { margin: 0 0 14px; color: var(--muted, #b7bfbc); font-size: 15px; }
 .category-entry-categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
-.category-entry-categories .category-button { min-height: 92px; flex-direction: column; justify-content: center; gap: 6px; }
+.category-entry-categories .category-button { flex-direction: column; justify-content: center; gap: 6px; }
 .category-entry-categories .registration-category-copy { display: grid; justify-items: center; gap: 2px; }
-.category-entry-categories .registration-category-copy em { font-style: normal; font-size: 13px; color: var(--muted, #92979c); }
+.category-entry-categories .registration-category-copy em { font-style: normal; color: var(--muted, #92979c); }
 .category-entry-categories .category-button.active .registration-category-copy em { color: #4fd1c5; font-weight: 700; }
 .ce-start-days { display: grid; gap: 12px; }
 .ce-start-day h4 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; padding: 0 2px 5px; border-bottom: 2px solid var(--community-accent, #52d3d8); font-size: 15px; text-transform: capitalize; color: var(--text, #f2f5f4); }
@@ -2213,7 +2176,7 @@ html[data-game] #app .race-header .race-card-top { display: grid; grid-template-
 html[data-game] #app .race-header .race-head { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: flex-start !important; gap: 8px; }
 html[data-game] #app .race-header .event-title { flex-basis: auto; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 145px !important; }
-html[data-game] #app .race-header .race-header-actions { display: flex; align-self: flex-start; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
+html[data-game] #app .race-header .race-header-actions { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
 .race-actions-menu { position: relative; }
 .race-actions-menu > summary { display: grid; place-items: center; width: 36px; height: 30px; border: 1px solid #343c3f; border-radius: 8px; cursor: pointer; list-style: none; font-size: 24px; }
 .race-actions-menu > summary::-webkit-details-marker { display: none; }
@@ -2230,7 +2193,7 @@ html[data-game] #app .race-header .race-info-chip { flex: none; align-self: flex
 html[data-game] #app .race-header > .race-starts { align-self: flex-start; width: auto; text-align: left; margin-top: 8px; }
 
 /* Keep schedules in the information column, alongside the circuit. */
-html[data-game] #app .race-header .race-head { justify-content: flex-start !important; align-content: flex-start; }
+html[data-game] #app .race-header .race-head { align-content: flex-start; }
 html[data-game] #app .race-header .race-head > .race-starts { margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: flex-start; width: auto; }
 html[data-game] #app .race-header .race-header-actions { margin: 0 !important; align-self: flex-start !important; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self: center; }
@@ -2248,10 +2211,9 @@ html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 
 
 /* SOLO / TDZ logos occupy the same visual space as endurance circuits. */
 html[data-game] #app .race-header .race-card-top > .event-type-panel { position: static !important; width: 100% !important; height: 175px !important; margin: 0 !important; align-self: center; flex: none; }
-html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: 100%; height: 100%; max-height: 175px; object-fit: contain; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { object-fit: contain; }
 @media (max-width:760px) {
   html[data-game] #app .race-header .race-card-top > .event-type-panel { height: 115px !important; }
-  html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { max-height: 115px; }
 }
 
 /* Single-session settings use the endurance header's small icon pills. */
@@ -2336,7 +2298,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-empty { margin: 4px 0; text-align: center; color: var(--em-faint); }
 .week-block {
   --kind: var(--em-accent);
-  position: relative; display: grid; gap: 4px; width: 100%; padding: 8px 9px 9px 12px; text-align: left; overflow: hidden;
+  position: relative; width: 100%; text-align: left; overflow: hidden;
   border: 1px solid var(--em-border); border-radius: 10px; color: var(--em-text); font: inherit; text-decoration: none; cursor: pointer;
   background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 16%, var(--em-panel-2)), var(--em-panel-2) 70%);
 }
@@ -2354,17 +2316,15 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-block-time small { font-size: 12.5px; font-weight: 700; color: var(--em-muted); white-space: nowrap; }
 .week-block-sim { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 75%, var(--em-text-strong)); }
 .week-badge { padding: 2px 6px; border-radius: var(--em-radius-pill); background: color-mix(in srgb, var(--kind) 32%, transparent); font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--em-text-strong); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
-.week-block-logo { flex: none; width: 40px; height: 40px; margin: -2px -2px -4px 0; }
+.week-block-logo { flex: none; }
 .week-block-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* The body's lines are the card's own lines on a computer; on a phone they make the middle of the agenda row. */
-.week-block-body { display: contents; }
 .week-block-time > span { white-space: nowrap; }
 .week-block-length small { display: none; }
-.week-block-name { font-size: 13.5px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+.week-block-name { font-size: 13.5px; line-height: 1.25; overflow-wrap: anywhere; }
 .week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
 .week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
 /* The title, the schedule and the facts of a card are only grouped on a phone (option G, Nathan 2026-11-02). */
-.week-block-title { display: contents; }
 .week-block-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .week-block-facts .week-block-meta { display: contents; }
 .week-block-kind, .week-soon, .week-block-plan { display: none; }
@@ -2396,7 +2356,6 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-block-live b { font-weight: 900; white-space: nowrap; }
 .week-block-live .week-stream-link { margin-left: auto; white-space: nowrap; }
 .week-block-facts { margin-top: 3px; }
-.week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .07); color: var(--em-text); font-weight: 700; }
 .week-block-facts .week-chip.is-warn { display: none; }
 .week-block-gauge { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
 .week-block-gauge > span { flex: 1; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .08); overflow: hidden; }
@@ -2438,7 +2397,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .home-side { order: -1; }
   .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .week-filters .week-filter { flex: none; white-space: nowrap; }
-  .week-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .week-grid { grid-template-columns: minmax(0, 1fr); }
   .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
   .week-day { min-height: 0; }
   .week-day.is-empty { display: none; }
@@ -2563,7 +2522,6 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .crews-crew-head .crews-chip { margin-left: auto; }
 .crews-manage { font-size: var(--em-text-sm); }
 .crews-cat { display: inline-flex; vertical-align: middle; }
-.crews-cat img, .crews-cat .category-logo { width: auto; height: 18px; }
 .crews-line { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 5px; font-size: var(--em-text-sm); }
 .crews-line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crews-bar { display: grid; grid-template-columns: repeat(var(--hours, 6), minmax(0, 1fr)); gap: 2px; }

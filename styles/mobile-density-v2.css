@@ -1,9 +1,6 @@
 /* Mobile density pass based on real phone captures. Keep desktop unchanged. */
 @media (max-width: 760px) {
   /* Shared simulator header: keep every control readable while removing dead vertical space. */
-  .site-nav-shell {
-    padding: 4px 8px 5px !important;
-  }
 
   .game-space-bar {
     min-height: 30px !important;

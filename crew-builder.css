@@ -160,7 +160,7 @@
 }
 
 .crew-builder-coverage-heading > div { display: grid; gap: 3px; }
-.crew-builder-step-label { color: var(--green); font-size: 10px; font-weight: 900; letter-spacing: 1px; }
+.crew-builder-step-label { color: var(--green); font-weight: 900; letter-spacing: 1px; }
 .crew-builder-coverage-heading strong { font-size: 18px; }
 .crew-builder-coverage-heading > span { color: var(--muted); font-size: 12px; font-weight: 800; }
 

@@ -12,26 +12,9 @@
   --accent: #35b978;
 }
 
-body {
-  background:
-    radial-gradient(circle at 15% -10%, rgba(31,143,90,.08), transparent 32rem),
-    var(--bg);
-}
-
-.top-stripes {
-  height: 4px;
-  grid-template-columns: 1fr 2.2fr 1fr;
-  background: #0b0d0e;
-}
-.top-stripes div:nth-child(1) { background: #202527; }
-.top-stripes div:nth-child(2) { background: linear-gradient(90deg,#18372a,#2aa36a,#18372a); }
-.top-stripes div:nth-child(3) { background: #202527; }
-.top-stripes div:nth-child(4) { display: none; }
-
 header {
   background: linear-gradient(180deg,#151719 0%,#0f1112 100%);
   border-bottom-color: #29312f;
-  box-shadow: 0 8px 28px rgba(0,0,0,.22);
 }
 
 .brand-button.logo {
@@ -39,9 +22,6 @@ header {
   align-items: center;
   gap: 14px;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--text);
   text-align: left;
 }
@@ -128,16 +108,11 @@ header {
 }
 
 @media (max-width: 700px) {
-  header {
-    padding: 8px 10px 10px;
-  }
 
   .header-inner {
-    display: grid;
     grid-template-columns: 68px minmax(0,1fr);
     align-items: start;
     gap: 8px 10px;
-    width: 100%;
   }
 
   .brand-button.logo {
@@ -159,16 +134,11 @@ header {
   #navigation {
     grid-column: 2;
     grid-row: 1;
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 6px;
-    width: 100%;
     min-width: 0;
     align-items: stretch;
   }
 
   #navigation .account-name {
-    grid-column: 1 / -1;
     order: -2;
     min-width: 0;
     padding: 1px 2px 3px;
@@ -232,10 +202,6 @@ header {
     width: 60px;
     height: 60px;
     flex-basis: 60px;
-  }
-
-  #navigation {
-    gap: 5px;
   }
 
   #navigation button {

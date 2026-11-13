@@ -5,10 +5,9 @@
 .registration-context-banner{display:grid;gap:4px;margin:12px 0 16px;padding:12px 14px;border:1px solid var(--border);border-left-width:4px;border-radius:9px;background:var(--panel2)}
 .registration-context-banner span{font-size:10px;font-weight:950;letter-spacing:1.1px;color:var(--muted)}
 .registration-context-banner strong{font-size:17px;line-height:1.15}
-.registration-context-banner.self{border-left-color:var(--green)}
-.registration-context-banner.other{border-left-color:#e7a83c;background:linear-gradient(90deg,rgba(231,168,60,.10),var(--panel2) 38%)}
+.registration-context-banner.other{background:linear-gradient(90deg,rgba(231,168,60,.10),var(--panel2) 38%)}
 .registration-context-banner.other span{color:#e7b55e}
-.registration-context-banner.category{border-left-color:#4aa3df;background:linear-gradient(90deg,rgba(74,163,223,.10),var(--panel2) 38%)}
+.registration-context-banner.category{background:linear-gradient(90deg,rgba(74,163,223,.10),var(--panel2) 38%)}
 .registration-context-banner.category span{color:#79bde8}
 @media(max-width:700px){.form-title{align-items:flex-start}.registration-nav-button{flex:1 1 auto}.registration-context-banner{margin-top:8px;padding:11px 12px}.registration-context-banner strong{font-size:15px}}
 .registration-other-starts{margin:14px 0 0;padding:0;border:0;min-width:0}
