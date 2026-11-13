@@ -1,7 +1,7 @@
 // Solo races: one entry per driver, limited places with a waiting list, one or two rounds and an
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
-import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
+import {state,esc,pilotNameTip,button,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent,eventLogoName,isTraining,trainingSpan} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan,streamDuringEndurance} from '../../shared/stream.mjs';
@@ -225,10 +225,6 @@ export function soloEntryBlock(event) {
 export function safeGuideLink(event) {
   if (event.access !== 'safe' || can('solo_safe') || !state.safeGuideUrl || !state.user) return '';
   return `<a class="planning-quick-button is-labelled is-safe-guide" href="${esc(state.safeGuideUrl)}" target="_blank" rel="noopener"><span class="planning-quick-label">Comment devenir SAFE</span></a>`;
-}
-
-export function myWaitlistPosition(departure) {
-  return (departure.availability || []).find(reg => reg.mine && reg.waitlistPosition)?.waitlistPosition || null;
 }
 
 

@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {announceCommunity,announceItems,parisDayStart} from '../server/discord-announce.mjs';
-import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
+
 import {layoutInput} from '../server/discord-layout.mjs';
 import {posterModel,posterHtml,posterText} from '../server/discord-poster.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
@@ -156,19 +156,6 @@ test('« Absent » from the announcement marks the pilot absent on the site',asy
   assert.equal(DB.db.prepare('SELECT COUNT(*) AS n FROM event_absences WHERE event_id=? AND user_id=?').get(EVENT,PILOT).n,1);
 });
 
-test('hooks: the type, else the sim, then OPEN / SAFE (TDZ only); Gridfest has its own; the password never goes on Discord',()=>{
-  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Bouboule',access:'safe'}),ANNOUNCE_HOOKS.BOULOULES);
-  assert.equal(eventHook({tdz:true,sim:'iracing',type:'SAFE',access:'safe'}),'Course SAFE sur iRacing : on roule propre et on respecte les autres.');
-  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Gridfest',access:'open'}),ANNOUNCE_HOOKS.Gridfest);
-  assert.equal(eventHook({tdz:false,sim:'ace',type:'',access:''}),ANNOUNCE_HOOKS.ace);
-  const payload=buildAnnounceEvent({id:EVENT,name:'Soirée',sim:'lmu',type:'SAFE',access:'safe',tdz:true,startsAt:MORNING+12*HOUR,rounds:[{circuit:'spa',durationMinutes:40,categories:['GT3']}],capacity:null,entered:3,password:true},{url:'https://tdz.site.example'});
-  assert.match(JSON.stringify(payload.embeds[0].fields),/🔑 Mot de passe disponible sur la fiche/);
-  assert.doesNotMatch(JSON.stringify(payload),/secret/);
-  assert.match(payload.embeds[0].description,/Ce soir 19h30/);
-  const race=buildAnnounceRace({id:RACE,name:'4h du Mans',circuit:'le-mans',official:true,eventType:'special',durationMinutes:240,departures:[{eventId:RACE,startsAt:MORNING+10*HOUR,crews:[],unassignedPilots:[]}]},{url:'https://site.example'});
-  assert.match(race.embeds[0].description,new RegExp(ANNOUNCE_HOOKS.official));
-  assert.match(JSON.stringify(race.embeds[0].fields),/Aucun équipage pour l’instant : lance-toi !/);
-});
 
 test('the setting keeps the announcement channel, and refuses anything else',()=>{
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES}).announce,ANNOUNCES);
@@ -176,23 +163,6 @@ test('the setting keeps the announcement channel, and refuses anything else',()=
   assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:'bot'}),/annonce du jour/);
 });
 
-test('the community\'s stream in the intro, at the time given on the event; the Twitch of each Gridfest streamer',()=>{
-  const site={url:'https://tdz.site.example',streamUrl:'https://www.twitch.tv/tdz'};
-  const intro=counts=>buildAnnounceIntro({events:2,races:0,...counts},site).embeds[0].description;
-  assert.match(intro({streams:[{name:'Soirée',time:'19:45'}]}),/📺 Lancement du stream sur \[Twitch\]\(https:\/\/www\.twitch\.tv\/tdz\) à 19h45/);
-  assert.match(intro({streams:[{name:'B',time:'21:15'},{name:'A',time:'19:45'}]}),/à 19h45 \(A\), 21h15 \(B\)/);
-  // No stream time today: the streamer neither streams nor races, no stream line.
-  assert.doesNotMatch(intro({streams:[]}),/📺/);
-  assert.doesNotMatch(buildAnnounceIntro({events:1,races:0,streams:[]},{url:site.url}).embeds[0].description,/📺/);
-  const event=buildAnnounceEvent({id:EVENT,name:'Gridfest',sim:'lmu',type:'Gridfest',access:'open',tdz:true,startsAt:MORNING+12*HOUR,rounds:[],capacity:null,entered:1,
-    streamers:[{name:'Zed',twitchUrl:'https://twitch.tv/zed',capacity:5,entered:1},{name:'Ana',twitchUrl:'',capacity:5,entered:0}]},site);
-  assert.doesNotMatch(JSON.stringify(event.components),/Stream/);
-  assert.match(event.embeds[0].description,/🎙️ \[Zed\]\(https:\/\/twitch\.tv\/zed\)/);
-  assert.match(event.embeds[0].description,/🎙️ Ana ·/);
-  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:' https://twitch.tv/tdz '}).stream,'https://twitch.tv/tdz');
-  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:'',stream:'https://twitch.tv/tdz'}).stream,undefined);
-  assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:'twitch.tv/tdz'}),/stream/);
-});
 
 
 test('an existing multi-message day is consolidated silently into the original intro',async t=>{
@@ -210,26 +180,8 @@ test('an existing multi-message day is consolidated silently into the original i
   assert.equal(new Set(DB.db.prepare('SELECT message_id FROM discord_announcements').all().map(row=>row.message_id)).size,1);
 });
 
-test('large daily announcements respect Discord embed, character and component limits',()=>{
-  const intro=buildAnnounceIntro({events:12},{name:'TDZ',url:'https://site.example'});
-  const items=Array.from({length:12},(_,index)=>({name:`Event ${index}`,payload:buildAnnounceEvent({id:String(index),name:`Event ${index}`,sim:'lmu',tdz:true,type:'BOULOULES',access:'open',startsAt:MORNING+HOUR,rounds:[],entered:0,note:'Long note '.repeat(80)},{url:'https://site.example'})}));
-  const payload=buildCompleteAnnouncement(intro,items,{url:'https://site.example',bannerUrl:'https://site.example/banner.webp'});
-  assert.equal(payload.embeds.length,1);assert.ok(payload.embeds[0].fields.length<=25);
-  assert.ok(payload.components.length<=5);
-  assert.equal(payload.embeds.filter(embed=>embed.image).length,1);
-  assert.match(JSON.stringify(payload.embeds[0].fields),/3 autres rendez-vous/);
-  const chars=payload.embeds.reduce((sum,embed)=>sum+[embed.title,embed.description,embed.author?.name,embed.footer?.text,...(embed.fields||[]).flatMap(field=>[field.name,field.value])].reduce((total,value)=>total+String(value||'').length,0),0);
-  assert.ok(chars<=6000);
-});
 
 
-test('a stream-only announcement has no invitation to register or absence buttons',()=>{
-  const intro=buildAnnounceIntro({events:0,races:0,lives:1},{url:'https://site.example'});
-  const payload=buildCompleteAnnouncement(intro,[{name:'Live',payload:{embeds:[{title:'Live',description:'Twitch'}],components:[]}}],{url:'https://site.example'});
-  assert.equal(payload.embeds[0].title,'Live');
-  assert.doesNotMatch(payload.embeds[0].description,/Inscris-toi/);
-  assert.deepEqual(payload.components,[]);
-});
 
 
 test('a missing original intro is replaced before legacy cards are deleted, without pinging again',async t=>{
@@ -277,44 +229,7 @@ test('a failed replacement preserves legacy cards and retries on the following p
 });
 
 
-test('rounds have distinct readable sections and full session labels inside a single frame',()=>{
-  const event=buildAnnounceEvent({id:EVENT,name:'SAFE race',sim:'ams2',tdz:true,type:'SAFE',access:'safe',startsAt:MORNING+HOUR,entered:12,rounds:[{circuit:'Velo Città',category:'GT4',car:'Ginetta G55',practice:10,qualifying:10,durationMinutes:20},{circuit:'Velo Città',category:'GT4',practice:5,qualifying:10,durationMinutes:40}]},{url:'https://site.example'});
-  const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1,races:0}),[{name:'SAFE race',payload:event}],{});
-  const embed=payload.embeds[0];
-  assert.equal(payload.embeds.length,1);
-  assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 1')));
-  assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 2')));
-  assert.ok(embed.fields.some(field=>/12 présents/.test(field.value)));
-  assert.match(JSON.stringify(embed),/Essais : 10 min/);
-  assert.match(JSON.stringify(embed),/Qualifications : 10 min/);
-  assert.match(JSON.stringify(embed),/Course : 40 min/);
-});
 
-test('live block uses configured streamer name, and only on a day with a stream time',()=>{
-  const intro=buildAnnounceIntro({events:1,streams:[{name:'A',time:'20:45'}]},{streamUrl:'https://twitch.tv/test'});
-  const payload=buildCompleteAnnouncement(intro,[],{streamName:'La Praline'});
-  assert.equal(payload.embeds[0].fields.at(-1).name,'📺 En direct avec La Praline');
-  // Races of other crews, no stream planned: the day is announced, without the stream.
-  const quiet=buildCompleteAnnouncement(buildAnnounceIntro({races:2,streams:[]},{streamUrl:'https://twitch.tv/test'}),[],{streamName:'La Praline'});
-  assert.ok(!quiet.embeds[0].fields.some(field=>/SOIRÉE/.test(field.name)));
-});
-test('all simulator events share identical facts and retain differences per round',()=>{
-  for(const sim of ['lmu','iracing','ams2','ace'])for(const type of ['SAFE','BOULOULES','TONDEUZ TRAINING','Gridfest']){
-    const base={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,practice:10,qualifying:10,durationMinutes:20};
-    const event={id:EVENT,name:'Race',sim,type,tdz:true,access:'safe',startsAt:MORNING,entered:0,rounds:[base,{...base,durationMinutes:40}]};
-    const shared=buildAnnounceEvent(event).embeds[0];
-    assert.match(shared.fields[0].value,/Velo Città/);
-    assert.match(shared.fields[0].value,/Ginetta G55/);
-    assert.doesNotMatch(shared.fields.find(field=>field.name.startsWith('Manche 1')).value,/Velo Città|Ginetta G55/);
-    event.rounds[1]={...base,circuit:'Interlagos',car:'Porsche',weather:'rain',fuel:2};
-    const mixed=buildAnnounceEvent(event).embeds[0];
-    assert.doesNotMatch(mixed.description,/Velo Città|Interlagos|Ginetta G55|Porsche/);
-    assert.match(mixed.fields.find(field=>field.name.startsWith('Manche 1')).value,/Velo Città/);
-    assert.match(mixed.fields.find(field=>field.name.startsWith('Manche 2')).value,/Interlagos/);
-    assert.match(mixed.fields.find(field=>field.name.startsWith('Manche 2')).value,/Porsche/);
-    assert.match(mixed.fields[0].value,/GT4/);
-  }
-});
 
 
 test('no entrants: no morning message or ping, even with an empty crew and repeated runs',async t=>{
@@ -520,10 +435,6 @@ test('the morning of a summer-time change still starts the day at midnight (Pari
   assert.equal(new Date(parisDayStart(Date.parse('2026-03-29T10:00:00Z'))+1).toISOString(),'2026-03-28T23:00:00.000Z');
 });
 
-test('the hooks by simulator never say « ce soir » (a race may start at 14h)', async () => {
-  const {ANNOUNCE_HOOKS} = await import('../server/discord-weekly-format.mjs');
-  for (const [key, text] of Object.entries(ANNOUNCE_HOOKS)) assert.doesNotMatch(text, /ce soir/i, key);
-});
 
 test('an endurance is announced only on its starts with a crew, without the pilots still alone (Nathan, 2026-11-01)',async t=>{
   const {DB,env,calls,settings}=setup(t);
@@ -654,8 +565,6 @@ test('a training shows its window on the poster and in the text, without « 0 in
   const event={id:'t1',name:'Training Spa',sim:'lmu',type:'TONDEUZ TRAINING',training:true,tdz:true,access:'open',startsAt,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],capacity:null,entered:0,streamers:[]};
   const text=posterText(posterModel([{kind:'event',data:event,url:'https://site.example/lmu/#event=t1'}],{name:'TDZ',url:'https://site.example'},{timestamp:startsAt}));
   assert.match(text,/Entraînement/);assert.match(text,/20h00–22h00|20h–22h/);assert.doesNotMatch(text,/0 inscrit/);
-  const embed=buildAnnounceEvent(event,{url:'https://site.example'},startsAt).embeds[0];
-  assert.match(embed.description,/→ 22h/);assert.doesNotMatch(embed.description,/⏱️/);
 });
 
 test('an endurance an admin streams (« Je streame ce départ ») is on the stream poster with @everyone, even without a crew',async t=>{

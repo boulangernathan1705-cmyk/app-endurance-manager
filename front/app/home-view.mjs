@@ -2,7 +2,7 @@ import {raceFilterKey,mySituation,emptyRaceFilters,normalizeRaceFilters,filtered
 import {readFilterState,writeFilterState,setFilterDate} from '../filter-state.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
-import {app,nav,state,activeGame,esc,button,addMenu,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {seasonCalendar} from './season-calendar.mjs';
 import {loadArchive} from './core.mjs';

@@ -1,32 +1,12 @@
-import {json, siteOrigin, fail, identity, rateLimit} from './core.mjs';
+import {json, siteOrigin, fail, rateLimit} from './core.mjs';
 import {currentCommunity} from './community.mjs';
 
 const DAY=86400;
 const clean=(value,max)=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
 
-async function ensureClientErrorsTable(env) {
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS client_errors (
-      id TEXT PRIMARY KEY,
-      created_at INTEGER NOT NULL,
-      kind TEXT NOT NULL,
-      page TEXT NOT NULL DEFAULT '',
-      api_path TEXT NOT NULL DEFAULT '',
-      method TEXT NOT NULL DEFAULT '',
-      message TEXT NOT NULL DEFAULT '',
-      detail TEXT NOT NULL DEFAULT '',
-      user_agent TEXT NOT NULL DEFAULT '',
-      viewport TEXT NOT NULL DEFAULT '',
-      online INTEGER NOT NULL DEFAULT 1,
-      community_id TEXT NOT NULL DEFAULT ''
-    )`),
-    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_client_errors_created_at ON client_errors(created_at DESC)')
-  ]);
-}
 
 // Errors of one community only (its organizers and admins read them on the diagnostics page).
 async function readClientErrors(env, community) {
-  await ensureClientErrorsTable(env);
   const cutoff=Math.floor(Date.now()/1000)-14*DAY;
   await env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(cutoff).run();
   return (await env.DB.prepare(`SELECT created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online
@@ -54,7 +34,6 @@ export async function ingestClientError(request,env) {
   } catch { return new Response(null,{status:204}); }
   const createdAt=Math.floor(Date.now()/1000);
   try {
-    await ensureClientErrorsTable(env);
     const community=await currentCommunity(env, request);
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO client_errors(id,created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online,community_id)

@@ -176,9 +176,7 @@ async function cleanup(env) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM oauth_states WHERE state_hash IN (SELECT state_hash FROM oauth_states WHERE expires_at<? LIMIT 500)').bind(timestamp),
     env.DB.prepare('DELETE FROM sessions WHERE token_hash IN (SELECT token_hash FROM sessions WHERE expires_at<? LIMIT 500)').bind(timestamp),
-    env.DB.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at<? LIMIT 500)').bind(timestamp),
-    // Races changed in a community whose Discord never followed (no recap set): forgotten after a day.
-    env.DB.prepare('DELETE FROM discord_pending_races WHERE queued_at<?').bind((timestamp - DAY) * 1000)
+    env.DB.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at<? LIMIT 500)').bind(timestamp)
   ]);
 }
 // Same-site page to reopen after Discord login: a plain path, optionally with the open race or My entries.

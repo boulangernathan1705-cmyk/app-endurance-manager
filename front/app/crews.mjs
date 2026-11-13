@@ -1,4 +1,4 @@
-import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag,carLogo,carLabel} from './core.mjs';
+import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,crewColorClass,sortedCrews,pilotCount,api,pickableSlots,communityTag,carLabel} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 import {hoursAxis,hoursBar,coverage as hoursCoverage} from './crews-page.mjs';
@@ -123,7 +123,6 @@ export function renderPilots(event,departure,options={}){
   </div></div>`;
 }
 
-export function renderCrews(event,departure,options={}){return renderPilots(event,departure,options);}
 
 // Moves a crew (or a pilot without crew) from the common start to the chosen official slot.
 export async function pickSlot(select){

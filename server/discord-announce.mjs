@@ -4,9 +4,9 @@
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay, raceUrl} from './discord-weekly-format.mjs';
+import {parisDay, raceUrl} from './discord-weekly-format.mjs';
 import {posterModel, posterHtml, posterText, renderPoster} from './discord-poster.mjs';
-import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
+import {discordRequest} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
@@ -149,18 +149,6 @@ async function streamTimes(env, rows, community = null, timestamp = Date.now()) 
   }
   return streams;
 }
-// What a row of the announcement shows now (null: the race is gone from the site).
-export async function announcePayload(env, community, row, timestamp, counts = null, stream = '') {
-  const site = {...siteOf(env, community), streamUrl:stream}, absent = discordAbsentButton(env);
-  if (row.kind === 'intro') return buildAnnounceIntro(counts || {events:0, races:0}, site);
-  if (row.kind === 'event' || row.kind === 'stream') {
-    const event = await eventSnapshot(env, community, row.item, timestamp);
-    return !event ? null : event.stream ? buildAnnounceStream(event, site, timestamp) : buildAnnounceEvent(event, site, timestamp, absent);
-  }
-  const race = await raceSnapshot(env, community, row.item, timestamp);
-  return race ? buildAnnounceRace(race, site, timestamp, await botCategoryEmojis(env, timestamp), absent) : null;
-}
-
 // One community: today's list made in the morning, its messages sent in order, then the counts kept up to date.
 // Returns whether Discord was asked something.
 export async function announceCommunity(env, community, settings, timestamp = Date.now()) {

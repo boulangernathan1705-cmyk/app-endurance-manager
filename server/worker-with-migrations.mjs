@@ -225,6 +225,8 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
+    // Races changed in a community whose Discord does not follow the site (no recap set): forgotten after a day.
+    run('Discord queue cleanup failed', () => env.DB.prepare('DELETE FROM discord_pending_races WHERE queued_at<?').bind(at.getTime() - 86400000).run());
     // Maintenance stays every 15 minutes; crew sync has its own schedule, so it is not duplicated here.
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));

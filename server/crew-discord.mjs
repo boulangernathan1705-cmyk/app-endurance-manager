@@ -653,12 +653,6 @@ async function bellReminders(env, timestamp, communities) {
   return told;
 }
 
-// Whether the bot may make the crews' channels on the server: true, false, or null when it cannot tell (bot not
-// on the server, Discord not answering).
-export async function botCanManageChannels(env, guildId) {
-  return (await checkBot(env, guildId)).ready;
-}
-
 // The same, with why it cannot (shown to the admins): 'rights' (rights not given yet), 'absent' (the bot is not on
 // the server), 'config' (the site has no bot), 'discord' (Discord did not answer).
 // required: channels that must exist (the category an admin just chose); the others may be gone, the bot makes them again.

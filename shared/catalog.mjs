@@ -171,13 +171,6 @@ export const SOLO_EVENTS_LABEL = 'EVENT SOLO';
 export const tdzOnly = (community, development = false) => community?.eventTdz === true || community?.slug === 'tdz' || (development && community?.slug === 'test');
 export const eventsLabel = (community, development = false) => tdzOnly(community, development) ? TDZ_EVENTS_LABEL : SOLO_EVENTS_LABEL;
 export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
-// Default number of places of a solo race: the game server size for that track. LMU hosted servers
-// have 20, 38 or 62 slots, 62 only at Le Mans (pit garages); iRacing grids vary, 40 is a safe default.
-// The organizer can change it for each race.
-export function gridSizeFor(circuitId) {
-  if (circuitId === 'le-mans') return 62;
-  return String(circuitId || '').startsWith('iracing-') ? 40 : 38;
-}
 export function gameForEvent(event) { return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu'; }
 // Simulators of the events calendar (solo format).
 export const SIMS = [
