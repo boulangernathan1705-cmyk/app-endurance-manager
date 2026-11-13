@@ -247,6 +247,15 @@ export const missingRights = settings => { try { const list = JSON.parse(setting
 // right goes missing, and the site shows « Réinviter le bot » until it is back. force: checked now (Administration).
 export async function checkBotRights(env, community, settings, timestamp = Date.now(), {force = false, failed = []} = {}) {
   let missing = missingRights(settings);
+  // Server-wide rights only matter for the bot's own categories: in the admins' channels, their rights there count, and those
+  // are checked when the setting is saved (Les Moissonneuses, 2026-11-13: no server-wide right, all fine in their channels).
+  if (!Object.keys(parseCategories(settings.bot_categories)).length) {
+    if (missing.length) {
+      await env.DB.prepare("UPDATE community_recap_settings SET missing_rights='[]' WHERE community_id=?").bind(community.id).run();
+      settings.missing_rights = '[]';
+    }
+    return [];
+  }
   if (force || failed.length || timestamp - Number(settings.rights_checked_at || 0) >= RIGHTS_EVERY) {
     const before = missing;
     let server;
