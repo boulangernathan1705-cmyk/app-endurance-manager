@@ -19,7 +19,7 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 
 ## Architecture actuelle
 
-- Frontend statique en JavaScript ES modules, sans bundler ; `npm run build:workers` rassemble les CSS dans `public/app.css`.
+- Frontend statique en JavaScript ES modules, sans bundler ; `npm run build:workers` rassemble les CSS dans `public/app.css` (commun) et `public/page-*.css` (pages à part).
 - API et pages sur Cloudflare Workers (`server/worker-with-migrations.mjs`), fichiers statiques servis par Workers Static Assets.
 - Une base Cloudflare D1 par environnement : `endurance-manager-prod`, `endurance-manager-dev`, et `fmt-endurance` en local.
 - Authentification Discord (OAuth, portée `identify`) ; bot Discord pour les fils, vocaux, récaps et annonces.
@@ -44,7 +44,7 @@ npm run check
 
 `npm run check` exécute les tests, le build Workers et l’audit strict du dépôt.
 
-Le code CSS reste modulaire dans le dépôt, mais `npm run build:workers` rassemble les feuilles nécessaires au démarrage dans `public/app.css`. Les fonctions non essentielles au premier écran, comme l’aide, sont chargées à la demande.
+Le code CSS reste modulaire dans le dépôt, mais `npm run build:workers` rassemble les feuilles dans `public/app.css`, partagé par toutes les pages, plus un petit `public/page-<nom>.css` pour les pages dont les styles ne servent nulle part ailleurs (fiches combo, mur des stands, aide, charte, diagnostics) : `PAGE_ONLY` dans `scripts/build.mjs`. Une feuille n’y entre que si les styles calculés des autres pages ne changent pas. Les fonctions non essentielles au premier écran, comme l’aide, sont chargées à la demande.
 
 ## Déploiement
 
