@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {retryAfter,discordRequest} from '../server/recap-discord.mjs';
+import {discordRequest} from '../server/recap-discord.mjs';
+import {retryAfter,discordFetch} from '../server/discord-api.mjs';
 
 test('retry-after uses Discord delay in seconds without consuming the response',async()=>{
   const response=Response.json({retry_after:0.25},{status:429});
@@ -33,4 +34,17 @@ test('a repeated short rate limit stops after the single retry',async t=>{
   globalThis.fetch=async()=>{calls++;return Response.json({retry_after:0},{status:429});};
   await assert.rejects(discordRequest({DISCORD_BOT_TOKEN:'fake'},'GET','/guilds/test/channels'),error=>error.status===429);
   assert.equal(calls,2);
+});
+
+test('every module asks Discord the same way: one more try after a short wait, then the answer as data', async t => {
+  const original = globalThis.fetch, calls = [];
+  t.after(() => globalThis.fetch = original);
+  globalThis.fetch = async (url, options) => {
+    calls.push({url, options});
+    return calls.length === 1 ? Response.json({retry_after:0.01, code:0}, {status:429}) : Response.json({code:50007}, {status:403});
+  };
+  const answer = await discordFetch({DISCORD_BOT_TOKEN:' fake '}, 'POST', '/channels/1/messages', {content:'x'});
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].options.headers.Authorization, 'Bot fake');
+  assert.deepEqual({ok:answer.ok, status:answer.status, code:answer.code}, {ok:false, status:403, code:50007});
 });

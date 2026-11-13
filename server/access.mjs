@@ -9,6 +9,7 @@
 //   day, and by the daily task. The player's other servers are never looked at.
 // - No Discord server set for the community, or the bot cannot tell: no access (fail closed).
 import {administrators, fail, now} from './core.mjs';
+import {discordFetch, botToken} from './discord-api.mjs';
 
 export const PERMISSIONS = Object.freeze([
   'access',               // accéder à l’espace Endurance Manager de la communauté
@@ -32,7 +33,6 @@ const LEGACY = {register:['endurance', 'solo_open'], create_crew:[], register_ot
 export const normalizePermissions = list => [...new Set((list || []).flatMap(permission => LEGACY[permission] || [permission]))]
   .filter(permission => PERMISSIONS.includes(permission));
 
-const DISCORD_API = 'https://discord.com/api/v10';
 const CHECK_EVERY = 24 * 3600; // seconds, the daily check of every member
 // The player on the site: roles asked again after 10 minutes, so a role given on Discord soon counts here.
 const VISIT_CHECK_EVERY = 10 * 60;
@@ -42,12 +42,8 @@ const UNKNOWN_MEMBER = 10007; // Discord: this user is not on the server (a 404 
 const ADMINISTRATOR = 0x8n;
 
 async function bot(env, path) {
-  const tokenValue = String(env?.DISCORD_BOT_TOKEN || '').trim();
-  if (!tokenValue) return {ok:false, status:0};
-  const response = await fetch(`${DISCORD_API}${path}`, {headers:{Authorization:`Bot ${tokenValue}`}, signal:AbortSignal.timeout(8000)});
-  if (response.ok) return {ok:true, status:response.status, data:await response.json()};
-  const error = await response.json().catch(() => null);
-  return {ok:false, status:response.status, code:Number(error?.code) || 0, data:null};
+  if (!botToken(env)) return {ok:false, status:0};
+  return discordFetch(env, 'GET', path);
 }
 
 // Server details (owner, roles with their Discord permissions), kept a few minutes per Worker instance.

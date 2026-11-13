@@ -1,4 +1,4 @@
-import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
+import {discordFetch} from './discord-api.mjs';
 import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,PUBLIC_VOICE_ACCESS,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): from the Monday of its race's week (at once if made during that week), every crew gets a voice
@@ -18,7 +18,6 @@ import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
 
-const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
 // The recap makes the race's category first: a crew's voice channel waits for it (made there directly), at
 // most this long, then is made in the admins' category (and moved later).
@@ -45,21 +44,14 @@ class Stop extends Error {}
 async function discord(env, budget, method, path, body) {
   if (budget.left <= 0) throw new Stop('budget');
   budget.left -= 1;
-  const call = () => fetch(`${DISCORD_API}${path}`, {method, signal:AbortSignal.timeout(8000),
-    headers:{Authorization:`Bot ${String(env.DISCORD_BOT_TOKEN || '').trim()}`, ...(body ? {'Content-Type':'application/json'} : {})},
-    body:body ? JSON.stringify(body) : undefined});
-  let response = await call();
-  const wait = await retryAfter(response);
-  if (wait !== null) response = await (await pause(wait), call());
-  if (response.status === 429) { budget.left = 0; throw new Stop('rate-limited'); }
-  await spaceOut(response);
-  const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(`Discord ${response.status}${data?.code ? ` (${data.code})` : ''}`);
-    error.status = response.status; error.code = data?.code; error.method = method; error.path = path; error.errors = data?.errors;
+  const answer = await discordFetch(env, method, path, body);
+  if (answer.status === 429) { budget.left = 0; throw new Stop('rate-limited'); }
+  if (!answer.ok) {
+    const error = new Error(`Discord ${answer.status}${answer.code ? ` (${answer.code})` : ''}`);
+    error.status = answer.status; error.code = answer.code || undefined; error.method = method; error.path = path; error.errors = answer.errors;
     throw error;
   }
-  return data;
+  return answer.data;
 }
 
 // What an admin can do when the bot is refused.
