@@ -232,9 +232,13 @@ export async function validateDiscordLayout(env, community, input) {
   return {...settingsRow(layout.mode), layout:JSON.stringify(layout)};
 }
 // The bot's rights on the whole server (what its own categories need).
-export async function serverRights(env, community) {
+async function botMember(env, community) {
   const guild = community.discordGuildId;
   const [roles, member] = await Promise.all([discord(env, 'GET', `/guilds/${guild}/roles`), discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
+  return {guild, roles, member};
+}
+export async function serverRights(env, community) {
+  const {guild, roles, member} = await botMember(env, community);
   const rights = effectivePermissions(roles, member, guild, {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
   const missing = [['Voir les salons',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],['Gérer les rôles',1n << 28n],['Gérer les fils',1n << 34n],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]]
     .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
@@ -442,9 +446,9 @@ function categoryRules(env, layout, key, channels, mask = SHARED) {
 async function shareRights(env, community, settings, rows, channels, budget) {
   const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
   const races = rows.filter(row => isRaceRow(row) && row.category_id && !row.closed_at).map(row => row.category_id);
-  // Discord refuses a rule with a right the bot does not hold itself (even with « Gérer les rôles »; SPM, 2026-11-12): only
-  // what it holds on the server is copied. Read once, and only when something has to change.
-  let held = null;
+  // Discord refuses any change to a right the bot does not hold itself, counted on the server for a category and in the
+  // category for a channel inside it (even with « Gérer les rôles »; SPM, 2026-11-12/13). Read once, only when needed.
+  let bot = null;
   const same = (channel, mask, access) => {
     const own = (channel.permission_overwrites || []).find(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
     return JSON.stringify(othersRules(env, channel.permission_overwrites, mask)) === JSON.stringify(categoryRules(env, layout, channel.key, channels, mask))
@@ -460,14 +464,17 @@ async function shareRights(env, community, settings, rows, channels, budget) {
       channel.key = key;
       const wantedAccess = channel.type === 4 ? categoryAccess(community) : REQUIRED | THREADS;
       if (same(channel, SHARED, wantedAccess)) continue;
-      held ??= await serverRights(env, community).then(result => result.rights).catch(() => ~0n);
+      bot ??= await botMember(env, community).catch(() => null);
+      const held = heldIn(env, bot, channels.find(item => item.id === channel.parent_id));
       const mask = SHARED & held, access = wantedAccess & held;
       if (same(channel, mask, access)) continue;
-      const mine = (channel.permission_overwrites || []).filter(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
-      const permission_overwrites = withBotAccess([...categoryRules(env, layout, key, channels, mask), ...mine], env.DISCORD_CLIENT_ID, access);
+      const permission_overwrites = mergeRules(env, channel.permission_overwrites, categoryRules(env, layout, key, channels, mask), mask, access);
       try { await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget); }
       catch (error) {
-        if (error.status === 403 || error.code === 50013) return false;
+        if (error.status === 403 || error.code === 50013) {
+          console.warn('Discord a refusé les droits du salon', JSON.stringify({community:community.id, channel:channel.id, name:channel.name}));
+          return false;
+        }
         throw error;
       }
       channel.permission_overwrites = permission_overwrites;
@@ -475,11 +482,29 @@ async function shareRights(env, community, settings, rows, channels, budget) {
   }
   return true;
 }
+// What the bot holds where a rule is written: on the server for a category, in its category for a channel (unknown: all,
+// Discord then says).
+function heldIn(env, bot, parent) {
+  if (!bot) return ~0n;
+  return effectivePermissions(bot.roles, bot.member, bot.guild, parent || {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
+}
+// The channel's rules with only the bits the bot manages and holds changed (mask for the others, access for its own): every
+// other bit of every rule stays as Discord has it, as removing one is a change Discord refuses too.
+function mergeRules(env, existing, wanted, mask, access) {
+  const key = item => `${Number(item.type)}:${item.id}`, bot = key({type:1, id:env.DISCORD_CLIENT_ID});
+  const goal = new Map(wanted.map(item => [key(item), item]));
+  const rules = new Map((existing || []).map(item => [key(item), {id:String(item.id), type:Number(item.type), allow:BigInt(item.allow || 0), deny:BigInt(item.deny || 0)}]));
+  for (const item of [...wanted, {id:String(env.DISCORD_CLIENT_ID), type:1}])
+    if (!rules.has(key(item))) rules.set(key(item), {id:String(item.id), type:Number(item.type), allow:0n, deny:0n});
+  return [...rules].map(([id, rule]) => id === bot ? {...rule, allow:rule.allow | access, deny:rule.deny & ~access}
+    : {...rule, allow:(rule.allow & ~mask) | BigInt(goal.get(id)?.allow || 0), deny:(rule.deny & ~mask) | BigInt(goal.get(id)?.deny || 0)})
+    .filter(rule => rule.allow || rule.deny || key(rule) === bot).map(rule => ({...rule, allow:String(rule.allow), deny:String(rule.deny)}));
+}
 // The bot's own categories: the missing ones made (with its rights), then their ids kept. channels: the server's, updated.
 async function makeCategories(env, community, settings, channels, budget) {
   const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
   const wanted = settings.enabled === 0 ? [] : wantedCategories(layout);
-  let changed = false;
+  let changed = false, held = null;
   for (const key of wanted) {
     const mine = cats[key] && channels.find(item => item.id === cats[key] && item.type === 4);
     if (mine) {
@@ -488,8 +513,10 @@ async function makeCategories(env, community, settings, channels, budget) {
       continue;
     }
     // Taken back if the bot made it already (a lost answer), never a category of the admins with the same name.
+    // Only rights the bot holds on the server (Discord refuses the category otherwise).
+    held ??= heldIn(env, await botMember(env, community).catch(() => null));
     const created = await discord(env,'POST',`/guilds/${settings.guild_id}/channels`,{type:4,name:CATEGORY_NAMES[key],
-      permission_overwrites:withBotAccess(categoryRules(env, layout, key, channels),env.DISCORD_CLIENT_ID,categoryAccess(community))},budget);
+      permission_overwrites:withBotAccess(categoryRules(env, layout, key, channels, SHARED & held),env.DISCORD_CLIENT_ID,categoryAccess(community) & held)},budget);
     channels.push(created);
     cats[key] = created.id; changed = true;
   }

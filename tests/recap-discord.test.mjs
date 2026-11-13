@@ -959,6 +959,27 @@ test('the bot copies only the rights it holds: a right it lacks on the server is
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'then nothing to change');
 });
 
+test('the bot never changes a right it lacks: rules already on its category keep those bits (SPM, 2026-11-13)',async t=>{
+  // Discord refuses removing a bit the bot lacks as much as adding one: a deny of « Se connecter » set by the admins stays.
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}],HELD=268520464n|THREADS,CONNECT=1n<<20n;
+  const {env,channels,calls,setFailure}=setup(t,{rights:String(HELD)});
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  const bot=named(channels,'🏆 Endurance Manager'),ADMINS={id:'333333333333333333',type:0,allow:'0',deny:String(CONNECT)};
+  bot.permission_overwrites=[...bot.permission_overwrites,ADMINS];
+  named(channels,'Accueil').permission_overwrites=[...PRIVATE,{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
+  const bits=list=>new Map((list||[]).map(rule=>[`${rule.type}:${rule.id}`,[BigInt(rule.allow||0),BigInt(rule.deny||0)]]));
+  setFailure((path,method)=>{
+    if(method!=='PATCH'||path!==`/channels/${bot.id}`)return false;
+    const before=bits(bot.permission_overwrites),after=bits(calls.at(-1).body.permission_overwrites);
+    return [...new Set([...before.keys(),...after.keys()])].some(id=>{const [a,d]=before.get(id)||[0n,0n],[a2,d2]=after.get(id)||[0n,0n];return ((a^a2)|(d^d2))&~HELD;});
+  });
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(bot.permission_overwrites.find(rule=>rule.id==='222222222222222222')?.allow,'3072','copied');
+  assert.equal(bot.permission_overwrites.find(rule=>rule.id===ADMINS.id)?.deny,String(CONNECT),'the admins’ rule kept');
+  assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),[]);
+});
+
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
   const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
