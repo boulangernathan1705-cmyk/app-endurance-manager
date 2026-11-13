@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.5 — 13 novembre 2026
+
+### 🐛 Corrections
+
+- **Affiche du jour** : une seule affiche par jour, le stream en haut puis « Aussi aujourd'hui ». Une course qui existe à la fois en event et en endurance n'apparaît qu'une fois. Les boutons deviennent « S'inscrire · nom » et « Absent ».
+- **Catégorie du bot Discord** : le bot ne modifie plus jamais un droit qu'il ne possède pas, même parmi les réglages déjà posés par les admins. Discord n'a plus de raison de refuser.
+
 ## v2.13.4 — 13 novembre 2026
 
 ### 🐛 Corrections
