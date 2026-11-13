@@ -1,6 +1,6 @@
-// At 7h30 (Paris), two messages (Nathan, 2026-11-01): the stream of the day first, with the races it streams, the only
-// one that pings @everyone; then the day's other endurances and events, without a ping. A day without a stream has only
-// the second one. Counts are updated in place; older layouts are replaced without a ping.
+// At 7h30 (Paris), ONE message (Nathan, 2026-11-13: « ça me plaît pas d'avoir 2 annonces »): the stream of the day on
+// top, with the races it streams, then « Aussi aujourd'hui » with the day's other endurances and events. It pings
+// @everyone with a stream, otherwise it is a plain message alert. Older layouts are replaced without a ping.
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
@@ -15,7 +15,8 @@ import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 
-const MINUTE = 60000;
+const MINUTE = 60000, HOUR = 60 * MINUTE;
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 // Only the first morning evaluation can ping (7h30–9h Paris). Later publications are silent.
 const FROM = 7 * 60 + 30, UNTIL = 9 * 60;
 // A small Discord budget also bounds cleanup of legacy separate messages.
@@ -29,7 +30,8 @@ async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 // The update time in the footer changes on every pass: not part of what is compared.
-const PREFIX = 'split-v1:';
+// A new prefix leaves a day announced by an older layout as it is until midnight (publishAnnouncement).
+const PREFIX = 'one-v1:';
 const contentHash = async payload => PREFIX + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
 
 // The channel chosen for the announcement, or '' (layout.announce).
@@ -216,7 +218,8 @@ function posterPayload(model, list, absent) {
   const join = item => {
     const gridfest = item.data.streamers?.length > 0, more = actionable.length > 1 ? ` · ${name(item)}` : '';
     return [{type:2,style:5,label:cut(`${gridfest ? 'Piloter pour un streamer' : 'S’inscrire'}${more}`,80),emoji:{name:gridfest ? '🎙️' : '✅'},url:item.url},
-      ...(absent ? [{...absent(item.row.item),label:cut(`Absent${more}`,80)}] : [])];
+      // The race's name once per row, on « S’inscrire »: « Absent » next to it is for the same race (2026-11-13).
+      ...(absent ? [{...absent(item.row.item),label:'Absent'}] : [])];
   };
   if (actionable.length === 1) rows.push({type:1,components:join(actionable[0])});
   else {
@@ -228,7 +231,7 @@ function posterPayload(model, list, absent) {
   return {content:'',embeds:[embed],components:rows,allowed_mentions:{parse:[]},poster:posterHtml(model)};
 }
 
-// One of the day's two messages (row: 'intro' for the stream, 'races' for the rest): recovered after a lost answer,
+// The day's message (row 'intro'; 'races' was the second message of older days): recovered after a lost answer,
 // edited in place, sent again silently when gone, or removed when it has nothing left to say (payload null).
 async function publishSlot(env, community, day, channel, row, input, ping, budget, timestamp) {
   let asked = false;
@@ -328,10 +331,8 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at,ping_attempted)
       VALUES(?,?,?,'intro',0,?,?,?,?)`).bind(community.id,day,'intro',community.discordGuildId,channel,timestamp,rows.length ? 1 : 0).run();
   }
-  await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
-    VALUES(?,?,'races','part',0,?,?,?)`).bind(community.id,day,community.discordGuildId,channel,timestamp).run();
   rows = await announcementRows(env, community, day);
-  const intro = rows.find(row => row.item === 'intro'), races = rows.find(row => row.item === 'races'), slots = [intro, races];
+  const intro = rows.find(row => row.item === 'intro'), slots = [intro];
   const ids = new Set(slots.map(row => row.message_id).filter(Boolean));
   const legacy = rows.some(row => !['intro','part'].includes(row.kind) && row.message_id && row.message_id !== '-' && !ids.has(row.message_id));
   const due = slots.some(row => row.pending_nonce || !String(row.content_hash || '').startsWith(PREFIX) || (row.message_id && row.channel_id !== channel))
@@ -346,13 +347,28 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     activeRows.push(row);
     items.push({row,kind:data.stream ? 'stream' : row.kind,data,url:row.kind === 'race' ? raceUrl(site.url,{eventId:row.item,circuit:data.circuit}) : site.url ? `${site.url}/lmu/#event=${encodeURIComponent(row.item)}` : ''});
   }
+  // An event of the calendar for the same race as an endurance of today (same name, start within an hour): told once,
+  // by the endurance, as on the calendar (Nathan, 2026-11-13: two « Production Endurance Challenge » on one poster).
+  const twins = new Map(), twinRows = [];
+  for (const item of items.filter(item => item.kind === 'event')) {
+    const race = items.find(other => other.kind === 'race' && sameName(other.data.name, item.data.name)
+      && (other.data.departures || []).some(start => Math.abs(Number(start.startsAt) - item.data.startsAt) < HOUR));
+    if (race) twins.set(item.row.item, race.row.item);
+  }
+  for (let index = items.length - 1; index >= 0; index--) if (twins.has(items[index].row.item)) {
+    items.splice(index, 1);
+    twinRows.push(...activeRows.splice(index, 1));
+  }
   for (const [position,row] of activeRows.entries()) {
     await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
       VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
     await env.DB.prepare('UPDATE discord_announcements SET name=? WHERE community_id=? AND day=? AND item=?')
       .bind(String(items[position]?.data?.name || ''),community.id,day,row.item).run();
   }
-  let streams = await streamTimes(env,activeRows,community,timestamp);
+  let streams = await streamTimes(env,[...activeRows,...twinRows],community,timestamp);
+  // The stream time given on a twin event is its endurance's.
+  for (const entry of streams.filter(entry => twins.has(entry.item))) if (!streams.some(other => other.item === twins.get(entry.item))) streams.push({item:twins.get(entry.item), name:'', time:entry.time});
+  streams = streams.filter(entry => !twins.has(entry.item));
   // A stream announced during an endurance start the community streams is that endurance's stream: told once.
   const streamedStarts = items.filter(item => item.kind === 'race' && streams.some(stream => stream.item === item.row.item)).flatMap(item => item.data.departures || []);
   const merged = new Set(items.filter(item => item.kind === 'stream' && streamDuringEndurance(item.data.startsAt, streamedStarts)).map(item => item.row.item));
@@ -373,28 +389,21 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
   const live = items.filter(item => item.kind === 'stream' || (stream && streamed.has(item.row.item)));
   const rest = items.filter(item => !live.includes(item));
-  const absent = discordAbsentButton(env);
-  const livePayload = live.length ? posterPayload(posterModel(live,site,{live:true,timestamp}),live,absent) : null;
-  const restPayload = rest.length ? posterPayload(posterModel(rest,site,{timestamp}),rest,absent) : null;
-  // Only the stream's message pings, once, on the first morning evaluation (7h30–9h).
-  const ping = intro.ping_attempted === 0 && minutes < UNTIL && Boolean(livePayload);
-  if (intro.ping_attempted === 0 && !livePayload) await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();
-  let asked = false;
-  // A day without a stream: the races alone, with a plain message alert (no @everyone), once that morning.
-  const alert = !livePayload && intro.ping_attempted === 0 && minutes < UNTIL ? 'alert' : false;
-  const first = await publishSlot(env,community,day,channel,intro,livePayload,ping ? 'everyone' : false,budget,timestamp);asked ||= first.asked;
-  if (first.blocked) return asked;
-  const second = await publishSlot(env,community,day,channel,races,restPayload,alert,budget,timestamp);asked ||= second.asked;
-  if (second.blocked) return asked;
+  const absent = discordAbsentButton(env), list = [...live, ...rest];
+  const payload = !list.length ? null : posterPayload(live.length ? posterModel(live,site,{live:true,timestamp,rest}) : posterModel(rest,site,{timestamp}),list,absent);
+  // One notification, on the first morning evaluation (7h30–9h): @everyone with a stream, otherwise a plain alert.
+  const ping = intro.ping_attempted === 0 && minutes < UNTIL ? (live.length ? 'everyone' : 'alert') : false;
+  const first = await publishSlot(env,community,day,channel,intro,payload,ping,budget,timestamp);
+  if (first.blocked) return first.asked;
   // Persist before cleanup: retired references survive an interrupted cleanup.
-  const keep = new Set([first.id,second.id].filter(Boolean).map(id => `${channel}:${id}`));
+  const keep = new Set([first.id].filter(Boolean).map(id => `${channel}:${id}`));
   const cleanup = await removeOldAnnouncements(env,community,day,keep,budget);
   for (const item of items) {
-    const id = live.includes(item) ? first.id : second.id;
-    await env.DB.prepare('UPDATE discord_announcements SET message_id=?,channel_id=?,checked_at=? WHERE community_id=? AND day=? AND item=? AND (message_id IS NULL OR message_id=? OR message_id=?)')
-      .bind(id,channel,timestamp,community.id,day,item.row.item,first.id || '',second.id || '').run();
+    await env.DB.prepare('UPDATE discord_announcements SET message_id=?,channel_id=?,checked_at=? WHERE community_id=? AND day=? AND item=? AND (message_id IS NULL OR message_id=?)')
+      .bind(first.id,channel,timestamp,community.id,day,item.row.item,first.id || '').run();
   }
-  const crossed = await crossOutCancelled(env,community,day,channel,[first.id,second.id],new Set(items.map(item => item.row.item)),budget);
+  const crossed = await crossOutCancelled(env,community,day,channel,[first.id],new Set(items.map(item => item.row.item)),budget);
+  const asked = first.asked;
   return asked || cleanup.asked || crossed;
 }
 
