@@ -39,7 +39,7 @@ test('editing, deleting or promoting an official race targets all Discords',asyn
 });
 test('official updates enqueue enabled Discord configurations in one database operation',async()=>{
  const pending=[];let calls=0;
- const env={DB:{prepare(sql){assert.match(sql,/SELECT community_id,\?,\? FROM community_recap_settings WHERE enabled=1/);return{bind(id,at){assert.equal(id,event);assert.equal(typeof at,'number');return{async run(){calls++;}};}};}}};
+ const env={DB:{prepare(sql){assert.match(sql,/SELECT community_id,\?,\? FROM community_recap_settings WHERE enabled=1/);return{bind(id,at){assert.equal(id,event);assert.equal(typeof at,'number');return{sql};}};},async batch(statements){calls++;assert.deepEqual(statements.map(item=>item.sql.match(/INTO (\w+)/)[1]),['discord_pending','discord_pending_races']);}}};
  queueWeeklySync(env,{waitUntil(task){pending.push(task);}},new Request('https://site.example'),event,null,true);
  await Promise.all(pending);assert.equal(calls,1);
 });

@@ -54,16 +54,27 @@ export function queueWeeklySync(env, ctx, request, eventId = null, communityId =
   if (!env?.DB || !ctx?.waitUntil) return;
   // Official race changes affect every configured Discord, not just the editing site.
   if(shared) {
-    ctx.waitUntil(env.DB.prepare(`INSERT INTO discord_pending(community_id,event_id,queued_at)
-      SELECT community_id,?,? FROM community_recap_settings WHERE enabled=1
-      ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id`)
-      .bind(eventId,Date.now()).run().catch(error => console.error('Discord shared sync failed',error.message)));
+    const at = Date.now();
+    ctx.waitUntil(env.DB.batch([
+      env.DB.prepare(`INSERT INTO discord_pending(community_id,event_id,queued_at)
+        SELECT community_id,?,? FROM community_recap_settings WHERE enabled=1
+        ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id`).bind(eventId,at),
+      ...(eventId ? [env.DB.prepare(`INSERT INTO discord_pending_races(community_id,event_id,queued_at)
+        SELECT community_id,?,? FROM community_recap_settings WHERE enabled=1
+        ON CONFLICT(community_id,event_id) DO UPDATE SET queued_at=excluded.queued_at`).bind(eventId,at)] : [])
+    ]).catch(error => console.error('Discord shared sync failed',error.message)));
     return;
   }
   ctx.waitUntil((communityId?communityById(env,communityId):currentCommunity(env,request)).then(async community => {
     if(!community)return;
-    await env.DB.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id')
-      .bind(community.id,eventId,Date.now()).run();
+    const at = Date.now();
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id')
+        .bind(community.id,eventId,at),
+      // Every race changed is remembered, not only the last one (server/recap-discord.mjs, syncLocked).
+      ...(eventId ? [env.DB.prepare('INSERT INTO discord_pending_races(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id,event_id) DO UPDATE SET queued_at=excluded.queued_at')
+        .bind(community.id,eventId,at)] : [])
+    ]);
   }).catch(error => {
     console.error('Discord sync failed', error instanceof Error ? error.message : 'unknown');
   }));
