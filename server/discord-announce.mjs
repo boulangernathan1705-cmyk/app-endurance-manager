@@ -12,11 +12,10 @@ import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance, streamIsRace, isEnduranceTwin} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 
-const MINUTE = 60000, HOUR = 60 * MINUTE;
-const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+const MINUTE = 60000;
 // Only the first morning evaluation can ping (7h30–9h Paris). Later publications are silent.
 const FROM = 7 * 60 + 30, UNTIL = 9 * 60;
 // A small Discord budget also bounds cleanup of legacy separate messages.
@@ -351,8 +350,8 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   // by the endurance, as on the calendar (Nathan, 2026-11-13: two « Production Endurance Challenge » on one poster).
   const twins = new Map(), twinRows = [];
   for (const item of items.filter(item => item.kind === 'event')) {
-    const race = items.find(other => other.kind === 'race' && sameName(other.data.name, item.data.name)
-      && (other.data.departures || []).some(start => Math.abs(Number(start.startsAt) - item.data.startsAt) < HOUR));
+    const race = items.find(other => other.kind === 'race'
+      && (other.data.departures || []).some(start => isEnduranceTwin(item.data, {name:other.data.name, startsAt:start.startsAt})));
     if (race) twins.set(item.row.item, race.row.item);
   }
   for (let index = items.length - 1; index >= 0; index--) if (twins.has(items[index].row.item)) {

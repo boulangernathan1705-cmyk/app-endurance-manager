@@ -101,3 +101,12 @@ test('a stream and an event keep the end of their stream, shown « 19h45–23h �
   assert.match(week, /data-stream-url=/);
   assert.match(week, /stopPropagation\(\);\s*window\.open\(link\.dataset\.streamUrl,'_blank','noopener,noreferrer'\)/);
 });
+
+test('une seule règle « même course » pour le calendrier et l’affiche du jour', async () => {
+  const {isEnduranceTwin, sameRaceName} = await import('../shared/stream.mjs');
+  const at = Date.parse('2026-11-13T19:00:00Z');
+  assert.equal(sameRaceName(' Production Endurance Challenge ', 'production endurance challenge'), true);
+  assert.equal(sameRaceName('', ''), false);
+  assert.equal(isEnduranceTwin({name:'PEC', startsAt:at + 30 * 60000}, {name:'pec', startsAt:at}), true);
+  assert.equal(isEnduranceTwin({name:'PEC', startsAt:at + 61 * 60000}, {name:'PEC', startsAt:at}), false);
+});
