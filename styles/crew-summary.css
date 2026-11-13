@@ -18,7 +18,6 @@
 
 .crew-summary-card {
   display: grid;
-  grid-template-columns: auto minmax(130px, .8fr) minmax(0, 1.2fr);
   align-items: center;
   gap: 10px;
   min-width: 0;

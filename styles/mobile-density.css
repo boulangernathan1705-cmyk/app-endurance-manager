@@ -45,9 +45,7 @@
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    justify-content: space-between !important;
     flex-wrap: nowrap !important;
-    gap: 10px !important;
     margin: 0 !important;
   }
   .crew-management-accordion-body .crew-state-label {
@@ -62,16 +60,9 @@
   .crew-management-accordion-body .crew-state-select {
     width: auto !important;
     min-width: 138px;
-    min-height: 38px !important;
-    padding: 6px 30px 6px 10px !important;
-    font-size: 12px !important;
   }
 
   /* Roster: one compact row per pilot with a small destructive action at the right. */
-  .crew-management-accordion-body .crew-roster {
-    gap: 5px !important;
-    padding: 7px 0 !important;
-  }
   .crew-management-accordion-body .crew-roster > li {
     display: grid !important;
     grid-template-columns: minmax(0,1fr) auto !important;
@@ -86,7 +77,6 @@
   .crew-management-accordion-body .crew-roster .crew-pilot-name {
     display: block;
     overflow: hidden;
-    font-size: 13px !important;
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -95,7 +85,6 @@
     display: block;
     margin-top: 2px;
     overflow: hidden;
-    font-size: 10.5px !important;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -116,29 +105,9 @@
     grid-template-columns: minmax(0,1fr) auto !important;
     align-items: center !important;
     gap: 8px !important;
-    padding: 8px 9px !important;
-  }
-  .crew-management-accordion-body .crew-add-pilot-button {
-    width: auto !important;
-    min-width: 70px !important;
-    min-height: 34px !important;
-    padding: 5px 9px !important;
-    font-size: 11px !important;
   }
 
   /* Slightly tighter compact crew cards visible before expansion. */
-  .crew-pilot-accordion-summary,
-  .crew-management-summary {
-    min-height: 58px !important;
-    padding: 8px 9px !important;
-  }
-  .crew-compact-team strong {
-    font-size: 13px;
-  }
-  .crew-compact-pilots,
-  .crew-compact-car {
-    font-size: 10px;
-  }
 }
 
 @media (max-width: 390px) {

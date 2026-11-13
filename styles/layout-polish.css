@@ -1,6 +1,5 @@
 /* Course : sous "Pilotes inscrits", afficher directement les cartes. */
 .ux-unassigned-section {
-  padding: 0;
   border: 0;
   background: transparent;
 }
@@ -103,9 +102,6 @@
 }
 
 /* Accordéons de contenu : Pilotes inscrits / Équipages / Pilotes restants. */
-.ux-course-pilots-accordion {
-  overflow: hidden;
-}
 
 .ux-course-split-overview {
   display: grid;
@@ -249,16 +245,6 @@
     width: auto !important;
     min-width: 140px !important;
     justify-self: start !important;
-  }
-
-  .ux-content-accordion-title {
-    font-size: 18px;
-  }
-
-  .ux-content-accordion-count {
-    min-width: 30px;
-    height: 30px;
-    font-size: 13px;
   }
 
   .ux-course-split-overview > .ux-course-pilots-accordion {

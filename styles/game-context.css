@@ -80,13 +80,6 @@ html[data-game="iracing"] .nav-game-switcher-iracing {
 }
 
 @media (max-width: 760px) {
-  .game-space-bar {
-    padding: 7px 12px 0;
-  }
-
-  .game-space-bar strong {
-    font-size: 11px;
-  }
 
   #navigation > [data-action="logout"] {
     order: 5;
@@ -102,6 +95,5 @@ html[data-game="iracing"] .nav-game-switcher-iracing {
     min-height: 42px;
     padding: 5px 6px;
     border-radius: 7px;
-    font-size: 11px;
   }
 }

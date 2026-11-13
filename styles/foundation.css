@@ -33,7 +33,6 @@
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -53,25 +52,7 @@ button {
 ========================================================= */
 
 .top-stripes {
-  height: 5px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.top-stripes div:nth-child(1) {
-  background: var(--blue);
-}
-
-.top-stripes div:nth-child(2) {
-  background: var(--green);
-}
-
-.top-stripes div:nth-child(3) {
-  background: var(--yellow);
-}
-
-.top-stripes div:nth-child(4) {
-  background: var(--red);
 }
 
 
@@ -79,18 +60,10 @@ button {
    HEADER
 ========================================================= */
 
-header {
-  background: #0d0f10;
-  border-bottom: 1px solid var(--border);
-  padding: 18px 20px;
-}
-
 .header-inner {
-  max-width: 1100px;
   margin: auto;
 
   display: flex;
-  align-items: center;
   justify-content: space-between;
 
   gap: 15px;
@@ -130,8 +103,6 @@ main {
 
 .primary-button {
   border: 0;
-  background: var(--green);
-  color: #07100a;
 
   font-weight: 900;
 
@@ -146,7 +117,6 @@ main {
 
 .secondary-button {
   border: 1px solid var(--border);
-  background: var(--panel2);
   color: var(--text);
 
   font-weight: 800;
@@ -281,8 +251,6 @@ main {
 
 .form-label {
   display: block;
-
-  color: var(--muted);
 
   font-size: 11px;
   font-weight: 900;
@@ -497,17 +465,6 @@ input:focus {
 ========================================================= */
 
 .pilot-row {
-  display: grid;
-
-  grid-template-columns:
-    minmax(100px, 1fr)
-    30px
-    78px
-    30px;
-
-  align-items: center;
-
-  gap: 8px;
 
   min-height: 34px;
 
@@ -695,8 +652,6 @@ input:focus {
   justify-content: flex-end;
 
   gap: 5px;
-
-  flex-wrap: wrap;
 }
 
 .category-button {

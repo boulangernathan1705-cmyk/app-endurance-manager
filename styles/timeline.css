@@ -53,7 +53,6 @@
   left: 0;
   width: 1px;
   height: 6px;
-  background: #7b898b;
 }
 .presence-boundary.is-finish { position: absolute; right: 0; height: 100%; }
 .presence-time {
@@ -66,7 +65,6 @@
   line-height: 18px;
   font-weight: 800;
   white-space: nowrap;
-  color: #c8d0ce;
 }
 .presence-time.ticks-4 { display: block; }
 .presence-boundary:first-child .presence-time { transform: none; }
@@ -94,8 +92,6 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: transparent;
-  color: #b0babc;
   font-family: inherit;
   font-size: 12px;
   font-weight: 800;
