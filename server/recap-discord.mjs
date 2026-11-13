@@ -238,7 +238,7 @@ export async function serverRights(env, community) {
   const rights = effectivePermissions(roles, member, guild, {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
   const missing = [['Voir les salons',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],['Gérer les rôles',1n << 28n],['Gérer les fils',1n << 34n],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]]
     .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
-  return {ready:!missing.length, missing};
+  return {ready:!missing.length, missing, rights};
 }
 const RIGHTS_EVERY = 3600000;
 export const missingRights = settings => { try { const list = JSON.parse(settings?.missing_rights || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
@@ -417,15 +417,15 @@ const categoryAccess = community => REQUIRED | MANAGE | THREADS | (community.mod
 // What the bot may copy (it can only give rights it has): seeing, writing, joining.
 const SHARED = VIEW | SEND | HISTORY | EMBED | (1n << 20n);
 // The rights of a channel without the bot's own, in a stable order (to compare them).
-function othersRules(env, overwrites) {
+function othersRules(env, overwrites, mask = SHARED) {
   return (overwrites || []).filter(item => !(Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID)))
-    .map(item => ({id:String(item.id), type:Number(item.type), allow:String(BigInt(item.allow || 0) & SHARED), deny:String(BigInt(item.deny || 0) & SHARED)}))
+    .map(item => ({id:String(item.id), type:Number(item.type), allow:String(BigInt(item.allow || 0) & mask), deny:String(BigInt(item.deny || 0) & mask)}))
     .filter(item => item.allow !== '0' || item.deny !== '0').sort((a,b) => a.id.localeCompare(b.id));
 }
 // The rights a bot category should have: those of the category it sits under when the admins chose so, else none (open to all).
-function categoryRules(env, layout, key, channels) {
+function categoryRules(env, layout, key, channels, mask = SHARED) {
   const [copy, at] = key === 'pit' ? [layout?.pitCopy, layout?.pitAt] : [layout?.copy, layout?.under];
-  return copy && at && at !== 'top' ? othersRules(env, channels.find(item => item.id === at)?.permission_overwrites) : [];
+  return copy && at && at !== 'top' ? othersRules(env, channels.find(item => item.id === at)?.permission_overwrites, mask) : [];
 }
 // The bot's categories kept private or open as chosen, and what the bot made in them (their channels, voices and the races'
 // categories): changed only where they differ. Discord needs « Gérer les rôles » for it. Without it: false, and the rest of the
@@ -433,20 +433,29 @@ function categoryRules(env, layout, key, channels) {
 async function shareRights(env, community, settings, rows, channels, budget) {
   const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
   const races = rows.filter(row => isRaceRow(row) && row.category_id && !row.closed_at).map(row => row.category_id);
+  // Discord refuses a rule with a right the bot does not hold itself (even with « Gérer les rôles »; SPM, 2026-11-12): only
+  // what it holds on the server is copied. Read once, and only when something has to change.
+  let held = null;
+  const same = (channel, mask, access) => {
+    const own = (channel.permission_overwrites || []).find(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
+    return JSON.stringify(othersRules(env, channel.permission_overwrites, mask)) === JSON.stringify(categoryRules(env, layout, channel.key, channels, mask))
+      && (BigInt(own?.allow || 0) & access) === access && !(BigInt(own?.deny || 0) & access);
+  };
   for (const [key, id] of Object.entries(cats)) {
-    const rules = categoryRules(env, layout, key, channels), wanted = JSON.stringify(rules);
     const below = key === 'pit' ? [] : channels.filter(item => races.includes(item.id) && [settings.destination_id, settings.iracing_destination_id].includes(id));
     const targets = [id, ...below.map(item => item.id)].flatMap(parent => [channels.find(item => item.id === parent), ...channels.filter(item => item.parent_id === parent)]).filter(Boolean);
     for (const channel of targets) {
       // Vocals keep their own rules: crew sync grants normal member features there.
       // Copying the category's restricted text permissions would undo that policy.
       if (channel.type === 2) continue;
+      channel.key = key;
+      const wantedAccess = channel.type === 4 ? categoryAccess(community) : REQUIRED | THREADS;
+      if (same(channel, SHARED, wantedAccess)) continue;
+      held ??= await serverRights(env, community).then(result => result.rights).catch(() => ~0n);
+      const mask = SHARED & held, access = wantedAccess & held;
+      if (same(channel, mask, access)) continue;
       const mine = (channel.permission_overwrites || []).filter(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
-      const access = channel.type === 4 ? categoryAccess(community) : REQUIRED | THREADS;
-      const own = mine[0];
-      if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted
-        && (BigInt(own?.allow || 0) & access) === access && !(BigInt(own?.deny || 0) & access)) continue;
-      const permission_overwrites = withBotAccess([...rules, ...mine], env.DISCORD_CLIENT_ID, access);
+      const permission_overwrites = withBotAccess([...categoryRules(env, layout, key, channels, mask), ...mine], env.DISCORD_CLIENT_ID, access);
       try { await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget); }
       catch (error) {
         if (error.status === 403 || error.code === 50013) return false;
