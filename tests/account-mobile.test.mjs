@@ -5,12 +5,12 @@ import {readFileSync} from 'node:fs';
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('le compte connecté reste compact sur mobile sans modifier le desktop', () => {
-  const css = read('styles/account-mobile-fix.css');
+  const css = read('styles/mobile-final.css');
   const game = read('game.html');
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /\.site-nav-shell \.account-trigger\s*\{[^}]*width:\s*auto\s*!important/s);
   assert.match(css, /max-width:\s*235px\s*!important/);
   // The avatar size that applies comes from the later mobile layer.
   assert.match(read('styles/mobile-density-v2.css'), /\.site-nav-shell \.account-avatar\s*\{[^}]*width:\s*26px\s*!important/s);
-  assert.match(game, /account-mobile-fix\.css\?v=2-left-popover/);
+  assert.match(game, /mobile-final\.css\?v=3-merged/);
 });

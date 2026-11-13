@@ -9,7 +9,7 @@ test('la passe mobile est chargée en dernier sur le jeu et les membres',()=>{
   const members=read('members.html');
   assert.match(game,/mobile-final\.css\?v=[^"']+/);
   assert.match(members,/mobile-final\.css\?v=[^"']+/);
-  assert.ok(game.indexOf('mobile-final.css')>game.indexOf('mobile-timeline-compact.css'));
+  assert.ok(game.indexOf('mobile-final.css')>game.indexOf('mobile.css'));
   assert.ok(members.indexOf('mobile-final.css')>members.indexOf('members-page.css'));
 });
 
