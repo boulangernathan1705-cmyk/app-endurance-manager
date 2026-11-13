@@ -61,14 +61,14 @@ function setup(t){
 }
 const sent=calls=>calls.filter(call=>call.method==='POST'&&call.path.startsWith('/channels/'));
 
-test('at 7h30 the stream comes first with @everyone and the race it streams, then the other races without a ping',async t=>{
+test('at 7h30 ONE message: the stream with @everyone and the race it streams, then « Aussi aujourd’hui » (Nathan, 2026-11-13)',async t=>{
   const {env,calls,settings}=setup(t);
   // Before 7h30: nothing.
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING-2*60000),false);
   assert.equal(calls.length,0);
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING),true);
   const posts=sent(calls);
-  assert.equal(posts.length,2,'the stream, then the races');
+  assert.equal(posts.length,1,'one announcement');
   assert.ok(posts.every(call=>call.path===`/channels/${ANNOUNCES}/messages`));
   // 1. The stream, with the event it streams (Coupe GT3, stream time 20h45): the only ping.
   const live=posts[0].body,embed=live.embeds[0],text=JSON.stringify(embed);
@@ -76,24 +76,21 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   assert.equal(live.embeds.length,1,'one visual frame, not several embeds');
   // Without Cloudflare's browser: the poster's text, short (no weather, no note).
   assert.match(embed.description,/^# 📺 Stream à 20h45\n\*\*avec \[tdz\]\(https:\/\/twitch.tv\/tdz\)\*\*/);
-  assert.match(text,/Coupe GT3/);assert.doesNotMatch(text,/6h de Spa/);
+  assert.match(text,/Coupe GT3/);
   assert.match(text,/`AMS2` `OPEN`/);assert.match(text,/Départ \*\*21h00\*\*/);assert.match(text,/1 \/ 20/);
   assert.match(text,/\*\*21h20\*\* · Manche 1/);assert.match(text,/\*\*22h00\*\* · Manche 2/);
   assert.doesNotMatch(text,/pluie|météo|☀️/i);
   assert.ok(embed.image,'the banner goes with the stream');
-  // No « Regarder le stream »: the streamer posts his own message when he goes live (Nathan, 2026-11-07).
-  assert.deepEqual(live.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
-  assert.equal(live.components[0].components[1].custom_id,`absent:${EVENT}`);
-  // 2. The other races: no ping, no stream, no banner; one line per crew with its pilots.
-  const races=posts[1].body,other=JSON.stringify(races.embeds[0]);
-  assert.equal(races.content,'');
-  assert.deepEqual(races.allowed_mentions,{parse:[]});assert.equal(races.flags,4096);
-  assert.match(races.embeds[0].description,/^## 📅 [A-Z][a-zé]+ \d+ /);
+  // 2. Below, the other races: one line per crew with its pilots.
+  const other=embed.description.slice(embed.description.indexOf('## Aussi aujourd’hui'));
+  assert.ok(embed.description.indexOf('Coupe GT3')<embed.description.indexOf('## Aussi aujourd’hui'));
   assert.match(other,/6h de Spa/);assert.doesNotMatch(other,/Coupe GT3|twitch/);
   assert.match(other,/`LMU` `PRIVÉE`/);assert.match(other,/fin \*\*jeu\. 02h30\*\*/);
-  assert.match(other,/\*\*20h00\*\* · Équipage A\\n-# Pilote 1/);
-  assert.ok(!races.embeds[0].image);
-  assert.deepEqual(races.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
+  assert.match(other,/\*\*20h00\*\* · Équipage A\n-# Pilote 1/);
+  // No « Regarder le stream »: the streamer posts his own message when he goes live (Nathan, 2026-11-07).
+  // The race's name once per row, on « S’inscrire » (2026-11-13).
+  assert.deepEqual(live.components.map(row=>row.components.map(button=>button.label)),[['S’inscrire · Coupe GT3','Absent'],['S’inscrire · 6h de Spa','Absent']]);
+  assert.equal(live.components[0].components[1].custom_id,`absent:${EVENT}`);
   // The next passes send nothing again.
   calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*60000),false);
@@ -113,11 +110,12 @@ test('a day without a stream: one message for the races, a plain alert without a
   assert.match(posts[0].body.embeds[0].description,/^## 📅 [A-Z][a-zé]+ \d+ /);
   assert.doesNotMatch(text,/twitch/);assert.ok(!posts[0].body.embeds[0].image,'no banner without a stream: it shows the streamer');
   assert.deepEqual(posts[0].body.components.map(row=>row.components[0].label),['S’inscrire · 6h de Spa','S’inscrire · Coupe GT3']);
-  // A stream time added later the same morning sends the stream's message, without a ping: the morning's chance is gone.
+  // A stream time added later the same morning edits that message, without a ping: the morning's chance is gone.
   DB.db.prepare("UPDATE events SET details=json_set(details,'$.streamTime','20:45') WHERE id=?").run(EVENT);calls.length=0;
   await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
-  assert.equal(sent(calls).length,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
-  assert.match(JSON.stringify(sent(calls)[0].body.embeds[0]),/Coupe GT3/);
+  assert.equal(sent(calls).length,0);
+  const edit=calls.find(call=>call.method==='PATCH');assert.deepEqual(edit.body.allowed_mentions,{parse:[]});
+  assert.match(edit.body.embeds[0].description,/^# 📺 Stream à 20h45/);
 });
 
 test('counts refresh silently; first publication after 9h and late activation are silent',async t=>{
@@ -128,9 +126,9 @@ test('counts refresh silently; first publication after 9h and late activation ar
   calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+11*60000),true);
   const edits=calls.filter(call=>call.method==='PATCH');
-  assert.equal(edits.length,1,'only the event changed');
+  assert.equal(edits.length,1,'the announcement, edited in place');
   assert.match(JSON.stringify(edits[0].body.embeds),/2 \/ 20/);
-  assert.equal([...messages.values()].length,2,'the stream and the races');
+  assert.equal([...messages.values()].length,1,'one announcement');
 
   DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),true);
@@ -208,8 +206,8 @@ test('an existing multi-message day is consolidated silently into the original i
   assert.equal(sent(calls).length,0,'reuses the original message');
   assert.ok(calls.some(call=>call.method==='DELETE'&&call.path.endsWith('/888888888888888888')));
   assert.ok(!calls.some(call=>JSON.stringify(call.body?.allowed_mentions||{}).includes('everyone')),'no ping again');
-  assert.equal(messages.size,2,'the stream and the races');
-  assert.equal(new Set(DB.db.prepare('SELECT message_id FROM discord_announcements').all().map(row=>row.message_id)).size,2);
+  assert.equal(messages.size,1,'one announcement');
+  assert.equal(new Set(DB.db.prepare('SELECT message_id FROM discord_announcements').all().map(row=>row.message_id)).size,1);
 });
 
 test('large daily announcements respect Discord embed, character and component limits',()=>{
@@ -248,7 +246,7 @@ test('a missing original intro is replaced before legacy cards are deleted, with
   assert.equal(replacement.body.flags,4096);
   assert.ok(calls.indexOf(replacement)<calls.findIndex(call=>call.method==='DELETE'));
   assert.ok(messages.has(DB.db.prepare("SELECT message_id FROM discord_announcements WHERE item='intro'").get().message_id));
-  assert.equal(messages.size,2);
+  assert.equal(messages.size,1);
 });
 
 test('an unchanged announcement deleted from Discord is recovered on the next refresh',async t=>{
@@ -256,8 +254,8 @@ test('an unchanged announcement deleted from Discord is recovered on the next re
   await announceCommunity(env,TDZ,settings(),MORNING);
   messages.clear();calls.length=0;
   await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
-  assert.equal(sent(calls).length,2);
-  assert.equal(messages.size,2);
+  assert.equal(sent(calls).length,1);
+  assert.equal(messages.size,1);
   assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
 });
 
@@ -274,7 +272,7 @@ test('a failed replacement preserves legacy cards and retries on the following p
   assert.ok(messages.has('888888888888888888'));
   globalThis.fetch=fetch;
   await announceCommunity(env,TDZ,settings(),MORNING+120000);
-  assert.equal(messages.size,2);
+  assert.equal(messages.size,1);
   assert.ok(!messages.has('888888888888888888'));
 });
 
@@ -351,9 +349,9 @@ test('two concurrent passes publish the day only once and release their lock',as
   const {DB,env,calls,settings}=setup(t);
   const results=await Promise.all([announceCommunity(env,TDZ,settings(),MORNING),announceCommunity(env,TDZ,settings(),MORNING)]);
   assert.equal(results.filter(Boolean).length,1);
-  assert.equal(sent(calls).length,2,'the stream and the races, once');
+  assert.equal(sent(calls).length,1,'the announcement, once');
   assert.equal(settings().lock_until,0);
-  assert.equal(DB.db.prepare("SELECT COUNT(DISTINCT message_id) AS n FROM discord_announcements").get().n,2);
+  assert.equal(DB.db.prepare("SELECT COUNT(DISTINCT message_id) AS n FROM discord_announcements").get().n,1);
 });
 
 test('a previously planned empty day is neither sent nor recreated after cancellations',async t=>{
@@ -432,10 +430,11 @@ test('a newly entered race is added without another ping',async t=>{
  assert.equal(sent(calls).length,0);assert.equal(messages.size,1);
  assert.match(JSON.stringify([...messages.values()]),/Coupe GT3/);
  assert.deepEqual(calls.find(call=>call.method==='PATCH').body.allowed_mentions,{parse:[]});
- // The streamed race entered after the morning: its stream message comes without a ping.
+ // The race streamed after the morning: the same message tells the stream, without a ping.
  DB.db.prepare("UPDATE events SET details=json_set(details,'$.streamTime','20:45') WHERE id=?").run(EVENT);calls.length=0;
  await announceCommunity(env,TDZ,settings(),MORNING+24*60000);
- assert.equal(sent(calls).length,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
+ assert.equal(sent(calls).length,0);assert.equal(messages.size,1);
+ const edit=calls.find(call=>call.method==='PATCH');assert.deepEqual(edit.body.allowed_mentions,{parse:[]});assert.match(edit.body.embeds[0].description,/Stream à 20h45/);
 });
 
 test('last cancellation removes the stale message; a later return never pings again',async t=>{
@@ -456,7 +455,7 @@ test('an accepted initial POST with a lost response is recovered without a secon
  };
  await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/Response lost/);
  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
- assert.equal(messages.size,2);assert.equal(sent(calls).length,2,'the stream once, then the races');
+ assert.equal(messages.size,1);assert.equal(sent(calls).length,1,'the announcement once');
  assert.equal(DB.db.prepare("SELECT pending_nonce FROM discord_announcements WHERE item='intro'").get().pending_nonce,'');
 });
 
@@ -466,7 +465,7 @@ test('a failed DB save after successful publication recovers the message before 
   const run=stmt.run.bind(stmt);stmt.run=async()=>{if(fail){fail=false;throw new Error('DB save failed');}return run();};}return stmt;};
  await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/DB save failed/);
  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
- assert.equal(sent(calls).length,2);assert.equal(messages.size,2);
+ assert.equal(sent(calls).length,1);assert.equal(messages.size,1);
  assert.ok(DB.db.prepare("SELECT message_id FROM discord_announcements WHERE item='intro'").get().message_id);
 });
 
@@ -476,7 +475,7 @@ test('when no accepted message is found, retrying the reserved nonce is silent',
  await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/Send failed/);
  const nonce=DB.db.prepare("SELECT pending_nonce FROM discord_announcements WHERE item='intro'").get().pending_nonce;
  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
- assert.equal(sent(calls).length,2);assert.equal(sent(calls)[0].body.nonce,nonce);
+ assert.equal(sent(calls).length,1);assert.equal(sent(calls)[0].body.nonce,nonce);
  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
 });
 
@@ -492,7 +491,7 @@ test('moving the announcement channel replaces it silently and cleans the old lo
  const {DB,env,calls,messages,settings}=setup(t);await announceCommunity(env,TDZ,settings(),MORNING);
  const layout=JSON.parse(settings().layout);layout.announce='666666666666666666';DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));calls.length=0;
  await announceCommunity(env,TDZ,settings(),MORNING+60000);
- assert.equal(sent(calls)[0].path,'/channels/666666666666666666/messages');assert.equal(messages.size,2);
+ assert.equal(sent(calls)[0].path,'/channels/666666666666666666/messages');assert.equal(messages.size,1);
  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
  assert.ok(calls.some(call=>call.method==='DELETE'&&call.path.startsWith(`/channels/${ANNOUNCES}/`)));
 });
@@ -510,7 +509,7 @@ test('the day\'s announcement keeps every start of the day, started or not, unti
   await announceCommunity(env,TDZ,settings(),MORNING);
   // 23h30 Paris (22h30 UTC): the 6h de Spa (21h Paris) and the event (22h Paris) have started; the message stays whole.
   await announceCommunity(env,TDZ,settings(),Date.parse('2026-10-28T22:30:00Z'));
-  assert.equal(messages.size,2);
+  assert.equal(messages.size,1);
   const text=JSON.stringify([...messages.values()]);
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);assert.doesNotMatch(text,/4h de Monza/);
 });
@@ -541,28 +540,28 @@ test('an endurance is announced only on its starts with a crew, without the pilo
   assert.doesNotMatch(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
 });
 
-test('with Cloudflare’s browser, each message is a poster made once at 7h30: the picture, the buttons, no text (Nathan, 2026-11-01)',async t=>{
+test('with Cloudflare’s browser, the announcement is one poster made once at 7h30: the picture, the buttons, no text (Nathan, 2026-11-01)',async t=>{
   const {DB,env,calls,settings}=setup(t);
   Object.assign(env,{CF_ACCOUNT_ID:'acc',BROWSER_RENDERING_TOKEN:'token',
     ASSETS:{fetch:async request=>new URL(request.url).pathname==='/images/endurance-manager-banner.webp'?new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}}):/^\/images\/fonts\/barlow-condensed-latin-\d+-normal\.woff2$/.test(new URL(request.url).pathname)?new Response(new Uint8Array([4,5,6])):new Response('',{status:404})}});
   await announceCommunity(env,TDZ,settings(),MORNING);
   const renders=calls.filter(call=>call.method==='RENDER'),posts=sent(calls);
-  assert.equal(renders.length,2);assert.equal(posts.length,2);
+  assert.equal(renders.length,1);assert.equal(posts.length,1);
   assert.ok(renders[0].path.endsWith('/accounts/acc/browser-rendering/screenshot'));
   // A short window and a full-page picture: the poster is as tall as its content, never padded to the window (2026-11-02).
   assert.ok(renders[0].body.viewport.height<=100);assert.equal(renders[0].body.screenshotOptions.fullPage,true);
   // A 720 px poster taken at 2×: on a phone, Discord shrinks the picture to the screen and the text stays readable (2026-11-03).
   assert.equal(renders[0].body.viewport.width,720);assert.equal(renders[0].body.viewport.deviceScaleFactor,2);
-  // The stream's poster: the banner, « STREAM 20H45 », the streamer; the races' one: no banner.
+  // The poster: the banner, « STREAM 20H45 », the streamer, then « AUSSI AUJOURD’HUI » and the other races (2026-11-13).
   // The site's pictures go inside the page: Cloudflare's browser does not fetch them from the site.
   assert.match(renders[0].body.html,/class=ban src="data:image\/webp;base64,AQID"/);
   // The font goes inside the page too: Barlow Condensed, its five weights (Nathan, 2026-11-03).
   assert.equal(renders[0].body.html.match(/@font-face\{font-family:"Barlow Condensed";font-weight:\d+;src:url\(data:font\/woff2;base64,BAUG\)/g).length,5);
   assert.match(renders[0].body.html,/STREAM 20H45/);assert.match(renders[0].body.html,/avec <b>tdz<\/b>/);
-  assert.doesNotMatch(renders[1].body.html,/class=ban/);assert.match(renders[1].body.html,/class=top>📅 [A-Z]+ \d+ [A-ZÉÛ]+<\/div>/);
+  const html=renders[0].body.html;assert.ok(html.indexOf('Coupe GT3')<html.indexOf('AUSSI AUJOURD’HUI')&&html.indexOf('AUSSI AUJOURD’HUI')<html.indexOf('6h de Spa'));
   assert.equal(posts[0].body.content,'@everyone');assert.deepEqual(posts[0].body.embeds,[]);
   assert.deepEqual(posts[0].body.attachments,[{id:0,filename:'annonce.png'}]);assert.ok(posts[0].file);
-  assert.deepEqual(posts[0].body.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
+  assert.deepEqual(posts[0].body.components.map(row=>row.components.map(button=>button.label)),[['S’inscrire · Coupe GT3','Absent'],['S’inscrire · 6h de Spa','Absent']]);
   // A late entrant: the poster stays as it is (checked, never edited, never made again).
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','Pilote 2',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r2',?,'start-e1','g2','Pilote 2','pilote 2','GT3','whole',0,'p2',?)`).run(EVENT,DEV_COMMUNITY);
@@ -588,7 +587,7 @@ test('when the poster cannot be made, the same facts go as text',async t=>{
   Object.assign(env,{CF_ACCOUNT_ID:'acc',BROWSER_RENDERING_TOKEN:'token',renderFails:true});
   await announceCommunity(env,TDZ,settings(),MORNING);
   const posts=sent(calls);
-  assert.equal(posts.length,2);assert.ok(!posts[0].file);
+  assert.equal(posts.length,1);assert.ok(!posts[0].file);
   assert.match(posts[0].body.embeds[0].description,/Stream à 20h45/);assert.equal(posts[0].body.content,'@everyone');
 });
 
@@ -696,7 +695,7 @@ test('a stream the streamer announced for his own endurance today is that endura
   assert.equal(posts[0].body.content,'@everyone');
   const live=JSON.stringify(posts[0].body);
   assert.match(live,/6h de Spa/);assert.doesNotMatch(live,/Le stream du 6h/);assert.match(live,/20h30/);
-  assert.ok(!posts.slice(1).some(post=>/6h de Spa/.test(JSON.stringify(post.body))),'the endurance once');
+  assert.equal(posts.length,1);assert.equal(posts[0].body.embeds[0].description.match(/6h de Spa/g).length,1,'the endurance once');
 });
 
 test('a stream announced for an event of today (a race) is that event’s stream, told once (Nathan, 2026-11-11)',async t=>{
@@ -709,5 +708,27 @@ test('a stream announced for an event of today (a race) is that event’s stream
   const posts=sent(calls),live=JSON.stringify(posts[0].body);
   assert.equal(posts[0].body.content,'@everyone');
   assert.match(live,/Coupe GT3/);assert.doesNotMatch(live,/Soirée Coupe/);assert.match(live,/20h30/);
-  assert.ok(!posts.slice(1).some(post=>/Coupe GT3/.test(JSON.stringify(post.body))),'the event once');
+  assert.equal(posts.length,1);assert.equal(posts[0].body.embeds[0].description.match(/Coupe GT3/g).length,1,'the event once');
+});
+
+test('an event of the calendar for the same race as an endurance of today is told once, by the endurance (Nathan, 2026-11-13)',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  // TDZ, 13 Nov.: « Production Endurance Challenge » both as an iRacing event (OPEN, streamed) and as the endurance.
+  DB.db.prepare("UPDATE events SET name='6H DE SPA',departures=? WHERE id=?").run(JSON.stringify([{id:'start-e1',startsAt:Date.parse('2026-10-28T19:30:00Z')}]),EVENT);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const posts=sent(calls),body=posts[0].body,text=body.embeds[0].description;
+  assert.equal(posts.length,1);assert.equal(body.content,'@everyone');
+  assert.equal(text.match(/6h de Spa/gi).length,1,'one block');assert.doesNotMatch(text,/AMS2/);
+  // The stream time given on the event is the endurance's.
+  assert.match(text,/^# 📺 Stream à 20h45/);
+  assert.deepEqual(body.components.map(row=>row.components.map(button=>button.label)),[['S’inscrire','Absent']]);
+  assert.equal(body.components[0].components[1].custom_id,`absent:${RACE}`);
+});
+
+test('a day announced in two messages by the previous layout keeps them until midnight (2026-11-13)',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  for(const [item,id] of [['intro','888888888888888881'],['races','888888888888888882']])DB.db.prepare(`INSERT INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,message_id,content_hash,checked_at,created_at,ping_attempted)
+    VALUES(?,?,?,?,0,?,?,?,'split-v1:poster:abc',?,?,1)`).run(DEV_COMMUNITY,'2026-10-28',item,item==='intro'?'intro':'part',GUILD,ANNOUNCES,id,MORNING,MORNING);
+  await announceCommunity(env,TDZ,settings(),MORNING+HOUR);
+  assert.equal(calls.filter(call=>call.path.startsWith('/channels/')).length,0,'not redrawn, not doubled');
 });
