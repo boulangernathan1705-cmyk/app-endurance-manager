@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v2.14 — 13 novembre 2026
+
+### ✨ Améliorations
+
+- **Affiche du jour sur Discord** : une seule affiche par jour. Le stream en haut, puis « Aussi aujourd'hui » avec les autres courses.
+- **Une course, un bloc** : une course qui existe en event et en endurance n'apparaît qu'une fois sur l'affiche, avec ses boutons « S'inscrire » et « Absent ».
+
 ## v2.13.4 — 13 novembre 2026
 
 ### 🐛 Corrections
