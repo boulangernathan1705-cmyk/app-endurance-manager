@@ -43,7 +43,7 @@
 .presence-boundary {
   grid-row: 1;
   position: relative;
-  left: auto !important;
+  left: auto;
   min-width: 0;
 }
 .presence-boundary::after {

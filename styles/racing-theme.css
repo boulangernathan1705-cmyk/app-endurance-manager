@@ -106,7 +106,7 @@ header::after {
   background: transparent;
 }
 .brand-mark-frame,
-.brand-copy { display:none !important; }
+.brand-copy { display:none; }
 #navigation {
   margin-left: auto;
   padding: 8px;

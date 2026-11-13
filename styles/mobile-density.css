@@ -8,7 +8,7 @@
     display: none !important;
   }
   .crew-pilot-accordion-body {
-    padding-top: 8px !important;
+    padding-top: 8px;
   }
 
   /* Unassigned pilots: keep the edit action useful without making it dominate the card. */
@@ -133,11 +133,11 @@
     padding: 8px 9px !important;
   }
   .crew-compact-team strong {
-    font-size: 13px !important;
+    font-size: 13px;
   }
   .crew-compact-pilots,
   .crew-compact-car {
-    font-size: 10px !important;
+    font-size: 10px;
   }
 }
 
