@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.3 — 13 novembre 2026
+
+### 🐛 Corrections
+
+- **Catégorie du bot Discord** : quand elle reprend les droits de la catégorie au-dessus, elle ne recopie que les droits que le bot possède lui-même. Discord n'a plus de raison de la refuser.
+
 ## v2.13.2 — 12 novembre 2026
 
 ### 🐛 Corrections
