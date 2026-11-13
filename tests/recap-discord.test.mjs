@@ -916,6 +916,17 @@ test('a right lost on the server is found within the hour: what needs it is skip
   assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),[]);
 });
 
+test('in the admins\' own channels, no right on the whole server is asked for: nothing shown, nothing rung (Les Moissonneuses, 2026-11-13)',async t=>{
+  const {DB,env}=setup(t,{rights:'0'});
+  await saveBotRecap(env,COMMUNITY,settingsRow('general',RECAP,RECAP));
+  DB.db.prepare("UPDATE community_recap_settings SET missing_rights='[\"Voir les salons\"]' WHERE community_id=?").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES(?,?,0)").run('300000000000000003','Admin');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at,discord_admin) VALUES(?,?,'[]','member',?,0,1)").run(DEV_COMMUNITY,'300000000000000003',Math.floor(Date.now()/1000));
+  assert.deepEqual(await checkBotRights(env,COMMUNITY,await botRecapSettings(env,COMMUNITY),NOW,{force:true}),[]);
+  assert.deepEqual(missingRights(await botRecapSettings(env,COMMUNITY)),[],'an old warning goes');
+  assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE kind='discord_error'").get().n,0);
+});
+
 test('a refusal on the bot\'s category alone is shown without ringing, and never stops the cards',async t=>{
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
   const {DB,env,channels,messages,setFailure}=setup(t,{rights:String(268520464n|THREADS)});
