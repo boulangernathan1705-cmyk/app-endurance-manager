@@ -68,8 +68,6 @@
   /* Course pilot cards */
   .ux-course-overview { gap: 12px; }
   .ux-unassigned-section { padding: 12px; }
-  .ux-unassigned-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-  .ux-unassigned-grid > .pilot-row { padding: 10px 12px; }
   .pilot-row { gap: 6px; }
   .pilot-main { gap: 7px 10px; }
   .pilot-row > .edit-button {
@@ -155,6 +153,5 @@
 }
 
 @media (min-width: 1180px) {
-  .ux-unassigned-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .crew-roster { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
 }

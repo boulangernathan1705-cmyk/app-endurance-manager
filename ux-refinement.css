@@ -4,12 +4,11 @@
 .ux-error-dialog h2{margin:0 0 10px;font-size:24px}.ux-error-dialog p{margin:0 0 22px;color:#dce5e3;line-height:1.55}.ux-error-dialog button{min-width:180px}
 .fold-registration[hidden]{display:none}
 .ux-course-overview{display:grid;gap:14px}
-.ux-unassigned-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ux-unassigned-grid>.pilot-row{margin:0;border:1px solid var(--border);background:var(--panel2)}
 .ux-crew-bucket{overflow:hidden;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.012)}.ux-crew-bucket>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;cursor:pointer;font-weight:900;list-style:none}.ux-crew-bucket>summary::-webkit-details-marker{display:none}.ux-crew-bucket>summary strong{display:grid;place-items:center;min-width:30px;height:30px;padding:0 8px;border-radius:999px;background:var(--panel3);border:1px solid var(--border)}
 .ux-crew-bucket[open]>summary{border-bottom:1px solid var(--border)}.ux-crew-bucket-body{display:grid;gap:10px;padding:12px}.ux-crew-bucket .crew-pilot-accordion{margin:0}.ux-unavailable-bucket{opacity:.82}
 .crew-roster{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}.crew-roster>li{margin:0!important;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.018)}
 [data-crew-builder-open][hidden],[data-crew-builder-panel][hidden]{display:none!important}
-@media(max-width:760px){.ux-unassigned-grid,.crew-roster{grid-template-columns:1fr}}
+@media(max-width:760px){.crew-roster{grid-template-columns:1fr}}
 
 
 /* Keep pilot names, preferences and controls comfortably inside each roster card. */

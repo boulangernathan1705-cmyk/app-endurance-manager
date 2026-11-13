@@ -180,11 +180,6 @@
   padding:9px!important;
   border-radius:9px!important;
 }
-.ux-unassigned-grid{gap:8px!important}
-.ux-unassigned-grid>.pilot-row{
-  padding:9px!important;
-  border-radius:8px!important;
-}
 
 @media (max-width:760px){
   .departure-fold>summary{

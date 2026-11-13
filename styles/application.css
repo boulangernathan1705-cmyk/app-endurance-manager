@@ -206,12 +206,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .crew-form h3, .crew-form p, .crew-form .toolbar { grid-column: 1/-1; margin: 0; }
 .crew-form label { font-size: 14px; }
 .crew-form input, .crew-form select { display: block; margin-top: 8px; }
-.pilot-wishes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
-.pilot-wishes > div { min-width: 0; }
-.pilot-wishes dt { color: #aabac0; font-size: 12px; }
-.pilot-wishes dd { margin: 2px 0 0; color: #f1f5f6; overflow-wrap: anywhere; }
 .crew-assignment select { min-width: 0; flex: 1; }
-@media (max-width: 600px) { .pilot-wishes { grid-template-columns: minmax(0, 1fr); } }
 @media(max-width:700px) {
   .departure-switcher { padding: 16px 12px 12px; gap: 8px; }
   .departure-arrows { flex-direction: column; gap: 4px; }

@@ -472,8 +472,7 @@ html[data-game] #app .crew-owner-badge { text-transform: none !important; letter
 
 /* Intérieur d'une tuile ouverte : des lignes, plus de cartes dans les cartes. */
 html[data-game] #app .crew-unified-body { border: 0; background: none; }
-html[data-game] #app .crew-unified-body .pilot-row,
-html[data-game] #app .ux-unassigned-grid .pilot-row {
+html[data-game] #app .crew-unified-body .pilot-row {
   border: 0 !important;
   border-top: 1px solid var(--border, #292d31) !important;
   border-radius: 0 !important;
@@ -1297,16 +1296,6 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
 }
 
 /* Pilots without a crew: cards in the style of the crew cards (frame, top stripe, category logo, name, car). */
-html[data-game] #app .ux-unassigned-grid > .pilot-row { display: flex !important; flex-direction: column !important; gap: 8px !important; padding: 12px 14px !important; border: 1px solid #2b3538 !important; border-top: 3px solid var(--community-accent, #52d3d8) !important; border-radius: 10px !important; background: #101617 !important; }
-html[data-game] #app .ux-unassigned-grid > .pilot-row.ux-current-pilot { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
-html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main { display: grid !important; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 2px 10px !important; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo { grid-column: 1; grid-row: 1 / span 2; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo .category-logo { width: 34px; height: auto; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > :not(.pilot-category-logo) { grid-column: 2; justify-self: start; min-width: 0; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-name { font-size: 16px !important; font-weight: 800 !important; color: #f4f6f5 !important; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-car { color: var(--muted, #92979c) !important; font-size: 13px !important; font-weight: 400 !important; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-preference { font-size: 12.5px; color: #c7d0d4; }
-html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-self: flex-end; }
 
 /* Members page: tabs, member cards, settings cards. */
 
@@ -1552,9 +1541,8 @@ html[data-game] #app .planning-body .ux-course-crews-body { grid-template-column
 html[data-game] #app .planning-body .ux-course-crews-body { gap: 10px; }
 html[data-game] #app .planning-body .ux-course-pilots-accordion { padding: 0 0 4px; }
 html[data-game] #app .planning-body .ux-course-pilots-body, html[data-game] #app .planning-body .ux-unassigned-section { padding: 0 !important; margin: 0; border: 0; background: none; }
-html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; gap: 10px !important; padding-top: 4px; }
 /* « Ton équipage » / your own entry: the white ring drawn inside the card, so every card keeps the same edges. */
-html[data-game] #app .planning-body .crew-card-shell.is-mine, html[data-game] #app .planning-body .ux-unassigned-grid > .pilot-row.ux-current-pilot { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: -2px; }
+html[data-game] #app .planning-body .crew-card-shell.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: -2px; }
 html[data-game] #app .planning-body .pilot-row { min-width: 0; }
 /* Crews of a start: no empty room kept under the pilots. */
 html[data-game] #app .planning-body .crew-tile-summary .crew-compact-pilots { min-height: 0; }
@@ -1662,12 +1650,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   html[data-game] #app .crew-tile-summary .crew-compact-pilots { min-height: 0; }
   html[data-game] #app .crew-tile-summary { gap: 6px; padding: 10px 12px; }
   /* Drivers without a crew: one card per row, full width (logo, name and car, then the whole timeline). */
-  html[data-game] #app .ux-unassigned-grid { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
-  html[data-game] #app .ux-unassigned-grid > .pilot-row { width: auto !important; max-width: none !important; }
-  html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main { grid-template-columns: 30px minmax(0, 1fr) !important; }
-  html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo { grid-column: 1 !important; grid-row: 1 / span 2 !important; }
-  html[data-game] #app .ux-unassigned-grid .pilot-main > :not(.pilot-category-logo) { grid-column: 2 !important; }
-  html[data-game] #app .ux-unassigned-grid .presence-timeline { width: 100% !important; }
   html[data-game] #app .ux-course-pilots-body, html[data-game] #app .ux-unassigned-section { padding: 4px 0; }
   /* Administration: the tabs on two columns (never out of the screen). */
 }
@@ -2099,15 +2081,7 @@ body:has([data-category-entry]) { overflow: hidden; }
 .pilot-category-logo.is-several { width: auto !important; gap: 4px; }
 .pilot-category-logo.is-several img, .pilot-category-logo.is-several .category-logo { max-width: 30px; }
 /* A driver without a crew entered in several categories: the logos side by side, the logo column as wide as them. */
-html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: auto minmax(0, 1fr) !important; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { width: auto !important; max-width: none !important; justify-self: start !important; gap: 4px; }
-html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several img { width: 30px !important; max-width: 30px !important; height: auto !important; max-height: 30px !important; object-fit: contain; }
 /* In the narrow cards of the computer grid, the logos take their own line above the name. */
-@media (min-width: 761px) {
-  html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: minmax(0, 1fr) !important; }
-  html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { grid-row: auto !important; order: -1; }
-  html[data-game] #app .ux-unassigned-grid .pilot-main:has(> .pilot-category-logo.is-several) > * { grid-column: 1 !important; }
-}
 /* Tableau des disponibilités (TM). */
 .ce-board { margin: 16px 0; border: 1px solid #2b3336; border-radius: 14px; background: rgba(13, 17, 18, .88); }
 .ce-board > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
