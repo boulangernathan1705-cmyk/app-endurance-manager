@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.4 — 13 novembre 2026
+
+### 🐛 Corrections
+
+- **Alerte de droits du bot Discord** : une communauté où le bot poste seulement dans les salons des admins n'est plus prévenue à tort qu'il manque un droit.
+
 ## v2.13.3 — 13 novembre 2026
 
 ### 🐛 Corrections
