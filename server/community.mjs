@@ -36,13 +36,6 @@ export async function allCommunities(env) {
   return ((await env.DB.prepare('SELECT * FROM communities ORDER BY created_at, id').all()).results || []).map(toCommunity);
 }
 
-// Communities with a module enabled (scheduled tasks: iRacing import, weekly Discord recap).
-export async function communitiesWith(env, module) {
-  const rows = (await env.DB.prepare('SELECT * FROM communities ORDER BY created_at, id').all()).results || [];
-  return rows.map(toCommunity).filter(community => community.modules[module] === true);
-}
-
-export const hasModule = (community, module) => community?.modules?.[module] === true;
 
 // Address of the site of a community: <slug>.BASE_DOMAIN, or the main address for the community of the main
 // address (COMMUNITY) and when there is a single site.

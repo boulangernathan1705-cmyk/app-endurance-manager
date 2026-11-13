@@ -1,4 +1,4 @@
-import {contextHelpMarker as helpContext,carLogo,carLabel} from './core.mjs';
+import {contextHelpMarker as helpContext,carLabel} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';

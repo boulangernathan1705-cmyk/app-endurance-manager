@@ -788,11 +788,7 @@ export default {
       const message=String(error.message);
       if (message.includes('participant_already_assigned')) return json({error:'Ce pilote est déjà affecté à un équipage sur ce départ. Modifie son inscription existante, ou retire-le de l’équipage avant de changer de catégorie ou de le déclarer indisponible.'},409);
       if (message.includes('participant_required') || message.includes('participant_fixed')) return json({error:'Recharge le site pour retrouver la fiche du pilote.'},409);
-      if (message.includes('no such table: communities') || message.includes('no such column: community_id')) return json({error:'La mise à jour de la base attend la migration 0034_communities.sql.'},503);
       if (message.includes('community_mismatch') || message.includes('community_fixed') || message.includes('community_invalid')) return json({error:'Action refusée : ces données appartiennent à une autre communauté.'},403);
-      if (message.includes('no such table: participants') || message.includes('no such column: r.participant_id')) return json({error:'La mise à jour de la base attend la migration 0012_participants.sql.'},503);
-      if (message.includes('no such column: locked')) return json({error:'La mise à jour de la base attend la migration 0015_crew_lock.sql.'},503);
-      if (message.includes('no such column: owner_user_id')) return json({error:'La mise à jour de la base attend la migration 0016_crew_ownership.sql.'},503);
       if (message.includes('UNIQUE constraint failed: crew_members.')) return json({error:'Ce pilote appartient déjà à un équipage sur ce départ. Actualise la page.'},409);
       if (message.includes('crew_category_in_use')) return json({error:'Ce pilote est affecté à un équipage de cette catégorie. Retire d’abord son affectation pour changer de catégorie.'},409);
       if (message.includes('crew_event_in_use')) return json({error:'Un équipage utilise encore ce départ ou cette catégorie. Supprime ou modifie cet équipage avant de continuer.'},409);

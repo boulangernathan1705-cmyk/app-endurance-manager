@@ -862,6 +862,12 @@ async function takeDown(env, community, row, budget) {
   Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:''});
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
+  // The races changed on the site since the last pass (queueWeeklySync): all of them go first, two per pass.
+  const startedAt = Date.now();
+  const changed = new Set(((await env.DB.prepare('SELECT event_id FROM discord_pending_races WHERE community_id=? AND queued_at<=?')
+    .bind(community.id,startedAt).all()).results || []).map(row => row.event_id));
+  if (priority) changed.add(priority);
+  let waiting = [];
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
   const layout = parseLayout(settings.layout), sameServer = settings.guild_id === community.discordGuildId;
@@ -939,15 +945,19 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   if (scope) {
     const eligible = await openRaces(env,community,events,scope,timestamp);
     const ids = [...new Set([...rows.filter(row => isRaceRow(row) && !row.closed_at).map(row => row.event_id),...eligible])];
-    // The race just changed first, then the ones checked longest ago.
-    const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
+    // The races just changed first, then the ones checked longest ago.
+    const ordered = ids.sort((a,b) => changed.has(b) - changed.has(a) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     // Repair scattered existing categories even when all recap messages are unchanged.
     // The normal creation path already orders newly created categories.
     if (!layout && rows.some(row => isRaceRow(row) && row.category_id && !row.closed_at)) {
       const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
       await placeCategory(env,community,settings.guild_id,channels,null,settings,budget);
     }
-    for (const eventId of ordered.filter(id => raceOn(settings, events.find(item => item.id === id))).slice(0,2)) {
+    const published = ordered.filter(id => raceOn(settings, events.find(item => item.id === id)));
+    // Changed races left for the next pass: another pass soon.
+    waiting = published.slice(2).filter(id => changed.has(id));
+    if (waiting.length) more = true;
+    for (const eventId of published.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
@@ -973,6 +983,9 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     if (community.modules?.crewChannels === true) await placeVoices(env,community,settings.guild_id,current,budget);
     if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
   }
+  // Done: the changes seen at the start are forgotten, except the races left for the next pass (a change since stays).
+  await env.DB.prepare(`DELETE FROM discord_pending_races WHERE community_id=? AND queued_at<=? AND event_id NOT IN (${waiting.map(() => '?').join(',')})`)
+    .bind(community.id,startedAt,...waiting).run();
   return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {})};
 }
 export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {

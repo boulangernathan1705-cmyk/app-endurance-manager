@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {flushDiscord} from '../server/worker-with-migrations.mjs';
+import {flushDiscord,queueWeeklySync} from '../server/worker-with-migrations.mjs';
 import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
 import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
@@ -553,6 +553,42 @@ test('après un changement, la course modifiée est mise à jour en premier', as
   DB.db.prepare("UPDATE discord_recap_publications SET checked_at=CASE event_id WHEN 'race-c' THEN 99 ELSE 1 END").run();
   calls.length=0;await syncBotRecaps(env,NOW+10,COMMUNITY,false,'race-c');
   assert.equal(DB.db.prepare("SELECT checked_at FROM discord_recap_publications WHERE event_id='race-c'").get().checked_at,NOW+10);
+});
+
+test('deux courses changées dans les mêmes 2 minutes : Discord met les deux à jour', async t => {
+  const {DB,env,messages}=setup(t);
+  // flushDiscord works at the real time: the races are tomorrow for real.
+  const at=Date.now();
+  for(const id of ['race-a','race-b','race-c','race-d'])race(DB,id,'Course '+id,'spa',[{id:'start-'+id,startsAt:at+DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  for(let i=0;i<4;i++)await syncBotRecaps(env,at+i,COMMUNITY);
+  // The two changed races are the ones checked most recently: only the queue can bring them first.
+  DB.db.prepare("UPDATE discord_recap_publications SET checked_at=CASE event_id WHEN 'race-c' THEN 99 WHEN 'race-d' THEN 98 ELSE 1 END").run();
+  for(const id of ['race-c','race-d']){
+    DB.db.prepare('UPDATE events SET name=? WHERE id=?').run('Renommée '+id,id);
+    const pending=[];
+    queueWeeklySync(env,{waitUntil:promise=>pending.push(promise)},new Request('https://site.example/api/races/'+id,{method:'PATCH'}),id,COMMUNITY.id);
+    await Promise.all(pending);
+  }
+  for(let pass=0;pass<4&&await flushDiscord(env,1);pass++);
+  for(const id of ['race-c','race-d']){
+    const row=DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(id);
+    assert.match(JSON.stringify(messages.get(row.message_id)),new RegExp('Renommée '+id),id+' à jour sur Discord');
+  }
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM discord_pending').get().n,0,'file vide à la fin');
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM discord_pending_races').get().n,0,'courses oubliées une fois faites');
+});
+
+test('plus de deux courses changées : un passage de plus, aucune oubliée', async t => {
+  const {DB,env}=setup(t);
+  for(const id of ['race-a','race-b','race-c','race-d'])race(DB,id,'Course '+id,'spa',[{id:'start-'+id,startsAt:NOW+DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  for(let i=0;i<4;i++)await syncBotRecaps(env,NOW+i,COMMUNITY);
+  for(const id of ['race-b','race-c','race-d'])DB.db.prepare('INSERT INTO discord_pending_races(community_id,event_id,queued_at) VALUES(?,?,0)').run(COMMUNITY.id,id);
+  assert.equal((await syncBotRecaps(env,NOW+10,COMMUNITY)).more,true);
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM discord_pending_races').get().n,1,'la troisième attend le passage suivant');
+  assert.notEqual((await syncBotRecaps(env,NOW+20,COMMUNITY)).more,true);
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM discord_pending_races').get().n,0);
 });
 
 test('les catégories des courses se rangent par simu, LMU puis iRacing, chacune par date',async t=>{

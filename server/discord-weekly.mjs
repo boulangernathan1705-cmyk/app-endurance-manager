@@ -5,7 +5,7 @@ import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance, streamIsRace, isEnduranceTwin} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -254,7 +254,7 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   // A stream announced during a streamed endurance start is that endurance's stream: shown once (Nathan, 2026-11-08).
   const streamed = endurances.filter(item => item.endurance.info.streamTime);
   // An event of the calendar for the same race as one of these endurances (same name, same start): told once, by the endurance.
-  const sameRace = item => !isStream(item.row) && endurances.some(endu => nameKey(endu.row.name) === nameKey(item.row.name) && Math.abs(endu.startsAt - item.startsAt) < 3600000);
+  const sameRace = item => !isStream(item.row) && endurances.some(endu => isEnduranceTwin({name:item.row.name, startsAt:item.startsAt}, {name:endu.row.name, startsAt:endu.startsAt}));
   for (let index = starts.length - 1; index >= 0; index--) if (sameRace(starts[index])) starts.splice(index, 1);
   const link = (parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {}).stream || '';
   const crews = new Map();

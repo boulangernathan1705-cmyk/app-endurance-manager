@@ -8,7 +8,6 @@ import {
   categoryEmojiName,
   isInParisWeek,
   isWeeklyDiscordMutation,
-  nextParisWeek,
   parisWeek
 } from '../server/discord-weekly-format.mjs';
 import {loadWeeklyDiscordSnapshot, syncWeeklyDiscord} from '../server/discord-weekly.mjs';
@@ -42,7 +41,6 @@ test('la semaine utilitaire suit lundi-dimanche en heure de Paris',()=>{
   const sunday=Date.parse('2026-09-13T19:00:00Z');
   const mondayAfterMidnightParis=Date.parse('2026-09-13T22:30:00Z');
   assert.equal(parisWeek(sunday).key,'2026-09-07');
-  assert.equal(nextParisWeek(sunday).key,'2026-09-14');
   assert.equal(parisWeek(mondayAfterMidnightParis).key,'2026-09-14');
   assert.equal(isInParisWeek(Date.parse('2026-09-12T12:00:00Z'),parisWeek(sunday)),true);
   assert.equal(isInParisWeek(Date.parse('2026-09-14T12:00:00Z'),parisWeek(sunday)),false);

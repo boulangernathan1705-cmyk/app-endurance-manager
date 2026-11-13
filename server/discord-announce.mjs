@@ -4,19 +4,18 @@
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay, raceUrl} from './discord-weekly-format.mjs';
+import {parisDay, raceUrl} from './discord-weekly-format.mjs';
 import {posterModel, posterHtml, posterText, renderPoster} from './discord-poster.mjs';
-import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
+import {discordRequest} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails, streamDuringEndurance, streamIsRace} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance, streamIsRace, isEnduranceTwin} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 
-const MINUTE = 60000, HOUR = 60 * MINUTE;
-const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+const MINUTE = 60000;
 // Only the first morning evaluation can ping (7h30–9h Paris). Later publications are silent.
 const FROM = 7 * 60 + 30, UNTIL = 9 * 60;
 // A small Discord budget also bounds cleanup of legacy separate messages.
@@ -150,18 +149,6 @@ async function streamTimes(env, rows, community = null, timestamp = Date.now()) 
   }
   return streams;
 }
-// What a row of the announcement shows now (null: the race is gone from the site).
-export async function announcePayload(env, community, row, timestamp, counts = null, stream = '') {
-  const site = {...siteOf(env, community), streamUrl:stream}, absent = discordAbsentButton(env);
-  if (row.kind === 'intro') return buildAnnounceIntro(counts || {events:0, races:0}, site);
-  if (row.kind === 'event' || row.kind === 'stream') {
-    const event = await eventSnapshot(env, community, row.item, timestamp);
-    return !event ? null : event.stream ? buildAnnounceStream(event, site, timestamp) : buildAnnounceEvent(event, site, timestamp, absent);
-  }
-  const race = await raceSnapshot(env, community, row.item, timestamp);
-  return race ? buildAnnounceRace(race, site, timestamp, await botCategoryEmojis(env, timestamp), absent) : null;
-}
-
 // One community: today's list made in the morning, its messages sent in order, then the counts kept up to date.
 // Returns whether Discord was asked something.
 export async function announceCommunity(env, community, settings, timestamp = Date.now()) {
@@ -351,8 +338,8 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   // by the endurance, as on the calendar (Nathan, 2026-11-13: two « Production Endurance Challenge » on one poster).
   const twins = new Map(), twinRows = [];
   for (const item of items.filter(item => item.kind === 'event')) {
-    const race = items.find(other => other.kind === 'race' && sameName(other.data.name, item.data.name)
-      && (other.data.departures || []).some(start => Math.abs(Number(start.startsAt) - item.data.startsAt) < HOUR));
+    const race = items.find(other => other.kind === 'race'
+      && (other.data.departures || []).some(start => isEnduranceTwin(item.data, {name:other.data.name, startsAt:start.startsAt})));
     if (race) twins.set(item.row.item, race.row.item);
   }
   for (let index = items.length - 1; index >= 0; index--) if (twins.has(items[index].row.item)) {
