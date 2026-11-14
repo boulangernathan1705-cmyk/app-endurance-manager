@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import scheduledWorker, {scheduledJob} from '../server/worker-with-migrations.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -41,9 +41,18 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
     if(method==='GET'&&path.includes('/messages?after=0'))return reply(200,state.messages || []);
     if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035,errors:{parent_id:{_errors:[{message:'Unknown channel'}]}}});
-    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||CREW_BOT_PERMISSIONS):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
+    // As Discord: a rule may only set or change rights the bot holds (unless administrator), or the whole request is refused.
+    const held=BigInt(state.botRights?(state.botPermissions||CREW_BOT_PERMISSIONS):'0');
+    const writes=(method==='POST'&&path===`/guilds/${GUILD}/channels`)||(method==='PATCH'&&/^\/channels\/\d+$/.test(path));
+    if(writes&&body?.permission_overwrites&&!(held&8n)){
+      const before=method==='PATCH'?(state.channels.find(item=>`/channels/${item.id}`===path)?.permission_overwrites||[]):[];
+      const bits=(rules,key)=>new Map(rules.map(item=>[`${item.type}:${item.id}`,BigInt(item[key]||0)]));
+      const changed=key=>{const now=bits(body.permission_overwrites,key),was=bits(before,key);return [...new Set([...now.keys(),...was.keys()])].some(id=>((now.get(id)||0n)^(was.get(id)||0n))&~held);};
+      if(changed('allow')||changed('deny'))return reply(403,{code:50013});
+    }
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`&&state.refuseCopy&&(body?.permission_overwrites||[]).some(item=>item.id!=='app-id'&&item.id!==GUILD))return reply(403,{code:50013});
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`){const channel={...body,id:String(next++)};state.channels.push(channel);return reply(200,channel);}
     const channelPath=path.match(/^\/channels\/(\d+)$/);
@@ -376,7 +385,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   await sync(at+HOUR);
   assert.equal(DB.db.prepare('SELECT message_id FROM crew_discord').get().message_id,null);
   let mark=discord.calls.length;await sync(at+2*HOUR);
-  assert.deepEqual(since(discord.calls,mark),[`GET /channels/${row.voice_id}`,`POST /channels/${row.voice_id}/messages`]);
+  assert.deepEqual(since(discord.calls,mark),[`GET /channels/${row.voice_id}`,`GET /guilds/${GUILD}/members/app-id`,`GET /guilds/${GUILD}/roles`,`POST /channels/${row.voice_id}/messages`]);
   // Someone deletes the voice channel: a new one, with the recap.
   const now=DB.db.prepare('SELECT * FROM crew_discord').get();
   discord.unknownChannel.add(`/channels/${row.voice_id}/messages/${now.message_id}`);
@@ -384,7 +393,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   await sync(at+3*HOUR);
   assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,null);
   mark=discord.calls.length;await sync(at+4*HOUR);
-  const again=discord.calls.slice(mark);
+  const again=discord.calls.slice(mark).filter(call=>call.method!=='GET');
   assert.deepEqual(again[0].body,{name:'🏎️ LMU · 6h SPA · Retour',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
 });
@@ -510,7 +519,7 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   mark=discord.calls.length;await sync(at+60_000);assert.deepEqual(created(discord.calls,mark),[]);
 });
 
-test('a category rule with a right the bot lacks: the voice retries with public access only', async () => {
+test('a category rule with a right the bot lacks: the voice is made at once, without that right', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
@@ -524,8 +533,26 @@ test('a category rule with a right the bot lacks: the voice retries with public 
   assert.equal((await req(base+'/crews','POST',{name:'Copie',category:'GT3'},'pilot')).status,201);
   const mark=discord.calls.length;await sync(at);
   const posts=created(discord.calls,mark);
-  assert.equal(posts.length,2);assert.deepEqual(posts[1].body.permission_overwrites,BOT_ACCESS);assert.equal(posts[1].body.parent_id,'600000000000000007');
+  assert.equal(posts.length,1);assert.deepEqual(posts[0].body.permission_overwrites,BOT_ACCESS);assert.equal(posts[0].body.parent_id,'600000000000000007');
   assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
+});
+
+test('a bot invited with an older link (no Speak, no voice features): the voice is still made, with what it can give', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  discord.state.botPermissions='1117200';
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Ancien lien',category:'GT3'},'pilot')).status,201);
+  const mark=discord.calls.length;await sync(at);
+  const posts=created(discord.calls,mark);
+  assert.equal(posts.length,1);
+  assert.equal(posts[0].body.permission_overwrites.find(item=>item.id===GUILD).allow,String(1117200n&~(1n<<4n)),'only the rights the bot holds');
+  assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_crew_discord').get()?.last_error ?? null,null);
 });
 
 test('« un fil par course » with LMU and iRacing apart: an iRacing race\'s voices go in « iRacing », not « LMU »', async () => {
