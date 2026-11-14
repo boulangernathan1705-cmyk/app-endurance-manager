@@ -159,6 +159,14 @@ export function withoutEdgeScripts(response) {
   return kept;
 }
 
+// The minute decides the job: even = Discord pass (every 2 min), odd ending in 1 or 5 = crews (about every 5 min),
+// 7, 23, 37 and 53 = maintenance (once per quarter hour). Never two jobs in the same minute.
+export function scheduledJob(minute) {
+  if (minute % 2 === 0) return 'discord';
+  if (minute % 10 === 1 || minute % 10 === 5) return 'crews';
+  return [7, 23, 37, 53].includes(minute) ? 'maintenance' : '';
+}
+
 export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
@@ -195,20 +203,23 @@ export default {
     return development ? markDevelopmentResponse(page, env) : page;
   },
 
-  // Separate schedules keep crew vocals responsive without accelerating the heavier maintenance jobs.
+  // One Cron Trigger, every minute (Cloudflare's free plan allows 5 for the whole account, shared with other Workers).
+  // Each minute runs at most one job, so each run keeps its own request budget.
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
+    const job = scheduledJob(at.getUTCMinutes());
     const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
-    // Every 5 minutes: crew vocals and race reminders, within their own request budget.
-    if (controller?.cron === '*/5 * * * *') {
+    if (!job) return;
+    // About every 5 minutes: crew vocals and race reminders.
+    if (job === 'crews') {
       run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:8}));
       return;
     }
     // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the day's announcement, the changes on the
     // site, else a setting still being put in place (the first one, or Monday's new week, takes several passes), else
     // the pilots added to the races' threads.
-    if (controller?.cron === '*/2 * * * *') {
+    if (job === 'discord') {
       // The setting and the threads take turns first, so that neither waits on the other.
       // A setting being put in place or taken off moves its crews' voices too (« Tout retirer » in minutes, not a quarter of an hour).
       const voices = community => community.modules?.crewChannels === true ? syncCrewDiscord(env, Date.now(), {community, requests:6}) : null;
@@ -227,20 +238,20 @@ export default {
     run('Notifications cleanup failed', () => purgeNotifications(env));
     // Races changed in a community whose Discord does not follow the site (no recap set): forgotten after a day.
     run('Discord queue cleanup failed', () => env.DB.prepare('DELETE FROM discord_pending_races WHERE queued_at<?').bind(at.getTime() - 86400000).run());
-    // Maintenance stays every 15 minutes; crew sync has its own schedule, so it is not duplicated here.
+    // Crew sync has its own minutes, so it is not duplicated here.
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
     // The Discord cards of crew requests no longer useful (start passed, pilot placed or gone).
     if (env.DISCORD_BOT_TOKEN) run('Crew request cards cleanup failed', () => cleanCrewRequestCards(env, at.getTime()));
-    // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
+    // :07 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
-    // :15 Official team and solo iRacing endurances, once for the whole platform.
+    // :23 Official team and solo iRacing endurances, once for the whole platform.
     if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
-    // :30 The weekly Discord recaps checked longest ago.
+    // :37 The weekly Discord recaps checked longest ago.
     if (slot === 2) run('Discord weekly scheduled sync failed', () => syncDueRecaps(env, 3));
-    // :00 and :45: a Discord setting still being put in place (or taken off) goes on (not next to the iRacing import).
+    // :07 and :53: a Discord setting still being put in place (or taken off) goes on (not next to the iRacing import).
     else if (slot !== 1) run('Discord pending sync failed', () => syncDueRecaps(env, 1, at.getTime(), {pending:true}));
-    // :45 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
+    // :53 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
     if (slot === 3) run('Special times or showcase failed', async () => {
       if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});
       await refreshShowcaseIfDue(env, at);
