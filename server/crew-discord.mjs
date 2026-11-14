@@ -443,14 +443,25 @@ async function raceCategoryGone(env, row) {
   await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(row.row_community).run();
   throw new Stop('gone');
 }
+// What the bot holds in a category (on the server without one): the only rights it may write in a channel there. Read once
+// per run; unknown: all (Discord then says).
+async function heldIn(env, budget, guildId, parent) {
+  budget.bots ??= {};
+  budget.bots[guildId] ??= await Promise.all([discord(env,budget,'GET',`/guilds/${guildId}/members/${env.DISCORD_CLIENT_ID}`), discord(env,budget,'GET',`/guilds/${guildId}/roles`)])
+    .catch(error => { if (error instanceof Stop) throw error; return null; });
+  if (!budget.bots[guildId]) return ~0n;
+  const [member, roles] = budget.bots[guildId];
+  return effectivePermissions(roles, member, guildId, parent || {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
+}
 async function createVoice(env, budget, row, setting, body) {
   const parent = voiceParent(row, setting);
   try {
     const category = parent ? await discord(env,budget,'GET',`/channels/${parent}`) : null;
+    const held = await heldIn(env, budget, row.guild_id, category);
     const create = rules => discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,...(parent ? {parent_id:parent} : {}),...rules});
     // If copied permissions are refused, retry with only public voice and bot access.
-    return await create({permission_overwrites:withPublicVoiceAccess(category?.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID)})
-      .catch(error => { if (parent && error?.code === 50013) return create({permission_overwrites:withPublicVoiceAccess([],row.guild_id,env.DISCORD_CLIENT_ID)}); throw error; });
+    return await create({permission_overwrites:withPublicVoiceAccess(category?.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID,held)})
+      .catch(error => { if (parent && error?.code === 50013) return create({permission_overwrites:withPublicVoiceAccess([],row.guild_id,env.DISCORD_CLIENT_ID,held)}); throw error; });
   } catch (error) {
     const parentGone = error?.status === 404 && error?.code === 10003 || error?.status === 400 && error?.errors?.parent_id;
     if (row.race_category && parentGone) await raceCategoryGone(env, row);
@@ -550,7 +561,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     const hasMemberRules = (voice.permission_overwrites || []).some(item => !(String(item.id) === String(env.DISCORD_CLIENT_ID) && Number(item.type) === 1));
     const rules = hasMemberRules ? voice.permission_overwrites : target.permission_overwrites;
     await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:parent, name:voiceName(row, crewName),
-      permission_overwrites:withPublicVoiceAccess(rules,row.guild_id,env.DISCORD_CLIENT_ID)});
+      permission_overwrites:withPublicVoiceAccess(rules,row.guild_id,env.DISCORD_CLIENT_ID,await heldIn(env,budget,row.guild_id,parent ? target : null),voice.permission_overwrites)});
     row.parent_id = parent;
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
     if (!row.race_category && parent) await sortVoices(env, budget, row, parent);
@@ -558,7 +569,9 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   // Repair existing vocals once after a voice policy upgrade, preserving unrelated restrictions.
   if (!opened && !row.recap_hash?.startsWith(VOICE_POLICY_VERSION) && (row.parent_id || null) === parent) {
     const voice = await sendInChannel(env,budget,row,'GET',`/channels/${row.voice_id}`);
-    const rules = withPublicVoiceAccess(voice.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID);
+    const category = voice.parent_id ? await discord(env,budget,'GET',`/channels/${voice.parent_id}`).catch(error => { if (error instanceof Stop) throw error; return null; }) : null;
+    const held = voice.parent_id && !category ? ~0n : await heldIn(env,budget,row.guild_id,category);
+    const rules = withPublicVoiceAccess(voice.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID,held,voice.permission_overwrites);
     if (JSON.stringify(rules) !== JSON.stringify(voice.permission_overwrites || [])) {
       await sendInChannel(env,budget,row,'PATCH',`/channels/${row.voice_id}`,{permission_overwrites:rules});
     }
