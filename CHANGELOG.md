@@ -1,5 +1,16 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.6 — 14 novembre 2026
+
+### 🐛 Corrections
+
+- **Vieux iPhone et iPad** : le site ne plante plus sur les Safari d'avant la version 15.4.
+- **Discord** : deux courses modifiées presque en même temps sont toutes les deux mises à jour tout de suite. Avant, la première pouvait attendre jusqu'à une heure.
+
+### 🧹 Ménage
+
+- Le site charge moins de style (576 → 459 ko) et le code Discord est plus simple, sans rien changer à l'écran.
+
 ## v2.13.5 — 13 novembre 2026
 
 ### 🐛 Corrections
