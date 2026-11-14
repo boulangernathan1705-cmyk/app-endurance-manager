@@ -46,11 +46,6 @@ export function dayLabel(timestamp) {
   return date ? `${weekdayFormat.format(date)} ${dayFormat.format(date)}` : '';
 }
 
-// "samedi 26 septembre 2026", for tooltips and screen readers.
-export function fullDateLabel(timestamp) {
-  const date = validStamp(timestamp);
-  return date ? fullDateFormat.format(date) : '';
-}
 
 const weekdayLongFormat = format({weekday:'long'});
 const dayMonthLongFormat = format({day:'numeric', month:'long'});

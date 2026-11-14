@@ -5,7 +5,7 @@ import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
 import {raceHourLabel,raceEndLabel,raceDayGroups,LONG_RACE_HOURS} from '../timeline.mjs';
 import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
-import {isAdmin,app,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
+import {isAdmin,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 import {timeInput,endBefore} from './solo-form.mjs';
 import {streamSpan,streamUrl} from '../../shared/stream.mjs';
@@ -52,11 +52,6 @@ export function draftFor(departure) {
   }
   return state.drafts[departure.id];
 }
-export function statusLabel(status) {
-  if(status==='whole')return 'Toute la course'; if(status==='unavailable')return 'Indisponible';
-  return String(status||'').split(',').map(part=>/^h\d+$/.test(part)?`Heure ${part.slice(1)}`:({beginning:'Début',middle:'Milieu',end:'Fin'}[part]||'')).filter(Boolean).join(' · ');
-}
-function slotLabel(status) { return status==='whole'?'Toute la course':status==='unavailable'?'Indisponible':String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>`Heure ${part.slice(1)}`).join(' · ')||statusLabel(status); }
 
 // A pilot's card: his hours as a thin bar under the hours of the race, as in the crews.
 export function renderRegistration(reg,departure,event,showCarPreference=true) {

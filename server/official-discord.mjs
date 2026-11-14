@@ -5,7 +5,7 @@
 // « 📌 INFOS », its anchor.
 // The bot needs the Administrator right for this (taken back afterwards): channels, roles and the server's
 // Community mode (forums and the announcement channel need it).
-const API = 'https://discord.com/api/v10';
+import {discordFetch} from './discord-api.mjs';
 const TEXT = 0, VOICE = 2, CATEGORY = 4, NEWS = 5, FORUM = 15;
 const VIEW = 1n << 10n, SEND = 1n << 11n, SEND_IN_THREADS = 1n << 38n, CREATE_THREADS = 1n << 35n;
 const STAFF_RIGHTS = (1n << 13n) | (1n << 34n) | (1n << 22n) | (1n << 23n) | (1n << 24n) | (1n << 40n); // messages, threads, mute, deafen, move, timeout
@@ -38,11 +38,9 @@ export const sameName = (a, b) => key(a) === key(b);
 const key = name => String(name || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 async function discord(env, method, path, body) {
-  const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
-    headers:{Authorization:`Bot ${String(env.DISCORD_BOT_TOKEN || '').trim()}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
-  const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw Object.assign(new Error(`Discord ${response.status}`), {status:response.status, code:data?.code});
-  return data;
+  const answer = await discordFetch(env, method, path, body);
+  if (!answer.ok) throw Object.assign(new Error(`Discord ${answer.status}`), {status:answer.status, code:answer.code || undefined});
+  return answer.data;
 }
 
 function overwrites(access, guildId, staffId, botId) {

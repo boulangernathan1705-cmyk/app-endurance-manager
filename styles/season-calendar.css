@@ -21,7 +21,7 @@
 .cal-day:nth-child(7n){border-right:0}
 .cal-day.out{background:rgba(0,0,0,.22)}
 .cal-day.past .cal-ev,.cal-day.past .cal-dots{opacity:.45}
-.cal-num{all:unset;font-weight:700;font-size:13px;line-height:1;color:var(--muted);height:22px;display:flex;align-items:center;cursor:default}
+.cal-num{all:unset;font-weight:700;font-size:13px;line-height:1;color:var(--muted);height:22px;display:flex;align-items:center}
 .cal-day.today .cal-num span{background:var(--accent);color:#06100b;border-radius:99px;padding:4px 7px}
 .cal-ev{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:34px minmax(0,1fr);gap:2px 8px;align-items:center;padding:6px 8px 6px 6px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--c);color:var(--text);min-width:0}
 .cal-ev:hover,.cal-ev:focus-visible{border-color:var(--c)}
@@ -38,8 +38,7 @@
 .cal-main .cal-grid{flex:1;min-height:0;grid-template-rows:auto repeat(var(--weeks,5),minmax(0,1fr))}
 .cal-main .cal-day{min-height:0;overflow:hidden;padding:4px 6px;gap:3px}
 .cal-main .cal-day .cal-num{height:18px}
-.cal-main .cal-day .cal-ev{grid-template-columns:24px minmax(0,1fr);gap:0 6px;padding:3px 6px 3px 4px;flex:none}
-.cal-main .cal-day .cal-ev .event-access-logo,.cal-main .cal-day .cal-ev .cal-logo-text{width:24px;height:24px;font-size:15px}
+.cal-main .cal-day .cal-ev{gap:0 6px;flex:none}
 .cal-main .cal-day .cal-ev b{font-size:12.5px}.cal-main .cal-day .cal-ev small{font-size:11.5px}
 .cal-main .cal-day .cal-live{display:none}
 .cal-t{display:none;font-style:normal}
@@ -72,7 +71,7 @@
   .cal-month{padding:8px 10px}.cal-shift{padding:8px 9px}
   .cal-dow{padding:7px 0;text-align:center;font-size:11px}
   .cal-body{display:flex;flex-direction:column;height:auto;gap:10px}
-  .cal-main .cal-grid{flex:none;grid-template-rows:auto}
+  .cal-main .cal-grid{flex:none}
   .cal-main .cal-grid{grid-template-rows:auto;grid-auto-rows:58px}
   .cal-main .cal-day,.cal-day{height:58px;min-height:0;padding:5px 2px;align-items:center;justify-content:flex-start;gap:5px;overflow:hidden}
   .cal-day > .cal-ev,.cal-day > .cal-cell,.cal-day > .cal-more{display:none !important}

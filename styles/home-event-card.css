@@ -3,24 +3,24 @@
 /* Les catégories et leurs inscrits restent disponibles dans le détail de l'événement.
    Sur la carte d'accueil, les compteurs pilotes/équipages suffisent et évitent une ligne redondante. */
 .event-card.event-card-harmonized .event-category-badges {
-  display: none !important;
+  display: none;
 }
 
 @media (min-width: 761px) {
   .event-card.event-card-harmonized {
-    min-height: 178px !important;
-    padding: 17px 292px 17px 24px !important;
+    min-height: 178px;
+    padding: 17px 292px 17px 24px;
   }
 
   .event-card.event-card-harmonized .event-card-body {
-    display: grid !important;
+    display: grid;
     grid-template-rows: auto auto auto auto;
     align-content: start;
     min-height: 142px;
   }
 
   .event-card.event-card-harmonized .event-name {
-    margin: 0 !important;
+    margin: 0;
     color: #f4ead9;
     font-size: 18px;
     font-weight: 900;
@@ -28,22 +28,16 @@
   }
 
   .event-card.event-card-harmonized .circuit-visual {
-    position: absolute !important;
-    top: 50% !important;
-    right: 16px !important;
-    width: 258px !important;
-    height: 146px !important;
-    transform: translateY(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .event-card.event-card-harmonized .circuit-visual img {
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
   }
 
@@ -54,22 +48,19 @@
 
 @media (max-width: 760px) {
   .event-card.event-card-harmonized .event-card-body {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) 96px !important;
+    display: grid;
     grid-template-areas:
       "title map"
       "info map"
       "crews crews"
-      "status status" !important;
-    column-gap: 8px;
-    row-gap: 7px;
+      "status status";
     align-items: start;
     width: 100%;
     min-width: 0;
   }
 
   .event-card.event-card-harmonized .event-name {
-    margin: 0 !important;
+    margin: 0;
     line-height: 1.12;
   }
 

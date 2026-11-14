@@ -106,7 +106,7 @@ header::after {
   background: transparent;
 }
 .brand-mark-frame,
-.brand-copy { display:none !important; }
+.brand-copy { display:none; }
 #navigation {
   margin-left: auto;
   padding: 8px;
@@ -296,23 +296,6 @@ textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,
 
 
 /* Header/navigation refinement for wide screens. */
-.site-nav-shell {
-  position: relative;
-  z-index: 8;
-  width: min(calc(100% - 44px),1180px);
-  height: 0;
-  margin: 0 auto;
-}
-.site-nav-shell #navigation {
-  position: absolute;
-  top: 22px;
-  right: 0;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-}
 .home-create-event {
   margin: 7px 0 10px;
 }
@@ -329,20 +312,6 @@ textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,
 }
 
 @media (max-width: 700px) {
-  .site-nav-shell {
-    width: 100%;
-    height: auto;
-    margin: 0;
-    padding: 8px 10px 0;
-  }
-  .site-nav-shell #navigation {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 6px;
-    width: 100%;
-    margin: 0;
-  }
   .home-create-event { margin: 7px 0 10px; }
   .home-create-event .primary-button { width: 100%; min-width: 0; }
 }

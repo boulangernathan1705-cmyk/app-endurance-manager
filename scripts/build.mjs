@@ -62,7 +62,10 @@ function stylesheetPaths(source, sourceName) {
   });
 }
 
+// Classic script, so it runs before every module of the page.
+const compatScriptTag = '<script src="/front/compat.js"></script>';
 function injectI18n(source) {
+  if (!source.includes('/front/compat.js')) source = source.replace(/<head>/i, `<head>\n${compatScriptTag}`);
   if (source.includes('/front/i18n.mjs') && source.includes('/front/i18n-content.mjs') && source.includes('/front/language-toggle-layout.mjs')) return source;
   if (!source.includes('</head>')) throw new Error('Document HTML sans balise </head> pour le sélecteur de langue.');
   return source.replace('</head>', `${i18nScriptTag}\n</head>`);
@@ -71,12 +74,12 @@ function injectI18n(source) {
 // Each deployment gets its own id: an open page compares it with /front/version.json and reloads itself once
 // a newer version is online (front/app/auto-refresh.mjs).
 const BUILD_ID = (process.env.WORKERS_CI_COMMIT_SHA || '').slice(0, 12) || Date.now().toString(36);
-function productionHtml(source) {
+function productionHtml(source, stylesheets = ['/app.css']) {
   let firstStylesheet = true;
   const bundled = source.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
     if (!firstStylesheet) return '';
     firstStylesheet = false;
-    return '<link rel="stylesheet" href="/app.css">';
+    return stylesheets.map(href => `<link rel="stylesheet" href="${href}">`).join('\n');
   });
   return injectI18n(bundled).replace('</head>', `<meta name="em-build" content="${BUILD_ID}">\n</head>`);
 }
@@ -98,39 +101,38 @@ const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
 const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
 const sourceWall = await readFile(root + 'mur.html', 'utf8');
 const sourceCharte = await readFile(root + 'charte.html', 'utf8');
-const paths = [
-  ...stylesheetPaths(sourceIndex,'index.html'),
-  ...stylesheetPaths(sourceGame,'game.html'),
-  ...stylesheetPaths(sourceMembers,'members.html'),
-  ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
-  ...stylesheetPaths(sourceHelp,'help.html'),
-  ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
-  ...stylesheetPaths(sourceCombos,'fiches-combo.html'),
-  ...stylesheetPaths(sourceLive,'mur-des-stands.html'),
-  ...stylesheetPaths(sourceWall,'mur.html'),
-  ...stylesheetPaths(sourceCharte,'charte.html'),
-];
-// styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
-// shared bundle whichever page lists it first.
+// One stylesheet shared by every page (/app.css, in the browser's cache once), plus a small one for the few pages
+// whose styles nothing else uses (/page-<name>.css, loaded after it). Order inside: first appearance across the
+// pages, styles/ux-refresh.css (the final layer) last.
+const PAGES = [
+  ['index.html', sourceIndex], ['game.html', sourceGame], ['members.html', sourceMembers], ['diagnostics.html', sourceDiagnostics],
+  ['help.html', sourceHelp], ['demande-communaute.html', sourceRequest], ['fiches-combo.html', sourceCombos],
+  ['mur-des-stands.html', sourceLive], ['mur.html', sourceWall], ['charte.html', sourceCharte]];
+const PAGE_ONLY = {'styles/combos.css':'combos', 'styles/live.css':'live', 'styles/pit-wall.css':'wall',
+  'styles/charte.css':'charte', 'styles/diagnostics.css':'diagnostics', 'help.css':'help'};
 const FINAL_LAYER = 'styles/ux-refresh.css';
-const uniqueStylesheetPaths = [...new Set(paths)].sort((a, b) => (a === FINAL_LAYER) - (b === FINAL_LAYER));
+const pagePaths = PAGES.map(([name, source]) => stylesheetPaths(source, name));
+const order = [...new Set(pagePaths.flat())].sort((a, b) => (a === FINAL_LAYER) - (b === FINAL_LAYER));
+async function writeBundle(name, list) {
+  const parts = [];
+  for (const path of list) parts.push(`/* ${path} */\n${await inlineCss(path)}`);
+  const css = parts.join('\n\n') + '\n';
+  if (/^\s*@import\s+url\(/mi.test(css)) throw new Error('Le bundle CSS contient encore un @import après compilation.');
+  await writeFile(new URL(name, out), css);
+}
+await writeBundle('app.css', order.filter(path => !PAGE_ONLY[path]));
+for (const name of new Set(Object.values(PAGE_ONLY))) await writeBundle(`page-${name}.css`, order.filter(path => PAGE_ONLY[path] === name));
+const pageHtml = name => {
+  const index = PAGES.findIndex(([page]) => page === name);
+  const extra = [...new Set(pagePaths[index].map(path => PAGE_ONLY[path]).filter(Boolean))];
+  return productionHtml(PAGES[index][1], ['/app.css', ...extra.map(item => `/page-${item}.css`)]);
+};
+const uniqueStylesheetPaths = order;
 
-const cssParts = [];
-for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
-const bundledCss = cssParts.join('\n\n') + '\n';
-if (/^\s*@import\s+url\(/mi.test(bundledCss)) throw new Error('Le bundle CSS contient encore un @import après compilation.');
-await writeFile(new URL('app.css', out), bundledCss);
-
-await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
-await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
-await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
-await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
-await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
-await writeFile(new URL('fiches-combo.html', out), productionHtml(sourceCombos));
-await writeFile(new URL('mur-des-stands.html', out), productionHtml(sourceLive));
-await writeFile(new URL('mur.html', out), productionHtml(sourceWall));
-await writeFile(new URL('charte.html', out), productionHtml(sourceCharte));
-const gameHtml = productionHtml(sourceGame);
+await writeFile(new URL('index.html', out), pageHtml('index.html'));
+for (const name of ['members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html', 'charte.html'])
+  await writeFile(new URL(name, out), pageHtml(name));
+const gameHtml = pageHtml('game.html');
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 await writeFile(new URL('events/index.html', out), gameHtml);

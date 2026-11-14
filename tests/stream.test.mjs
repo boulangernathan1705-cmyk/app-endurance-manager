@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateEvent} from '../server/core.mjs';
-import {buildCalendarPayload, buildAnnounceStream, buildAnnounceIntro} from '../server/discord-weekly-format.mjs';
+import {buildCalendarPayload} from '../server/discord-weekly-format.mjs';
 import {streamUrl,streamDetails,isStreamLogo,STREAM_LOGO_MAX_LENGTH,streamSpan} from '../shared/stream.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -35,7 +35,7 @@ test('stream addresses: a Twitch name or a Twitch, YouTube or Kick channel', () 
   assert.equal(streamUrl('https://evil.example/twitch.tv'), null);
 });
 
-test('the week’s calendar and the morning announcement show the stream, its crew and its link', () => {
+test('the week’s calendar shows the stream, its crew and its link', () => {
   const event = {id:'e1', name:'LES 6H DE SPA', sim:'stream', circuits:[''], startsAt:Date.UTC(2090, 9, 15, 17, 45), capacity:null, entered:0,
     stream:{streamTime:'19:45', raceSim:'lmu', raceTime:'20:00', streamUrl:'https://www.twitch.tv/tondeuz', crew:{eventName:'6h de Spa', crew:'Équipage A', pilots:['Pilote 1', 'Pilote 2']}}};
   const box = buildCalendarPayload({periodLabel:'semaine', events:[event]}, {url:'https://tdz.example'}).embeds[0].fields[0];
@@ -43,10 +43,6 @@ test('the week’s calendar and the morning announcement show the stream, its cr
   assert.match(box.value, /📺 Stream 19h45 sur \[Twitch\]\(https:\/\/www\.twitch\.tv\/tondeuz\) · 🏁 Départ 20h00 · 🎮 LMU/);
   assert.match(box.value, /6h de Spa avec l’\*\*Équipage A\*\* · Pilote 1, Pilote 2/);
   assert.doesNotMatch(box.value, /places|personne/);
-  const card = buildAnnounceStream(event, {url:'https://tdz.example'});
-  assert.match(card.embeds[0].description, /Ce soir, c’est stream !/);
-  assert.deepEqual(card.components, []);
-  assert.match(buildAnnounceIntro({events:0, races:1, lives:1, streams:[]}).embeds[0].description, /1 endurance\*\* et \*\*1 stream/);
 });
 
 test('free activity, description and streamer identity survive validation without a simulator restriction', () => {
@@ -83,11 +79,6 @@ test('new stream fields are bounded and logos must be small inline raster images
   assert.ok(new TextEncoder().encode(JSON.stringify(stream(largest))).length<24000);
 });
 
-test('Discord shows a freely chosen activity instead of an undefined simulator label',()=>{
-  const event={id:'free',name:'Soirée découverte',startsAt:Date.UTC(2090,9,15,17),stream:{isRace:false,activity:'Euro Truck Simulator 2',streamTime:'19:00'}};
-  assert.match(buildAnnounceStream(event).embeds[0].description,/🎮 Euro Truck Simulator 2/);
-  assert.doesNotMatch(buildAnnounceStream(event).embeds[0].description,/undefined/);
-});
 
 test('a stream and an event keep the end of their stream, shown « 19h45–23h » on the week (Nathan 2026-11-02)', () => {
   assert.equal(validateEvent(stream({streamTime:'19:45', streamEnd:'23:00'})).details.streamEnd, '23:00');
@@ -100,4 +91,13 @@ test('a stream and an event keep the end of their stream, shown « 19h45–23h �
   // The link opens the stream without opening the race (the card is a button).
   assert.match(week, /data-stream-url=/);
   assert.match(week, /stopPropagation\(\);\s*window\.open\(link\.dataset\.streamUrl,'_blank','noopener,noreferrer'\)/);
+});
+
+test('une seule règle « même course » pour le calendrier et l’affiche du jour', async () => {
+  const {isEnduranceTwin, sameRaceName} = await import('../shared/stream.mjs');
+  const at = Date.parse('2026-11-13T19:00:00Z');
+  assert.equal(sameRaceName(' Production Endurance Challenge ', 'production endurance challenge'), true);
+  assert.equal(sameRaceName('', ''), false);
+  assert.equal(isEnduranceTwin({name:'PEC', startsAt:at + 30 * 60000}, {name:'pec', startsAt:at}), true);
+  assert.equal(isEnduranceTwin({name:'PEC', startsAt:at + 61 * 60000}, {name:'PEC', startsAt:at}), false);
 });

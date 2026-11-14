@@ -1,3 +1,4 @@
+import {discordFetch, botToken} from './discord-api.mjs';
 import {effectivePermissions,withBotAccess,VOICE_ACCESS,PUBLIC_VOICE_ACCESS} from './discord-permissions.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {administrators} from './core.mjs';
@@ -12,7 +13,7 @@ import {crewVoiceName} from './crew-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
-const API = 'https://discord.com/api/v10', DAY = 86400000;
+const DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
 const RECAP_FORMAT = 13;
 const MAX_CHANNELS = 450;
@@ -104,35 +105,15 @@ export function recapError(error) {
   if (error.status === 401) return 'Le bot du site n’est pas disponible. Préviens le gestionnaire de la plateforme.';
   return 'Discord ne répond pas. Le récap réessaiera automatiquement.';
 }
-export const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-// Discord's « try again in … » when it is short enough to wait for (in ms), else null.
-export async function retryAfter(response) {
-  if (response.status !== 429) return null;
-  const data = await response.clone().json().catch(() => null), seconds = Number(data?.retry_after ?? response.headers.get('retry-after'));
-  return Number.isFinite(seconds) && seconds <= 5 ? Math.ceil(seconds * 1000) + 50 : null;
-}
-// The last request allowed on this route for now (Discord says so in its answer): wait for the next one, rather than be refused.
-export async function spaceOut(response) {
-  const seconds = Number(response.headers?.get?.('x-ratelimit-reset-after'));
-  if (response.headers?.get?.('x-ratelimit-remaining') === '0' && Number.isFinite(seconds) && seconds > 0) await pause(Math.min(seconds, 5) * 1000 + 50);
-}
+
 async function discord(env, method, path, body, budget = {left:12}) {
-  if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
+  if (!botToken(env)) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
   if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
   // Something made, moved or deleted on the server (not a message): its list of channels is read again.
   if (method !== 'GET' && !path.includes('/messages')) budget.moved = true;
-  // A FormData body carries a file (the announcement's poster): sent as is, with more time.
-  const form = typeof FormData !== 'undefined' && body instanceof FormData;
-  const call = () => fetch(API + path, {method, signal:AbortSignal.timeout(form ? 20000 : 8000),
-    headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body && !form ? {'Content-Type':'application/json'} : {})}, body:form ? body : body ? JSON.stringify(body) : undefined});
-  let response = await call();
-  // A short wait asked by Discord (several requests at once on the same server): one more try, the first was not done.
-  const wait = await retryAfter(response);
-  if (wait !== null) response = await (await pause(wait), call());
-  await spaceOut(response);
-  const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
-  return data;
+  const answer = await discordFetch(env, method, path, body);
+  if (!answer.ok) throw Object.assign(new Error('Discord indisponible'), {status:answer.status, code:answer.code || undefined, path});
+  return answer.data;
 }
 // The same requests for the morning announcement (server/discord-announce.mjs).
 export const discordRequest = discord;
@@ -862,6 +843,12 @@ async function takeDown(env, community, row, budget) {
   Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:''});
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
+  // The races changed on the site since the last pass (queueWeeklySync): all of them go first, two per pass.
+  const startedAt = Date.now();
+  const changed = new Set(((await env.DB.prepare('SELECT event_id FROM discord_pending_races WHERE community_id=? AND queued_at<=?')
+    .bind(community.id,startedAt).all()).results || []).map(row => row.event_id));
+  if (priority) changed.add(priority);
+  let waiting = [];
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
   const layout = parseLayout(settings.layout), sameServer = settings.guild_id === community.discordGuildId;
@@ -939,15 +926,19 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   if (scope) {
     const eligible = await openRaces(env,community,events,scope,timestamp);
     const ids = [...new Set([...rows.filter(row => isRaceRow(row) && !row.closed_at).map(row => row.event_id),...eligible])];
-    // The race just changed first, then the ones checked longest ago.
-    const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
+    // The races just changed first, then the ones checked longest ago.
+    const ordered = ids.sort((a,b) => changed.has(b) - changed.has(a) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     // Repair scattered existing categories even when all recap messages are unchanged.
     // The normal creation path already orders newly created categories.
     if (!layout && rows.some(row => isRaceRow(row) && row.category_id && !row.closed_at)) {
       const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
       await placeCategory(env,community,settings.guild_id,channels,null,settings,budget);
     }
-    for (const eventId of ordered.filter(id => raceOn(settings, events.find(item => item.id === id))).slice(0,2)) {
+    const published = ordered.filter(id => raceOn(settings, events.find(item => item.id === id)));
+    // Changed races left for the next pass: another pass soon.
+    waiting = published.slice(2).filter(id => changed.has(id));
+    if (waiting.length) more = true;
+    for (const eventId of published.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
@@ -973,6 +964,9 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     if (community.modules?.crewChannels === true) await placeVoices(env,community,settings.guild_id,current,budget);
     if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
   }
+  // Done: the changes seen at the start are forgotten, except the races left for the next pass (a change since stays).
+  await env.DB.prepare(`DELETE FROM discord_pending_races WHERE community_id=? AND queued_at<=? AND event_id NOT IN (${waiting.map(() => '?').join(',')})`)
+    .bind(community.id,startedAt,...waiting).run();
   return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {})};
 }
 export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {

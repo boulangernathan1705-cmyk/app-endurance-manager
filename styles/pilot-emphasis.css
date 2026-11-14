@@ -68,14 +68,7 @@
 }
 
 .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
-  grid-column: 4;
-  grid-row: 2;
-  justify-self: end;
-  min-height: 32px;
   margin-top: 5px;
-  padding: 5px 11px;
-  font-size: 12px;
-  white-space: nowrap;
   z-index: 1;
 }
 
@@ -92,7 +85,7 @@
 
 /* Stabilise le survol des accordéons d'équipage. */
 .crew-pilot-accordion-summary {
-  transition: none !important;
+  transition: none;
 }
 
 .crew-pilot-accordion-summary:hover {
@@ -105,8 +98,6 @@
   }
 
   .departure-fold[id^="departure-"] > summary {
-    grid-template-columns: 38px minmax(0, 1fr) 26px;
-    grid-template-rows: auto auto auto auto;
     gap: 7px 10px;
   }
 
@@ -126,9 +117,6 @@
   }
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
-    grid-column: 2;
-    grid-row: 4;
-    justify-self: start;
     margin-top: 2px;
   }
 

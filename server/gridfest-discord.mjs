@@ -1,24 +1,21 @@
 import {assignStreamerWaitlist, streamersOf, eventDetails, gridfestPasswordValid} from '../shared/grindfest.mjs';
 import {fail, hash, id, now} from './core.mjs';
+import {discordFetch} from './discord-api.mjs';
 
-const API = 'https://discord.com/api/v10';
 const BATCH_SIZE = 8; // At most 24 Discord calls, within the Worker's subrequest budget.
 const LEASE_SECONDS = 120;
 
 async function discord(env, method, path, data) {
-  let response;
-  try {
-    response = await fetch(API + path, {method, headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type':'application/json'},
-      ...(data ? {body:JSON.stringify(data)} : {}), signal:AbortSignal.timeout(8000)});
-  } catch { throw Error('Discord ne répond pas. Réessaie plus tard.'); }
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    if (response.status === 429) fail(429, 'Discord limite les envois. Attends un peu avant de réessayer.');
-    if (Number(error.code) === 50007) throw Error('MP bloqués : le pilote doit autoriser les messages privés du serveur.');
-    if (response.status === 404 && Number(error.code) === 10007) throw Error('Ce pilote n’est plus membre du Discord de la communauté.');
+  let answer;
+  try { answer = await discordFetch(env, method, path, data); }
+  catch { throw Error('Discord ne répond pas. Réessaie plus tard.'); }
+  if (!answer.ok) {
+    if (answer.status === 429) fail(429, 'Discord limite les envois. Attends un peu avant de réessayer.');
+    if (answer.code === 50007) throw Error('MP bloqués : le pilote doit autoriser les messages privés du serveur.');
+    if (answer.status === 404 && answer.code === 10007) throw Error('Ce pilote n’est plus membre du Discord de la communauté.');
     throw Error('Envoi refusé par Discord. Vérifie le bot et les messages privés du pilote.');
   }
-  return response.json();
+  return answer.data;
 }
 
 async function entries(env, community, event) {

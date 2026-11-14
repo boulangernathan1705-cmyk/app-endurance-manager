@@ -17,7 +17,7 @@ Devise : « La simplicité, c'est la sophistication suprême » : interface la p
 | Pages endurance/events (front) | `front/app/*.mjs` (point d'entrée `app.js`), vues `*-view.mjs`, formulaires `*-form.mjs` |
 | Administration | `front/members-page.mjs` |
 | Données partagées front/serveur | `shared/` (catalogue voitures/circuits, durées, stream) |
-| Styles | `styles/tokens.css` (valeurs de la charte), `styles/*.css` ; `ux-refresh.css` est la grosse couche finale : y retirer plutôt qu'y ajouter |
+| Styles | `styles/tokens.css` (valeurs de la charte), `styles/*.css` ; `ux-refresh.css` est la grosse couche finale : y retirer plutôt qu'y ajouter ; vérifier un changement avec `scripts/css-compare.mjs` (styles calculés avant/après) |
 | Cloche (notifications du site) | `server/notifications.mjs`, `front/notifications.mjs` |
 | Page Équipages des responsables | `front/app/crews-page.mjs` ; assistant d'équipage `crew-builder.js` |
 | Base D1 | `migrations/NNNN_nom.sql` (numéro suivant le dernier) |

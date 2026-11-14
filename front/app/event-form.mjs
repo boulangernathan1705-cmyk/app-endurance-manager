@@ -1,7 +1,7 @@
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired,SOLO_DRIVER_LIMIT_MINUTES} from '../../shared/duration.mjs';
-import {app,state,activeGame,esc,button,canManage,can,canEditRace,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
+import {app,state,activeGame,esc,button,can,canEditRace,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
 import {renderSoloEventForm} from './solo-form.mjs';
 import {raceInfoFields,raceInfoRecap} from './race-info.mjs';
 import {renderHome} from './home-view.mjs';

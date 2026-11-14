@@ -1,13 +1,12 @@
 /* Course : sous "Pilotes inscrits", afficher directement les cartes. */
 .ux-unassigned-section {
-  padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
+  border: 0;
+  background: transparent;
 }
 
 /* Le seul compte à rebours conservé est celui de l'en-tête de l'événement. */
 .event-card .event-countdown:not(.running) {
-  display: none !important;
+  display: none;
 }
 
 /* Départs : même en-tête compact dans Course et Équipages. */
@@ -92,20 +91,17 @@
 .departure-fold .fold-registration,
 .departure-fold .fold-registration .registration-form,
 .departure-fold .fold-registration .form-section {
-  width: 100% !important;
-  max-width: none !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .departure-fold .fold-registration .registration-form {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* Accordéons de contenu : Pilotes inscrits / Équipages / Pilotes restants. */
-.ux-course-pilots-accordion {
-  overflow: hidden;
-}
 
 .ux-course-split-overview {
   display: grid;
@@ -249,16 +245,6 @@
     width: auto !important;
     min-width: 140px !important;
     justify-self: start !important;
-  }
-
-  .ux-content-accordion-title {
-    font-size: 18px;
-  }
-
-  .ux-content-accordion-count {
-    min-width: 30px;
-    height: 30px;
-    font-size: 13px;
   }
 
   .ux-course-split-overview > .ux-course-pilots-accordion {

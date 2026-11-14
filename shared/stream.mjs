@@ -68,10 +68,15 @@ export const streamDuringEndurance = (startsAt, starts) => Number.isFinite(Numbe
 // Same race: the same name that day, the same sim with a start within an hour of the stream's race (or stream) time,
 // or any race starting at the stream's race time (± 15 min).
 const clock = time => { const [hours, mins] = String(time || '').split(':').map(Number); return hours * 60 + mins; };
+// The same race told twice (an event of the calendar and an endurance, or a stream and its race): same name, case aside.
+export const sameRaceName = (a, b) => Boolean(raceNameKey(a)) && raceNameKey(a) === raceNameKey(b);
+const raceNameKey = value => String(value || '').trim().toLowerCase();
+// An event of the calendar for the same race as an endurance start: same name, starting within the hour. Told once,
+// by the endurance (calendar and morning announcement alike).
+export const isEnduranceTwin = (event, endurance) => sameRaceName(event.name, endurance.name) && Math.abs(Number(event.startsAt) - Number(endurance.startsAt)) < 3600000;
 export function streamIsRace(stream, race) {
   const at = Number(stream.startsAt), shift = stream.raceTime && stream.time ? (clock(stream.raceTime) - clock(stream.time)) * 60000 : 0;
   const target = at + (Number.isFinite(shift) ? shift : 0), near = Math.abs(Number(race.startsAt) - target);
-  const key = value => String(value || '').trim().toLowerCase();
-  return Number.isFinite(near) && ((key(stream.name) && key(stream.name) === key(race.name) && near <= 12 * 3600000)
+  return Number.isFinite(near) && ((sameRaceName(stream.name, race.name) && near <= 12 * 3600000)
     || (Boolean(stream.raceSim) && stream.raceSim === race.sim && near <= 3600000) || (Boolean(stream.raceTime) && near <= 15 * 60000));
 }

@@ -1,5 +1,5 @@
 import {esc, state, api, isAdmin} from './core.mjs';
-import {isGrindfest, streamersOf, gridfestPasswordValid} from '../../shared/grindfest.mjs';
+import {isGrindfest, streamersOf} from '../../shared/grindfest.mjs';
 import {soloEntryList} from './solo.mjs';
 import {isTrainingType} from '../../shared/catalog.mjs';
 
