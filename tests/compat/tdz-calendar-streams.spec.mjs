@@ -65,6 +65,9 @@ test('a streamed iRacing endurance shows in the events list and under the home Â
   await page.setViewportSize({width:1440,height:1000});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const start=Date.now()+2*3600000,date=new Date(start).toISOString().slice(0,10);
+  // On a Sunday night, in two hours is already next week in Paris: the home then shows it one week on.
+  const paris=(time,option)=>new Date(time).toLocaleDateString('en-GB',{timeZone:'Europe/Paris',...option});
+  const nextWeek=paris(Date.now(),{weekday:'long'})==='Sunday'&&paris(start)!==paris(Date.now());
   const endu={id:'endu-ir',name:'Nurburgring Endurance Championship',format:'endurance',circuit:'iracing-spa',eventType:'lmu',official:true,categories:['GT3'],durationHours:4,durationMinutes:240,version:1,absences:[],
     departures:[{id:'n1',date,time:'14:00',startsAt:start,endsAt:start+4*3600000,availability:[{id:'r1',name:'La Praline',status:'whole',category:'GT3',streamTime:'13:30'}],crews:[]}]};
   const live={id:'stream-ir',name:'Stream du Nurburgring',format:'solo',sim:'stream',details:{streamTime:'13:30',activity:'iRacing'},categories:[],version:1,absences:[],
@@ -83,6 +86,7 @@ test('a streamed iRacing endurance shows in the events list and under the home Â
   await expect(list).toContainText('ðŸ“º Stream 13h30 Â· Nurburgring Endurance Championship');
   await expect(list).not.toContainText('Stream du Nurburgring');
   await page.goto('/lmu/#accueil');
+  if(nextWeek)await page.getByRole('button',{name:'Semaine suivante'}).click();
   await expect(page.locator('.week-block').filter({hasText:'Nurburgring Endurance Championship'})).toBeVisible();
   await expect(page.locator('.week-grid')).not.toContainText('Stream du Nurburgring');
   expect(errors).toEqual([]);

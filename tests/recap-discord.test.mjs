@@ -557,9 +557,10 @@ test('après un changement, la course modifiée est mise à jour en premier', as
 
 test('deux courses changées dans les mêmes 2 minutes : Discord met les deux à jour', async t => {
   const {DB,env,messages}=setup(t);
-  // flushDiscord works at the real time: the races are tomorrow for real.
+  // flushDiscord works at the real time: the races (6 h) started an hour ago, so they are in this week whatever the day
+  // (« tomorrow » was next week on a Sunday).
   const at=Date.now();
-  for(const id of ['race-a','race-b','race-c','race-d'])race(DB,id,'Course '+id,'spa',[{id:'start-'+id,startsAt:at+DAY}]);
+  for(const id of ['race-a','race-b','race-c','race-d'])race(DB,id,'Course '+id,'spa',[{id:'start-'+id,startsAt:at-3600000}]);
   await saveBotRecap(env,COMMUNITY,SETTINGS);
   for(let i=0;i<4;i++)await syncBotRecaps(env,at+i,COMMUNITY);
   // The two changed races are the ones checked most recently: only the queue can bring them first.
