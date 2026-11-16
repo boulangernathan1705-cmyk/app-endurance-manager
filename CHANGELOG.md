@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.8 — 16 novembre 2026
+
+### ✨ Améliorations
+
+- **Discord, salons des endurances** : la carte des courses à venir est rangée par jour, comme dans le fil de la course (« sam. 21 nov. · 3h, 10h, 13h »), avec le nombre de pilotes inscrits.
+
 ## v2.13.7 — 16 novembre 2026
 
 ### 🐛 Corrections
