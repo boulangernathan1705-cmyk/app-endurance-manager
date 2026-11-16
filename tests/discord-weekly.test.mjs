@@ -344,3 +344,15 @@ test('Discord orders crews, unassigned pilots and their category logos by LMU cl
 test('making a race official triggers its Discord recap update',()=>{
   assert.equal(isWeeklyDiscordMutation(new Request('https://site.example/api/events/11111111-1111-4111-8111-111111111111/official',{method:'POST'})),true);
 });
+
+test('le calendrier du salon : une ligne par jour comme dans le fil, puis le nombre de pilotes inscrits', () => {
+  const at=(day,hour)=>Date.UTC(2026,10,day,hour-1);
+  const start=(day,hour,extra={})=>({eventId:'monza',eventName:'6 heures de Monza',circuit:'monza',durationMinutes:360,eventType:'special',startsAt:at(day,hour),crews:[],unassignedPilots:[],...extra});
+  const departures=[start(20,3),start(20,10),start(21,13,{crews:[{name:'Stream',category:'Hypercar',pilots:['Léa','Paul']}],unassignedPilots:[{name:'Max',categories:['GT3']}]}),start(22,18,{unassignedPilots:['Max','Léa']})];
+  const empty={...start(21,4),eventId:'ricard',eventName:'WEC',circuit:'paul-ricard'};
+  const payload=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:[...departures,empty],periodLabel:'semaine'},{url:'https://a.endurance-manager.app'},Date.now(),'lmu',{},{threads:{monza:'11',ricard:'12'},head:false});
+  const card=payload.embeds.find(embed=>embed.title?.includes('LMU'));
+  const [monza,ricard]=card.description.split('\n\n');
+  assert.equal(monza,['<#11>','📍 Autodromo Nazionale Monza · ⏱️ 6 h · 🏷️ Événement spécial','📅 **ven. 20 nov.** · 3h, 10h','📅 **sam. 21 nov.** · 13h','📅 **dim. 22 nov.** · 18h','👤 3 pilotes inscrits'].join('\n'));
+  assert.equal(ricard.split('\n').length,3,'personne d’inscrit : pas de ligne de pilotes');
+});

@@ -796,7 +796,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const card=index.embeds.at(-1),spa=threads.find(thread=>thread.name.includes('Spa')).id;
   assert.equal(index.embeds.length,2);assert.match(index.embeds[0].title,/^📝 Semaine/);assert.ok(index.embeds[0].image.url.includes('banner'));
   assert.equal(card.title,'🏎️ LMU · 1 course à venir');assert.match(card.image.url,/\/images\/discord-spacer\.png$/);
-  assert.match(card.description,new RegExp(`^\\*\\*\\S+ \\d+ \\S+\\*\\* · <#${spa}>\\n📍 .+ · ⏱️ .+\\n🕑 \\*\\*\\d+h\\d\\d\\*\\*`));
+  assert.match(card.description,new RegExp(`^<#${spa}>\\n📍 .+ · ⏱️ .+\\n📅 \\*\\*\\S+ \\d+ \\S+\\*\\* · \\d+h`));
   assert.match(card.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
   // LMU and iRacing share the channel: the iRacing message has its card only, as wide.
   const iracing=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('iRacing')));

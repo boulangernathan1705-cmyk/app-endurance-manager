@@ -256,18 +256,17 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   }
   if(threads){
     // One message per sim and channel (Nathan, 2026-11-01, « option A »): the card of the community and the week with its
-    // banner (first message of the channel), then the sim's card, each race in two or three lines (its day and the link to
-    // its thread; circuit, length and type; its start times and crews).
+    // banner (first message of the channel), then the sim's card, each race in a few lines: the link to its thread; circuit,
+    // length and type; one line per day with its start times, as in the thread; how many pilots are entered (Nathan, 2026-11-16).
     const races=[...groupByRace(current).map(group=>[group,true]),...groupByRace(future).map(group=>[group,false])];
     const box=([group,live])=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
       const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
       const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
-      const day=recapDay.format(first.startsAt);
-      const times=group.map(departure=>departure.timePending?'horaire à confirmer':recapDay.format(departure.startsAt)===day?`**${clockLabel(departure.startsAt)}**`:`${recapDay.format(departure.startsAt).split(' ')[0]} ${clockLabel(departure.startsAt)}`);
-      const crews=group.reduce((total,departure)=>total+(departure.crews||[]).filter(crew=>crew.pilots?.length).length,0);
-      return [`${live?'🔴 **En cours** · ':''}**${cap(day)}** · ${thread?`<#${thread}>`:url?`[${name}](${url})`:name}`,
+      // Its days and their start times, as in its thread; then how many pilots are entered (crews and without a crew).
+      const pilots=new Set(group.flatMap(departure=>[...(departure.crews||[]).flatMap(crew=>crew.pilots||[]),...(departure.unassignedPilots||[]).map(pilot=>asPilot(pilot).name)])).size;
+      return [`${live?'🔴 **En cours** · ':''}${thread?`<#${thread}>`:url?`[${name}](${url})`:`**${name}**`}`,
         [`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · '),
-        [`🕑 ${[...new Set(times)].join(' · ')}`,crews&&`👥 ${crews} équipage${crews>1?'s':''}`].filter(Boolean).join(' · ')].join('\n');};
+        startsRecap(group),pilots&&`👤 ${pilots} pilote${pilots>1?'s':''} inscrit${pilots>1?'s':''}`].filter(Boolean).join('\n');};
     let shown=races.length,description='';
     // 4096 characters at most: the last races go to the site.
     do{description=[...races.slice(0,shown).map(box),shown<races.length&&`… et ${races.length-shown} autre${races.length-shown>1?'s':''} sur le site.`].filter(Boolean).join('\n\n');}while(description.length>4000&&--shown>0);
