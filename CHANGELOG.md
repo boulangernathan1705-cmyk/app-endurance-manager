@@ -1,5 +1,16 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.7 — 16 novembre 2026
+
+### 🐛 Corrections
+
+- **Accueil** : sur un écran d'ordinateur portable, le logo d'une course ne cache plus son horaire dans la semaine.
+- **Vocaux d'équipage Discord** : le bot ne demande plus à Discord un droit qu'il n'a pas, les vocaux se créent à nouveau partout. Si un droit manque, l'erreur propose « Réinviter le bot ».
+
+### 🧹 Ménage
+
+- Les tâches automatiques du site passent par une seule horloge Cloudflare au lieu de trois, sans rien changer aux horaires.
+
 ## v2.13.6 — 14 novembre 2026
 
 ### 🐛 Corrections
