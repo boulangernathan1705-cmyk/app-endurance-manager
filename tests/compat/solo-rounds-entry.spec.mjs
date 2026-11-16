@@ -10,7 +10,9 @@ for(const width of [1366,390])test(`one entry block for an event in two rounds a
   rounds:[{circuit:'imola',durationMinutes:25,categories:['GT3']},{circuit:'spa',durationMinutes:25,categories:['GT3']}],departures:[departure],version:1};
  await page.route('**/api/**',route=>{const path=new URL(route.request().url()).pathname;let data={ok:true};if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},permissions:['access','endurance','solo_open'],access:'member',discordReady:true,community:{id:'alpha',slug:'alpha',name:'Alpha',modules:{soloRaces:true}},communities:[]};else if(['/api/events','/api/races'].includes(path))data={events:[race]};else if(path.includes('notifications'))data={notifications:[],unread:0};return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});});
  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
- await page.goto('/lmu/');await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return Boolean(state.user);});
+ await page.goto('/lmu/');await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return Boolean(state.user)&&state.participantsLoaded;});
+ // The app's own first render follows its last request: let it land before drawing the race by hand.
+ await page.waitForLoadState('networkidle');
  const show=async availability=>page.evaluate(async({race,availability})=>{const {state}=await import('/front/app/core.mjs');race.departures[0].availability=availability;state.events=[race];state.currentEventId=race.id;const {renderEvent}=await import('/front/app/event-view.mjs');renderEvent();},{race,availability});
  await show(departure.availability);
  const block=page.locator('.solo-entry-block');
