@@ -15,6 +15,8 @@ async function boot(page,game,events){
   });
   await page.goto(`/${game}/`);
   await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return state.access==='member'&&state.events.length>0;});
+  // The app's own first display done (Firefox may finish it after the events): it would otherwise redraw over the test's.
+  await page.waitForLoadState('networkidle');
 }
 
 for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit inside their cards`,async({page})=>{
