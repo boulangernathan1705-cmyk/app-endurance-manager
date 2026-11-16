@@ -1088,6 +1088,9 @@ test('a race\'s thread archived by Discord (nobody wrote for a week) is opened a
   DB.db.prepare("INSERT OR IGNORE INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,'[]','member',0,0)").run(DEV_COMMUNITY,OWNER);
   await addThreadMembers(env,NOW,12);await addThreadMembers(env,NOW,12);
   calls.length=0;assert.equal(await addThreadMembers(env,NOW+60000,12),0);assert.equal(calls.length,0,'not before the hour');
+  // A message of an hour ago: not quiet.
+  const snowflake=at=>String((BigInt(at)-1420070400000n)<<22n);
+  thread.last_message_id=snowflake(NOW);
   thread.thread_metadata={archived:true};
   calls.length=0;await addThreadMembers(env,NOW+3600001,12);
   assert.deepEqual(calls.map(call=>[call.method,call.path]),[['GET',`/channels/${thread.id}`],['PATCH',`/channels/${thread.id}`]]);
@@ -1096,6 +1099,17 @@ test('a race\'s thread archived by Discord (nobody wrote for a week) is opened a
   thread.thread_metadata={archived:false};
   calls.length=0;await addThreadMembers(env,NOW+7200002,12);
   assert.deepEqual(calls.map(call=>call.method),['GET']);
+  // Six days without a message (Discord archives on the 7th, and the thread then leaves its members' list): its next
+  // starts, without a ping.
+  thread.last_message_id=snowflake(NOW-6*DAY);
+  calls.length=0;await addThreadMembers(env,NOW+4*3600000,12);
+  const post=calls.find(call=>call.method==='POST');
+  assert.equal(post.path,`/channels/${thread.id}/messages`);
+  assert.match(post.body.content,/^📅 \*\*.+\*\* · \d+h/);
+  assert.equal(post.body.flags,4096);assert.deepEqual(post.body.allowed_mentions,{parse:[]});
+  // Its race over: nothing more.
+  calls.length=0;await addThreadMembers(env,NOW+2*DAY,12);
+  assert.ok(!calls.some(call=>call.method==='POST'));
 });
 
 test('a pass with nothing to change makes one request; a changed race only its edit more',async t=>{

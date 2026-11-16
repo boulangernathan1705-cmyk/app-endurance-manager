@@ -6,7 +6,7 @@ import {notify} from './notifications.mjs';
 import {communityAdmins} from './access.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
-import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES, nextStartsRecap} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
@@ -1025,13 +1025,17 @@ export async function removeBotDiscord(env,timestamp,community) {
 }
 
 
+// A thread quiet for 6 days gets the race's next starts (Discord archives it on the 7th).
+const QUIET_THREAD_MS = 6 * 86400000;
+const snowflakeTime = id => { try { return id ? Number(BigInt(id) >> 22n) + 1420070400000 : 0; } catch { return 0; } };
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
 // Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile, or archived by Discord).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id,p.members_checked_at FROM discord_recap_publications p
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id,p.members_checked_at,e.departures FROM discord_recap_publications p
     JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
+    LEFT JOIN events e ON e.id=p.event_id
     WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.message_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
   const budget = {left:limit};
   let added = 0;
@@ -1045,11 +1049,15 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
       ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
       .bind(thread.community_id,thread.event_id,JSON.stringify(administrators(env)),thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
-      // Discord archives a thread nobody wrote in for a week, and it leaves everyone's list (a race over two weekends: its
-      // thread opened on the first Monday). Looked at each hour, opened again while its race is on.
+      // Discord archives a thread nobody wrote in for a week and takes it out of its members' list, for good: opening it
+      // again does not put it back (a race over two weekends, its thread opened on the first Monday). Before the 7th day
+      // without a message, the bot writes its next starts there, without a ping: the thread stays in everyone's list.
       if (thread.members_checked_at) try {
         const channel = await discord(env,'GET',`/channels/${thread.channel_id}`,null,budget);
         if (channel?.thread_metadata?.archived) await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
+        const lastMessage = Math.max(snowflakeTime(channel?.last_message_id), snowflakeTime(thread.channel_id));
+        const starts = lastMessage < timestamp - QUIET_THREAD_MS ? nextStartsRecap(thread.departures, timestamp) : '';
+        if (starts) await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:starts,flags:4096,allowed_mentions:{parse:[]}},budget);
       } catch (error) {
         if (error.budget || error.status === 429) return added;
       }
