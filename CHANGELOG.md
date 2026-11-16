@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.10 — 16 novembre 2026
+
+### 🐛 Corrections
+
+- **Fils des courses Discord** : un fil resté six jours sans message reçoit, sans ping, la ligne de ses prochains départs. Discord ne le masque plus, et il reste dans la liste de chacun jusqu'à la course.
+
 ## v2.13.9 — 16 novembre 2026
 
 ### 🐛 Corrections
