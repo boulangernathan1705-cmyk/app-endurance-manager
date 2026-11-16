@@ -177,6 +177,12 @@ function startsRecap(departures){
   }
   return [...days].map(([day,times])=>`📅 **${day}** · ${[...new Set(times)].join(', ')}`).join('\n');
 }
+// The starts still to come of a race (its departures as saved, JSON), the same lines: « 📅 **sam. 21 nov.** · 5h, 14h ».
+export function nextStartsRecap(departures,now=Date.now()){
+  let list=[];try{list=JSON.parse(departures||'[]');}catch{}
+  const next=(Array.isArray(list)?list:[]).filter(item=>Number(item?.startsAt)>now).map(item=>({startsAt:Number(item.startsAt),timePending:Boolean(item.tbd||item.timePending)}));
+  return next.length?startsRecap(next):'';
+}
 // One block per race: its name is the link to the race, the bar has the colour of its simulator.
 function raceEmbed(departures,siteUrl,compact=false,current=false,emojis={}){
   const first=departures[0],{title,note}=eventTitleAndNote(first.eventName);
