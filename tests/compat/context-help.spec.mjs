@@ -20,7 +20,9 @@ async function setup(page, {permissions = ['access', 'endurance'], locale = 'fr'
     await route.fulfill({contentType:'application/json', body:JSON.stringify(data)});
   });
   await page.goto('/lmu/');
-  await page.waitForFunction(async () => (await import('/front/app/core.mjs')).state.user?.name === 'Nathan');
+  await page.waitForFunction(async () => {const {state} = await import('/front/app/core.mjs'); return state.user?.name === 'Nathan' && state.participantsLoaded;});
+  // The app's own first render follows its last request: let it land before drawing a page by hand.
+  await page.waitForLoadState('networkidle');
   return {race, writes, errors};
 }
 

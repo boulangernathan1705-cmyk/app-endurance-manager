@@ -4,7 +4,9 @@ for(const count of [1,2])for(const tdz of [false,true])test(`solo header ${tdz?'
  const race={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'OPEN LMU',format:'solo',sim:'lmu',access:'open',circuit:'portimao',durationHours:1,durationMinutes:60,categories:[],details:{type:'OPEN',password:'test-password'},rounds:[{circuit:'portimao',durationMinutes:40,practice:5,qualifying:10,categories:['GT3'],weather:'cloud',fuel:2,tyres:2},{circuit:'spa',durationMinutes:40,categories:['GT3']}],departures:[departure],version:1};
  race.rounds=race.rounds.slice(0,count);
  await page.route('**/api/**',route=>{const path=new URL(route.request().url()).pathname;let data={ok:true};if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},permissions:['access','endurance','manage_races','solo_open'],access:'member',discordReady:true,community:{id:'alpha',slug:'alpha',name:'Alpha',modules:{soloRaces:true}},communities:[]};else if(['/api/events','/api/races'].includes(path))data={events:[race]};else if(path.includes('notifications'))data={notifications:[],unread:0};return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});});
- await page.goto('/lmu/');await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return Boolean(state.user);});
+ await page.goto('/lmu/');await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return Boolean(state.user)&&state.participantsLoaded;});
+ // The app's own first render follows its last request: let it land before drawing the race by hand.
+ await page.waitForLoadState('networkidle');
  await page.evaluate(async({race,tdz})=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=tdz;state.manager=true;state.events=[race];state.currentEventId=race.id;const {renderEvent}=await import('/front/app/event-view.mjs');renderEvent();},{race,tdz});
  await expect(page.locator('.race-header .event-access-logo')).toBeVisible();
  await expect(page.locator('.race-side .event-sim-badge')).toBeVisible();
