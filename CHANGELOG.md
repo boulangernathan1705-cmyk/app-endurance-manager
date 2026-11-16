@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.9 — 16 novembre 2026
+
+### 🐛 Corrections
+
+- **Fils des courses Discord** : une course sur deux week-ends garde son fil visible dans la liste des salons. Discord masquait un fil resté une semaine sans message ; le bot le rouvre maintenant dans l'heure.
+
 ## v2.13.8 — 16 novembre 2026
 
 ### ✨ Améliorations
