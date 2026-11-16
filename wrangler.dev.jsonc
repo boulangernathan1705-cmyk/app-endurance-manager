@@ -10,8 +10,9 @@
   "minify": true,
   "observability": {"enabled": true, "head_sampling_rate": 0.1, "redact_query_string": true},
   "build": { "command": "npm run build:workers" },
+  // No Cron Trigger on dev: the free plan allows 5 for the whole account, and dev's Discord modules stay off.
   "triggers": {
-    "crons": ["*/15 * * * *", "*/2 * * * *", "*/5 * * * *"]
+    "crons": []
   },
   // The route (more specific than production's *.endurance-manager.app/*) keeps dev on this Worker.
   "routes": [

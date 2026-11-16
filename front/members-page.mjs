@@ -532,7 +532,8 @@ function discordTabMarkup(setup, settings, look) {
   const state = `<ul class="adm-rows"><li class="adm-row is-${tone}" data-discord-state><span><strong>${title}</strong><small>${sub}</small></span>
     <span class="adm-actions"><span class="settings-status" data-discord-saved aria-live="polite"></span><button type="button" class="primary-button" data-discord-open>${config?.enabled ? 'Modifier' : 'Régler Discord'}</button></span></li>${config?.missingRights?.length ? rightsRow(setup) : ''}</ul>`;
   const crewWarn = voices && (crews.botReady !== true || crews.lastError);
-  const crewRights = !crewWarn ? '' : crews.botReady === true ? row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError))
+  const crewRights = !crewWarn ? '' : crews.botReady === true ? row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError),
+      crews.botInviteUrl ? `<span class="adm-actions"><a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Réinviter le bot</a></span>` : '')
     : row('warn', 'Vocaux d’équipage : le bot n’a pas ses droits', esc(crews.botProblem === 'channel' ? `Dans « ${crews.botChannelName || 'le salon'} », un administrateur Discord doit autoriser Endurance Manager : ${(crews.botMissing || []).join(', ')}. Les autres accès restent privés.` : crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants : ${crews.botMissing.join(', ')}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights),
       `<span class="adm-actions">${crews.botInviteUrl && crews.botProblem !== 'channel' ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="discord">C’est fait</button></span>`);
   const sims = {lmu:'LMU', iracing:'iRacing', all:'LMU et iRacing'}[answers.sims] || 'LMU et iRacing';

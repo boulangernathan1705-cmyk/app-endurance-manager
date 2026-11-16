@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import scheduledWorker from '../server/worker-with-migrations.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
+import scheduledWorker, {scheduledJob} from '../server/worker-with-migrations.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -41,9 +41,18 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
     if(method==='GET'&&path.includes('/messages?after=0'))return reply(200,state.messages || []);
     if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035,errors:{parent_id:{_errors:[{message:'Unknown channel'}]}}});
-    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||CREW_BOT_PERMISSIONS):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
+    // As Discord: a rule may only set or change rights the bot holds (unless administrator), or the whole request is refused.
+    const held=BigInt(state.botRights?(state.botPermissions||CREW_BOT_PERMISSIONS):'0');
+    const writes=(method==='POST'&&path===`/guilds/${GUILD}/channels`)||(method==='PATCH'&&/^\/channels\/\d+$/.test(path));
+    if(writes&&body?.permission_overwrites&&!(held&8n)){
+      const before=method==='PATCH'?(state.channels.find(item=>`/channels/${item.id}`===path)?.permission_overwrites||[]):[];
+      const bits=(rules,key)=>new Map(rules.map(item=>[`${item.type}:${item.id}`,BigInt(item[key]||0)]));
+      const changed=key=>{const now=bits(body.permission_overwrites,key),was=bits(before,key);return [...new Set([...now.keys(),...was.keys()])].some(id=>((now.get(id)||0n)^(was.get(id)||0n))&~held);};
+      if(changed('allow')||changed('deny'))return reply(403,{code:50013});
+    }
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`&&state.refuseCopy&&(body?.permission_overwrites||[]).some(item=>item.id!=='app-id'&&item.id!==GUILD))return reply(403,{code:50013});
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`){const channel={...body,id:String(next++)};state.channels.push(channel);return reply(200,channel);}
     const channelPath=path.match(/^\/channels\/(\d+)$/);
@@ -97,11 +106,20 @@ const since=(calls,from)=>calls.slice(from).map(call=>`${call.method} ${call.pat
 const notifications=async (req,actor)=>(await req('/api/notifications','GET',null,actor)).data.notifications;
 const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&&call.path===`/guilds/${GUILD}/channels`);
 
-test('crew vocals sync every five minutes while quarter-hour maintenance stays separate',async()=>{
-  for(const file of ['wrangler.jsonc','wrangler.dev.jsonc','wrangler.prod.jsonc']) {
-    const config=JSON.parse(readFileSync(new URL(`../${file}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,''));
-    for(const cron of ['*/2 * * * *','*/5 * * * *','*/15 * * * *']) assert.ok(config.triggers.crons.includes(cron),`${file}: ${cron}`);
-  }
+test('one Cron Trigger per Worker: each minute runs at most one job',async()=>{
+  // Cloudflare's free plan allows 5 Cron Triggers for the whole account, shared with other Workers.
+  const crons=file=>JSON.parse(readFileSync(new URL(`../${file}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,'')).triggers.crons;
+  assert.deepEqual(crons('wrangler.prod.jsonc'),['* * * * *']);
+  assert.deepEqual(crons('wrangler.jsonc'),['* * * * *']);
+  assert.deepEqual(crons('wrangler.dev.jsonc'),[],'no Cron Trigger on dev');
+  const jobs=Array.from({length:60},(_,minute)=>scheduledJob(minute));
+  assert.equal(jobs.filter(job=>job==='discord').length,30,'Discord pass every 2 minutes');
+  assert.equal(jobs.filter(job=>job==='crews').length,12,'crews about every 5 minutes');
+  assert.deepEqual(jobs.flatMap((job,minute)=>job==='maintenance'?[Math.floor(minute/15)]:[]),[0,1,2,3],'maintenance once per quarter hour');
+  for(let minute=0;minute<60;minute++) if(jobs[minute]==='crews') assert.ok([1,5].includes(minute%10));
+});
+
+test('crew vocals sync on their own minutes while quarter-hour maintenance stays separate',async()=>{
   const {DB,env,req,login,discord}=harness();
   await login(ADMIN,'admin','Orga');
   await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
@@ -112,24 +130,24 @@ test('crew vocals sync every five minutes while quarter-hour maintenance stays s
   env.IRACING_IMPORT='off';
   const prepare=DB.prepare.bind(DB);let crewCheckWrites=0;
   DB.prepare=sql=>{if(sql.startsWith('UPDATE crew_discord SET checked_at='))crewCheckWrites++;return prepare(sql);};
-  const scheduled=async(cron,scheduledTime)=>{
+  const scheduled=async(scheduledTime)=>{
     const pending=[],realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
     try{
-      await scheduledWorker.scheduled({cron,scheduledTime},env,{waitUntil:promise=>pending.push(promise)});
+      await scheduledWorker.scheduled({cron:'* * * * *',scheduledTime},env,{waitUntil:promise=>pending.push(promise)});
       await Promise.all(pending);
     }finally{globalThis.fetch=realFetch;}
   };
-  const at=Date.UTC(2090,9,14,12,5);
-  await scheduled('*/5 * * * *',at);
+  const at=Date.UTC(2090,9,14,12,1);
+  await scheduled(at);
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.ok(row.voice_id&&row.message_id,'the five-minute tick creates the crew vocal');
   assert.equal(row.checked_at,at);
   assert.ok(DB.db.prepare('SELECT 1 FROM rate_limits WHERE key=?').get('expired-before-crew-sync'),'five-minute sync does not run maintenance');
-  await scheduled('*/5 * * * *',at+10*60_000);
-  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+10*60_000,'the quarter-hour five-minute tick still syncs crews');
-  await scheduled('*/15 * * * *',at+10*60_000);
-  assert.equal(crewCheckWrites,2,'only the two five-minute ticks check the crew, without a duplicate at the quarter hour');
-  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+10*60_000,'maintenance does not sync crews a second time');
+  await scheduled(at+4*60_000);
+  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+4*60_000,'the next crew minute (:05) syncs crews again');
+  await scheduled(at+6*60_000);
+  assert.equal(crewCheckWrites,2,'only the two crew minutes check the crew, maintenance (:07) does not');
+  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+4*60_000,'maintenance does not sync crews a second time');
   assert.equal(DB.db.prepare('SELECT 1 FROM rate_limits WHERE key=?').get('expired-before-crew-sync'),undefined,'quarter-hour maintenance still runs');
   assert.equal(created(discord.calls,0).length,1,'the same vocal is retained across ticks');
 });
@@ -367,7 +385,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   await sync(at+HOUR);
   assert.equal(DB.db.prepare('SELECT message_id FROM crew_discord').get().message_id,null);
   let mark=discord.calls.length;await sync(at+2*HOUR);
-  assert.deepEqual(since(discord.calls,mark),[`GET /channels/${row.voice_id}`,`POST /channels/${row.voice_id}/messages`]);
+  assert.deepEqual(since(discord.calls,mark),[`GET /channels/${row.voice_id}`,`GET /guilds/${GUILD}/members/app-id`,`GET /guilds/${GUILD}/roles`,`POST /channels/${row.voice_id}/messages`]);
   // Someone deletes the voice channel: a new one, with the recap.
   const now=DB.db.prepare('SELECT * FROM crew_discord').get();
   discord.unknownChannel.add(`/channels/${row.voice_id}/messages/${now.message_id}`);
@@ -375,7 +393,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   await sync(at+3*HOUR);
   assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,null);
   mark=discord.calls.length;await sync(at+4*HOUR);
-  const again=discord.calls.slice(mark);
+  const again=discord.calls.slice(mark).filter(call=>call.method!=='GET');
   assert.deepEqual(again[0].body,{name:'🏎️ LMU · 6h SPA · Retour',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
 });
@@ -501,7 +519,7 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   mark=discord.calls.length;await sync(at+60_000);assert.deepEqual(created(discord.calls,mark),[]);
 });
 
-test('a category rule with a right the bot lacks: the voice retries with public access only', async () => {
+test('a category rule with a right the bot lacks: the voice is made at once, without that right', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
@@ -515,8 +533,26 @@ test('a category rule with a right the bot lacks: the voice retries with public 
   assert.equal((await req(base+'/crews','POST',{name:'Copie',category:'GT3'},'pilot')).status,201);
   const mark=discord.calls.length;await sync(at);
   const posts=created(discord.calls,mark);
-  assert.equal(posts.length,2);assert.deepEqual(posts[1].body.permission_overwrites,BOT_ACCESS);assert.equal(posts[1].body.parent_id,'600000000000000007');
+  assert.equal(posts.length,1);assert.deepEqual(posts[0].body.permission_overwrites,BOT_ACCESS);assert.equal(posts[0].body.parent_id,'600000000000000007');
   assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
+});
+
+test('a bot invited with an older link (no Speak, no voice features): the voice is still made, with what it can give', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  discord.state.botPermissions='1117200';
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Ancien lien',category:'GT3'},'pilot')).status,201);
+  const mark=discord.calls.length;await sync(at);
+  const posts=created(discord.calls,mark);
+  assert.equal(posts.length,1);
+  assert.equal(posts[0].body.permission_overwrites.find(item=>item.id===GUILD).allow,String(1117200n&~(1n<<4n)),'only the rights the bot holds');
+  assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_crew_discord').get()?.last_error ?? null,null);
 });
 
 test('« un fil par course » with LMU and iRacing apart: an iRacing race\'s voices go in « iRacing », not « LMU »', async () => {

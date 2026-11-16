@@ -46,11 +46,29 @@ const VOICE_FEATURES = STREAM | (1n << 39n) | (1n << 42n) | (1n << 45n) | (1n <<
 const VOICE_CHAT = SEND | HISTORY | EMBED | (1n << 6n) | (1n << 12n) | (1n << 15n)
   | (1n << 18n) | (1n << 31n) | (1n << 37n) | (1n << 46n) | (1n << 49n) | (1n << 50n);
 export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | SPEAK | USE_VAD | VOICE_FEATURES | VOICE_CHAT | (1n << 0n);
-export function withPublicVoiceAccess(overwrites, guildId, clientId) {
+// held: what the bot holds where the rules are written (in the category for a channel inside it). Discord refuses the whole
+// channel if a rule sets, or removes, a right the bot lacks there (SPM, 2026-11-14: no voice made). before: the channel's
+// rules now (none for a new channel): every bit the bot does not hold stays as it is.
+export function withPublicVoiceAccess(overwrites, guildId, clientId, held = ~0n, before = []) {
   const copy = withBotAccess(overwrites, clientId, VOICE_ACCESS);
   for (const rule of copy) rule.deny = String(BigInt(rule.deny || 0) & ~PUBLIC_VOICE_ACCESS);
   let everyone = copy.find(rule => String(rule.id) === String(guildId) && Number(rule.type) === 0);
   if (!everyone) { everyone = {id:String(guildId),type:0,allow:'0',deny:'0'}; copy.push(everyone); }
   everyone.allow = String(BigInt(everyone.allow || 0) | PUBLIC_VOICE_ACCESS);
-  return copy;
+  return keepUnheld(copy, before, clientId, held);
+}
+// « Gérer les permissions » on a channel needs an administrator: never counted as held otherwise.
+function keepUnheld(wanted, before, clientId, held) {
+  const can = held === ~0n ? held : held & ~MANAGE_ROLES;
+  if (can === ~0n) return wanted;
+  const key = rule => `${Number(rule.type)}:${rule.id}`, bot = key({type:1, id:clientId});
+  const old = new Map((before || []).map(rule => [key(rule), rule]));
+  const merge = (now, was) => (BigInt(was || 0) & ~can) | (BigInt(now || 0) & can);
+  const rules = wanted.map(rule => ({...rule, emptied:BigInt(rule.allow || 0) || BigInt(rule.deny || 0),
+    allow:merge(rule.allow, old.get(key(rule))?.allow), deny:merge(rule.deny, old.get(key(rule))?.deny)}));
+  for (const [id, rule] of old) if (!rules.some(item => key(item) === id))
+    rules.push({...rule, emptied:true, allow:BigInt(rule.allow || 0) & ~can, deny:BigInt(rule.deny || 0) & ~can});
+  // A rule left empty only by the mask goes (as Discord would keep nothing of it); the others stay as they were asked.
+  return rules.filter(rule => rule.allow || rule.deny || !rule.emptied || key(rule) === bot)
+    .map(({emptied, ...rule}) => ({...rule, allow:String(rule.allow), deny:String(rule.deny)}));
 }

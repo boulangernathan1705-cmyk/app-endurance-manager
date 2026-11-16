@@ -509,7 +509,8 @@ test('the scheduled job purges expired rate-limit counters and sessions',async()
  const past=Math.floor(Date.now()/1000)-60,future=past+7200;
  DB.db.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,?,?),(?,?,?)').run('old',1,past,'fresh',1,future);
  const pending=[];
- await workerWithMigrations.scheduled({},env,{waitUntil:promise=>pending.push(promise)});
+ const maintenanceMinute=new Date();maintenanceMinute.setUTCMinutes(7);
+ await workerWithMigrations.scheduled({cron:'* * * * *',scheduledTime:maintenanceMinute.getTime()},env,{waitUntil:promise=>pending.push(promise)});
  await Promise.all(pending);
  assert.deepEqual(DB.db.prepare('SELECT key FROM rate_limits ORDER BY key').all().map(row=>row.key),['fresh']);
 });
