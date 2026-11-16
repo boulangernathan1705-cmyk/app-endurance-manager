@@ -1081,6 +1081,23 @@ test('the pilots with access are added to the race\'s thread once each, those of
   calls.length=0;assert.equal(await addThreadMembers(env,NOW+2000,12),2);
 });
 
+test('a race\'s thread archived by Discord (nobody wrote for a week) is opened again within the hour',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  const thread=channels.find(item=>item.type===11);
+  DB.db.prepare("INSERT OR IGNORE INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,'[]','member',0,0)").run(DEV_COMMUNITY,OWNER);
+  await addThreadMembers(env,NOW,12);await addThreadMembers(env,NOW,12);
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW+60000,12),0);assert.equal(calls.length,0,'not before the hour');
+  thread.thread_metadata={archived:true};
+  calls.length=0;await addThreadMembers(env,NOW+3600001,12);
+  assert.deepEqual(calls.map(call=>[call.method,call.path]),[['GET',`/channels/${thread.id}`],['PATCH',`/channels/${thread.id}`]]);
+  assert.deepEqual(calls[1].body,{archived:false});
+  // Open: looked at, left as it is.
+  thread.thread_metadata={archived:false};
+  calls.length=0;await addThreadMembers(env,NOW+7200002,12);
+  assert.deepEqual(calls.map(call=>call.method),['GET']);
+});
+
 test('a pass with nothing to change makes one request; a changed race only its edit more',async t=>{
   const {DB,env,calls}=setup(t);race(DB);race(DB,'race-b','8h de Monza','monza',[{id:'start-b',startsAt:NOW+2*DAY}]);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110',voices:true});

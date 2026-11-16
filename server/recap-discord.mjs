@@ -1027,10 +1027,10 @@ export async function removeBotDiscord(env,timestamp,community) {
 
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
 // Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
-// A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
+// A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile, or archived by Discord).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id FROM discord_recap_publications p
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id,p.members_checked_at FROM discord_recap_publications p
     JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
     WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.message_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
   const budget = {left:limit};
@@ -1045,7 +1045,16 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
       ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
       .bind(thread.community_id,thread.event_id,JSON.stringify(administrators(env)),thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
+      // Discord archives a thread nobody wrote in for a week, and it leaves everyone's list (a race over two weekends: its
+      // thread opened on the first Monday). Looked at each hour, opened again while its race is on.
+      if (thread.members_checked_at) try {
+        const channel = await discord(env,'GET',`/channels/${thread.channel_id}`,null,budget);
+        if (channel?.thread_metadata?.archived) await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
+      } catch (error) {
+        if (error.budget || error.status === 429) return added;
+      }
       await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
+      if (budget.left <= 0) break;
       continue;
     }
     // Added by mentioning them in an EDIT of the race's message, then taken off: an edit notifies nobody (no badge), while a
