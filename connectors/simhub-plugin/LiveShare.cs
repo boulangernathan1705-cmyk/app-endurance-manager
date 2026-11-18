@@ -155,11 +155,11 @@ namespace EnduranceManager.SimHub
 
         // One snapshot from the copy of the game's memory, handed to the sending thread; the previous one, if not
         // sent yet, is replaced (only the latest state matters).
-        public void Offer(byte[] b, Sample s, Recorder recorder, LmuApi api)
+        public void Offer(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed = null)
         {
             if (s.Control < 0 || s.Control > 1) return;
             Snapshot message;
-            try { message = Build(b, s, recorder, api); } catch { return; }
+            try { message = Build(b, s, recorder, api, computed); } catch { return; }
             lock (gate) { pending = message; offeredAt = DateTime.Now; }
             wake.Set();
             if (DateTime.Now - numbersAt > TimeSpan.FromSeconds(20) && Interlocked.Exchange(ref reading, 1) == 0)
@@ -172,7 +172,7 @@ namespace EnduranceManager.SimHub
             }
         }
 
-        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api)
+        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed)
         {
             int count = Math.Min(I32(b, ScoringInfo + 104), MaxVehicles);
             double length = F64(b, ScoringInfo + 88);
@@ -211,7 +211,9 @@ namespace EnduranceManager.SimHub
                     compound, damage, used.TryGetValue(DriverKey(driver), out double lap) ? R(lap, 2) : null,
                     // Plugin 2.5: wheels' compounds, the game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving),
                     // the flag shown to the car (6 blue) and under yellow.
-                    wheels, b[at + 457], b[at + 504], b[at + 505]
+                    wheels, b[at + 457], b[at + 504], b[at + 505],
+                    // Computed.cs: laps since the car left the pits, its last lane and box times (s).
+                    computed?.OutLaps(id, I16(b, at + 100)), computed?.Pit(id)?.Lane, computed?.Pit(id)?.Box
                 });
             }
             // A car without virtual energy (LMP2) shows its fuel instead: energy counts once the game gave some.
@@ -282,7 +284,8 @@ namespace EnduranceManager.SimHub
                 ["motor"] = s.MotorState == 0 ? null : new Dictionary<string, object> { ["state"] = s.MotorState, ["temp"] = R(s.MotorTemp, 1), ["water"] = R(s.MotorWater, 1), ["rpm"] = R(s.MotorRpm, 0), ["torque"] = R(s.MotorTorque, 1), ["soc"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null },
                 ["gaps"] = new[] { R(Math.Abs(s.GapAhead), 3), R(s.GapBehind, 3) },
                 ["impact"] = s.ImpactET > 0 ? new[] { R(s.ImpactET, 2), R(s.ImpactForce, 0) } : null,
-                ["flag"] = s.Flag, ["pitState"] = s.PitStateScoring
+                ["flag"] = s.Flag, ["pitState"] = s.PitStateScoring,
+                ["optimal"] = computed?.Optimal, ["predicted"] = computed?.Predicted, ["impacts"] = computed?.Impacts, ["lockups"] = computed?.LockupsLastLap
             };
             // The outline once per connection (the room keeps it).
             if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }

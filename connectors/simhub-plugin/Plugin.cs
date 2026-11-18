@@ -67,6 +67,8 @@ namespace EnduranceManager.SimHub
         public Course Course { get; } = new Course();
         public PitMenu Menu { get; } = new PitMenu();
         public GameApi Game { get; } = new GameApi();
+        // Our own calculations after LMU Drive's ideas (Computed.cs): pit timing and out-laps per car, optimal and predicted lap.
+        public Computed Computed { get; } = new Computed();
         // The game's live standings (penalties by kind, finish status) and Lovely's track and car files.
         Standings standings;
         Lovely lovely;
@@ -127,6 +129,10 @@ namespace EnduranceManager.SimHub
             foreach (var (name, get) in Course.Properties) this.AttachDelegate(name, () => get(Course.View));
             // What LMU Drive reads of the car and the session (Telemetry.cs, plugin 2.5), from the last reading.
             foreach (var (name, get) in Telemetry.Properties) this.AttachDelegate(name, () => latest is Sample s ? get(s) : null);
+            this.AttachDelegate("Voiture.TourOptimal", () => Computed.Optimal);
+            this.AttachDelegate("Voiture.TourPrevu", () => Computed.Predicted);
+            this.AttachDelegate("Voiture.ChocsRelais", () => Computed.Impacts);
+            this.AttachDelegate("Voiture.BlocagesDernierTour", () => Computed.LockupsLastLap);
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
@@ -239,10 +245,12 @@ namespace EnduranceManager.SimHub
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
                             latest = driving ? (object)sample : null;
+                            // Each car's pit lane and our optimal and predicted lap (Computed.cs), ten times a second.
+                            if (driving) try { Computed.Update(buffer, sample, recorder.Current); } catch { }
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share) live.Frame(sample);
-                            if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
+                            if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api, Computed);
                             // Between two, nine quick messages a second: our car's frames and the cars on the map.
                             else if (driving && Settings.Share) live.Fast(buffer);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.

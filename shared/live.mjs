@@ -17,10 +17,11 @@ export const DELTA_VERSION = 2;
 // energy (or fuel) its last lap used, as the game shows them of every car (later plugins; null from older ones).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
   'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank', 'cmp', 'dmg', 'veLap',
-  'wcmp', 'pst', 'flag', 'yellow'];
+  'wcmp', 'pst', 'flag', 'yellow', 'outLaps', 'lane', 'box'];
 // Plugin 2.5: wcmp, the compound of each wheel (FL FR RL RR) as the game's index and type (« 1.0 1.0 2.0 2.0 »); pst, the
 // game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving); flag, the flag shown to the car (6 blue); yellow,
-// under yellow.
+// under yellow; outLaps, laps since the car left the pits (null: no stop yet), lane and box, its last stop's time in
+// the pit lane and stopped in the box (s), timed by the plugin.
 const TEXT = new Set(['cls', 'driver', 'vehicle', 'num', 'cmp', 'wcmp']);
 const WHEEL_COMPOUNDS = /^\d{1,3}\.\d{1,3}( \d{1,3}\.\d{1,3}){3}$/;
 const PERCENT = new Set(['tank', 'dmg', 'veLap']);
@@ -141,7 +142,10 @@ export function cleanSnapshot(input) {
       aids:cleanAids(me.aids), liftCoast:num(me.liftCoast, 0, 255), motor:cleanMotor(me.motor),
       gaps:Array.isArray(me.gaps) ? [0, 1].map(index => num(me.gaps[index], -3600, 3600)) : null,
       impact:Array.isArray(me.impact) && num(me.impact[0], 0, 1e7) !== null ? [me.impact[0], num(me.impact[1], 0, 1e9)] : null,
-      flag:num(me.flag, 0, 20), pitState:num(me.pitState, 0, 10)},
+      flag:num(me.flag, 0, 20), pitState:num(me.pitState, 0, 10),
+      // Plugin 2.5's own calculations: optimal lap (best sectors), predicted lap (best + the game's delta), impacts
+      // this stint, lockups last lap.
+      optimal:time(me.optimal), predicted:time(me.predicted), impacts:num(me.impacts, 0, 1000), lockups:num(me.lockups, 0, 1000)},
     field, map:map && map.length >= 50 ? map : null
   };
 }

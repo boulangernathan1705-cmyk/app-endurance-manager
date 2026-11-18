@@ -98,6 +98,12 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   `limitsPenalty` en tête, et pour chaque voiture `wcmp` (gomme des 4 roues), `pst`, `flag`, `yellow`. Vérifié en piste (19/11) :
   températures, gomme, stands, hybride, chocs. Écartés car faux en piste : « SoC » (772), écarts de place (788/792),
   estimation du tour (472). À revoir : nom de gomme selon l'indice, lift and coast (toujours 0), drapeaux de secteur (11).
+- calcule, depuis la 2.5.0, à la façon de LMU Drive mais avec notre code (`Computed.cs`, dix fois par seconde) : pour
+  chaque voiture, le chrono de son dernier arrêt (voie et temps arrêté) et les tours depuis sa sortie des stands
+  (`outLaps`, `lane`, `box` en fin de rangée, pour « SORTIE n/3 ») ; pour nous, le tour optimal (meilleurs secteurs de
+  la séance), le tour prévu (meilleur tour du jeu + delta du jeu), les chocs du relais et les blocages de roue du
+  dernier tour (`Voiture.TourOptimal`, `TourPrevu`, `ChocsRelais`, `BlocagesDernierTour` ; `optimal`, `predicted`,
+  `impacts`, `lockups` dans `me`).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 

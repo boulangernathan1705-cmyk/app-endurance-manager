@@ -489,9 +489,9 @@ test('plugin 2.5: what LMU Drive reads (inner layer, compound per wheel, aids, h
   const wheels = [[90, 85, 170, 500, [92, 88, 81], [95, 93, 90], 85, 1, 0, false, false], [90, 85, 170, 500, [92, 88, 81], [95, 'x', 90], 0, 300, 0, 'yes', true],
     [90, 85, 170, 500], [90, 85, 170, 500]];
   const me = {wheels, aids:{abs:true, tc:false, pitLimiter:false, limiter:false, wipers:1, lights:0}, liftCoast:120,
-    motor:{state:2, temp:61.5, water:44, rpm:8000, torque:150, soc:54.2}, gaps:[1.234, 'x'], impact:[812.5, 4200], flag:6, pitState:0};
+    motor:{state:2, temp:61.5, water:44, rpm:8000, torque:150, soc:54.2}, gaps:[1.234, 'x'], impact:[812.5, 4200], flag:6, pitState:0, optimal:207.9, predicted:-3, impacts:2, lockups:1};
   const read = cleanSnapshot(snap({me, sectorFlags:[0, 1, 0], grip:3, clouds:2, tod:58788, wetAvg:0.1, wind:3.2, limitsPenalty:4,
-    field:[{id:2, wcmp:'1.0 1.0 2.0 2.0', pst:4, flag:0, yellow:0}, {id:3, wcmp:'medium'}]}));
+    field:[{id:2, wcmp:'1.0 1.0 2.0 2.0', pst:4, flag:0, yellow:0, outLaps:2, lane:53.6, box:18.1}, {id:3, wcmp:'medium'}]}));
   assert.deepEqual(read.me.wheels[0].inner, [95, 93, 90]);
   assert.equal(read.me.wheels[0].optimal, 85);
   assert.equal(read.me.wheels[0].compound, 1);
@@ -512,6 +512,11 @@ test('plugin 2.5: what LMU Drive reads (inner layer, compound per wheel, aids, h
   assert.equal(cars[2].wcmp, '1.0 1.0 2.0 2.0');
   assert.equal(cars[2].pst, 4);
   assert.equal(cars[3].wcmp, null);
+  assert.equal(cars[2].outLaps, 2);
+  assert.equal(cars[2].box, 18.1);
+  assert.equal(read.me.optimal, 207.9);
+  assert.equal(read.me.predicted, null);
+  assert.equal(read.me.impacts, 2);
   // An older plugin: nothing of it.
   const old = cleanSnapshot(snap());
   assert.equal(old.me.aids, null);
