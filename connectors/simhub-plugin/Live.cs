@@ -22,6 +22,14 @@ namespace EnduranceManager.SimHub
         public double Spread, Ride;
         // The tread's three temperatures as the game's tyre screen shows them (°C): inner, middle, outer side.
         public double TreadIn, TreadMid, TreadOut;
+        // Plugin 2.5, what LMU Drive reads of each wheel (LMU's own wheel layout, LMU.Data.Base LMUWheel): the rubber's inner
+        // layer under the tread (inner, middle, outer side, °C), the temperature the compound works best at (°C, 0 unknown),
+        // the compound on this wheel (the game's index and type: a mixed set shows), a puncture, a lost wheel, the
+        // camber (degrees), the load on the tyre (N), its grip used (0 to 1), the brake line pressure (0 to 1) and how
+        // far the suspension is pushed in (metres).
+        public double InnerIn, InnerMid, InnerOut, Optimal, Camber, Load, Grip, BrakePressure, Suspension;
+        public int CompoundIndex, CompoundType;
+        public bool Flat, Off;
     }
 
     public struct Sample
@@ -39,7 +47,7 @@ namespace EnduranceManager.SimHub
         public int Damage;
         // The eight dent zones as the game counts them (0 front, then round by the left: 1 front left ... 7 front right), 0 to
         // 2 each, and whether a part came off (in LMU only the rear wing can).
-        public int[] Dents = new int[8];
+        public int[] Dents;
         public bool Detached;
         public bool Invalid;
         public string FrontCompound, RearCompound;
@@ -64,6 +72,21 @@ namespace EnduranceManager.SimHub
         public int TC, TCMax, TCSlip, TCSlipMax, TCCut, TCCutMax, ABS, ABSMax, MotorMap, MotorMapMax, Migration, MigrationMax;
         public int AntiSwayFront, AntiSwayFrontMax, AntiSwayRear, AntiSwayRearMax, TrackLimitsSteps;
         public double RearBrakeBias, Battery, Regen, GapAhead, GapBehind, DeltaBest;
+        // Plugin 2.5, the rest of LMU's telemetry that LMU Drive reads: the aids at work right now, the limiters, the
+        // wipers, lift and coast (the game's progress, 0 to 255), the hybrid (state of charge 0 to 1, the motor's and its
+        // water's temperature °C, rpm, torque Nm, state 0 unavailable 1 off 2 drawing 3 regenerating), the gaps to the
+        // cars a place ahead and behind (s), the last impact (game time and strength), the turbo (kPa) and the engine torque.
+        public bool AbsOn, TcOn, PitLimiter, SpeedLimiter, LimiterAvailable, AntiStall;
+        public int Wipers, LiftCoast, MotorState, Headlights, Flag, UnderYellow, CountLap, PitStateScoring, Sector;
+        public double Soc, MotorTemp, MotorWater, MotorRpm, MotorTorque, GapPlaceAhead, GapPlaceBehind, ImpactET, ImpactForce, Boost, EngineTorque;
+        // The game's own estimate of this lap (s) and where the pit lane starts (metres into the lap).
+        public double EstimatedLap, PitLapDist;
+        // The session (LMUStaticInfo): the yellow flag of each sector, the start lights, the track's grip level and cloud
+        // cover as the game counts them, the time of day (hours into the day), the average wetness of the line, the wind
+        // (m/s) and how many track limits steps make a penalty and a point.
+        public int[] SectorFlags;
+        public int StartLight, RedLights, TrackGrip, Clouds, LimitsPerPenalty, LimitsPerPoint;
+        public double TimeOfDay, WetAverage, Wind, SessionLeft;
     }
 
     public static class LmuMemory
@@ -82,6 +105,9 @@ namespace EnduranceManager.SimHub
             int end = Array.IndexOf(b, (byte)0, at, size);
             return Encoding.UTF8.GetString(b, at, (end < 0 ? at + size : end) - at).Trim();
         }
+
+        // A temperature LMU may give in kelvin or in °C: above 200 it is kelvin. 0 when unknown.
+        static double Celsius(double value) => double.IsNaN(value) || value <= 0 ? 0 : value > 200 ? value - 273.15 : value;
 
         // Each wheel's rolling radius (metres) on the car being driven, measured as it goes.
         static double[] radius = new double[4];
@@ -125,11 +151,29 @@ namespace EnduranceManager.SimHub
                 Water = F64(b, t + 364), Oil = F64(b, t + 372), LapDist = F64(b, v + 104),
                 Id = I32(b, v), Vehicle = Text(b, v + 36, 64), Control = (sbyte)b[v + 197], IntoLap = F64(b, v + 464), Garage = b[v + 507] != 0
             };
+            // Arrays made here: a struct cannot initialise its fields (C# before 10).
+            s.Dents = new int[8]; s.SectorFlags = new int[3];
             s.RearBrakeBias = F64(b, t + 664); s.DeltaBest = F64(b, t + 696); s.Battery = F64(b, t + 704);
             s.TC = b[t + 750]; s.TCMax = b[t + 751]; s.TCSlip = b[t + 752]; s.TCSlipMax = b[t + 753]; s.TCCut = b[t + 754]; s.TCCutMax = b[t + 755];
             s.ABS = b[t + 756]; s.ABSMax = b[t + 757]; s.MotorMap = b[t + 758]; s.MotorMapMax = b[t + 759]; s.Migration = b[t + 760]; s.MigrationMax = b[t + 761];
             s.AntiSwayFront = b[t + 762]; s.AntiSwayFrontMax = b[t + 763]; s.AntiSwayRear = b[t + 764]; s.AntiSwayRearMax = b[t + 765];
             s.TrackLimitsSteps = b[t + 767]; s.Regen = F32(b, t + 768); s.GapAhead = F32(b, t + 780); s.GapBehind = F32(b, t + 784);
+            // LMUCarTelemetry after the gaps and the settings (offsets checked against LMU.Data.Base, pack 4).
+            s.ImpactET = F64(b, t + 552); s.ImpactForce = F64(b, t + 560); s.EngineTorque = F64(b, t + 592);
+            s.PitLimiter = b[t + 604] != 0; s.LimiterAvailable = b[t + 656] != 0; s.AntiStall = b[t + 657] != 0; s.Boost = F64(b, t + 672);
+            s.MotorTorque = F64(b, t + 712); s.MotorRpm = F64(b, t + 720); s.MotorTemp = F64(b, t + 728); s.MotorWater = F64(b, t + 736); s.MotorState = b[t + 744];
+            s.AbsOn = b[t + 746] != 0; s.TcOn = b[t + 747] != 0; s.SpeedLimiter = b[t + 748] != 0; s.Wipers = b[t + 749]; s.LiftCoast = b[t + 766];
+            s.Soc = F32(b, t + 772); s.GapPlaceAhead = F32(b, t + 788); s.GapPlaceBehind = F32(b, t + 792);
+            // LMUVehicleScoringInfo: headlights, pit state, the flag shown to the car, yellow, whether the lap counts,
+            // the game's lap estimate and where the pit lane starts.
+            s.Headlights = b[v + 456]; s.PitStateScoring = b[v + 457]; s.Flag = b[v + 504]; s.UnderYellow = b[v + 505]; s.CountLap = b[v + 506];
+            for (int k = 0; k < 3; k++) s.SectorFlags[k] = (sbyte)b[ScoringInfo + 110 + k];
+            s.StartLight = b[ScoringInfo + 113]; s.RedLights = b[ScoringInfo + 114]; s.TrackGrip = b[ScoringInfo + 349]; s.Clouds = b[ScoringInfo + 350];
+            s.LimitsPerPenalty = b[ScoringInfo + 351]; s.LimitsPerPoint = b[ScoringInfo + 352]; s.TimeOfDay = F32(b, ScoringInfo + 344);
+            s.WetAverage = F64(b, ScoringInfo + 332); s.SessionLeft = F32(b, ScoringInfo + 340);
+            double wx = F64(b, ScoringInfo + 244), wy = F64(b, ScoringInfo + 252), wz = F64(b, ScoringInfo + 260);
+            s.Wind = Math.Sqrt(wx * wx + wy * wy + wz * wz);
+            s.EstimatedLap = F64(b, v + 472); s.PitLapDist = F32(b, v + 524); s.Sector = (sbyte)b[v + 102];
             string model = Text(b, t + 796, 30);
             if (model != "") s.Car = model;
             if (s.Car != radiusCar) { radiusCar = s.Car; radius = new double[4]; }
@@ -154,7 +198,11 @@ namespace EnduranceManager.SimHub
                     Pressure = F64(b, w + 120), Brake = F64(b, w + 24) - 273.15,
                     Surface = F64(b, w + 136) - 273.15, Slip = ground > 5 ? Math.Max(-1, Math.Min(1, (turning - ground) / ground)) : 0,
                     Spread = i % 2 == 0 ? right - left : left - right, Ride = F64(b, w + 8),
-                    TreadIn = (i % 2 == 0 ? right : left) - 273.15, TreadMid = F64(b, w + 136) - 273.15, TreadOut = (i % 2 == 0 ? left : right) - 273.15
+                    TreadIn = (i % 2 == 0 ? right : left) - 273.15, TreadMid = F64(b, w + 136) - 273.15, TreadOut = (i % 2 == 0 ? left : right) - 273.15,
+                    // The inner layer is left, middle, right as the tread (kelvin).
+                    InnerIn = F64(b, w + (i % 2 == 0 ? 228 : 212)) - 273.15, InnerMid = F64(b, w + 220) - 273.15, InnerOut = F64(b, w + (i % 2 == 0 ? 212 : 228)) - 273.15,
+                    Optimal = Celsius(F32(b, w + 236)), CompoundIndex = b[w + 240], CompoundType = b[w + 241], Flat = b[w + 177] != 0, Off = b[w + 178] != 0,
+                    Camber = F64(b, w + 80) * 180 / Math.PI, Load = F64(b, w + 104), Grip = F64(b, w + 112), BrakePressure = F64(b, w + 32), Suspension = F64(b, w + 0)
                 };
             }
             // LMU leaves mFrontRideHeight and mRearRideHeight at 0: the axle's height is its two wheels' (checked on track).

@@ -75,6 +75,8 @@ namespace EnduranceManager.SimHub
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
         public volatile string LastSession;
+        // The last reading while driving (boxed: the dashboards read it on SimHub's thread), null otherwise.
+        volatile object latest;
         public string Status => !Settings.Enabled ? "En pause" : uploader?.Status ?? "";
 
         public void Init(PluginManager pluginManager)
@@ -123,6 +125,8 @@ namespace EnduranceManager.SimHub
             }
             // The race figures under NeoRed's names (EnduranceManagerPlugin.Energy.VE.Current_%…), for any dashboard.
             foreach (var (name, get) in Course.Properties) this.AttachDelegate(name, () => get(Course.View));
+            // What LMU Drive reads of the car and the session (Telemetry.cs, plugin 2.5), from the last reading.
+            foreach (var (name, get) in Telemetry.Properties) this.AttachDelegate(name, () => latest is Sample s ? get(s) : null);
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
@@ -234,6 +238,7 @@ namespace EnduranceManager.SimHub
                             lastEt = sample.ET;
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
+                            latest = driving ? (object)sample : null;
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share) live.Frame(sample);
