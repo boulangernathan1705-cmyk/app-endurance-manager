@@ -235,7 +235,7 @@ namespace EnduranceManager.SimHub
                 // Plugin 2.5: yellow per sector, start lights, the track's grip and cloud cover (the game's levels), the
                 // time of day (hours), the line's average wetness, the wind (m/s), track limits steps for a penalty.
                 ["sectorFlags"] = s.SectorFlags, ["lights"] = s.StartLight, ["grip"] = s.TrackGrip, ["clouds"] = s.Clouds,
-                ["tod"] = R(s.TimeOfDay, 2), ["wetAvg"] = s.WetAverage >= 0 && s.WetAverage <= 1 ? R(s.WetAverage, 2) : null, ["wind"] = R(s.Wind, 1),
+                ["tod"] = s.TimeOfDay >= 0 && s.TimeOfDay <= 86400 ? R(s.TimeOfDay, 0) : null, ["wetAvg"] = s.WetAverage >= 0 && s.WetAverage <= 1 ? R(s.WetAverage, 2) : null, ["wind"] = R(s.Wind, 1),
                 ["limitsPenalty"] = s.LimitsPerPenalty
             };
             var me = new Dictionary<string, object>

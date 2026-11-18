@@ -490,7 +490,7 @@ test('plugin 2.5: what LMU Drive reads (inner layer, compound per wheel, aids, h
     [90, 85, 170, 500], [90, 85, 170, 500]];
   const me = {wheels, aids:{abs:true, tc:false, pitLimiter:false, limiter:false, wipers:1, lights:0}, liftCoast:120,
     motor:{state:2, temp:61.5, water:44, rpm:8000, torque:150, soc:54.2}, gaps:[1.234, 2.5, 1.234, 'x'], impact:[812.5, 4200], flag:6, pitState:0, estimate:209.4};
-  const read = cleanSnapshot(snap({me, sectorFlags:[0, 1, 0], grip:3, clouds:2, tod:14.5, wetAvg:0.1, wind:3.2, limitsPenalty:4,
+  const read = cleanSnapshot(snap({me, sectorFlags:[0, 1, 0], grip:3, clouds:2, tod:58788, wetAvg:0.1, wind:3.2, limitsPenalty:4,
     field:[{id:2, wcmp:'1.0 1.0 2.0 2.0', pst:4, flag:0, yellow:0, est:210.2}, {id:3, wcmp:'medium'}]}));
   assert.deepEqual(read.me.wheels[0].inner, [95, 93, 90]);
   assert.equal(read.me.wheels[0].optimal, 85);
@@ -508,7 +508,7 @@ test('plugin 2.5: what LMU Drive reads (inner layer, compound per wheel, aids, h
   assert.equal(read.me.flag, 6);
   assert.equal(read.me.estimate, 209.4);
   assert.deepEqual(read.sectorFlags, [0, 1, 0]);
-  assert.equal(read.tod, 14.5);
+  assert.equal(read.tod, 58788);
   const cars = Object.fromEntries(read.field.map(car => [car.id, car]));
   assert.equal(cars[2].wcmp, '1.0 1.0 2.0 2.0');
   assert.equal(cars[2].pst, 4);

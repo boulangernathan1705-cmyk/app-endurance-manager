@@ -126,10 +126,10 @@ export function cleanSnapshot(input) {
     v:LIVE_VERSION, track, session, et, end:num(input.end, 0, 1e7), maxLaps:num(input.maxLaps, 0, 100000), length:num(input.length, 100, 100000),
     phase:num(input.phase, 0, 20), yellow:num(input.yellow, -1, 20), air:num(input.air, -50, 80), trackTemp:num(input.trackTemp, -50, 100),
     rain:num(input.rain, 0, 1), wet:num(input.wet, 0, 1), light:num(input.light, 0, 1),
-    // Plugin 2.5: yellow per sector, start lights, grip and cloud levels, time of day (h), average wetness, wind (m/s),
+    // Plugin 2.5: yellow per sector, start lights, grip and cloud levels, time of day (s into the day), average wetness, wind (m/s),
     // track limits steps for a penalty.
     sectorFlags:Array.isArray(input.sectorFlags) && input.sectorFlags.length === 3 && input.sectorFlags.every(value => num(value, -1, 20) !== null) ? input.sectorFlags : null,
-    lights:num(input.lights, 0, 20), grip:num(input.grip, 0, 20), clouds:num(input.clouds, 0, 20), tod:num(input.tod, 0, 24),
+    lights:num(input.lights, 0, 20), grip:num(input.grip, 0, 20), clouds:num(input.clouds, 0, 20), tod:num(input.tod, 0, 86400),
     wetAvg:num(input.wetAvg, 0, 1), wind:num(input.wind, 0, 200), limitsPenalty:num(input.limitsPenalty, 0, 255),
     // car: the model as the fiches combo name it (their track + car), vehicle: the entry's full name in the scoring.
     me:{id, driver:text(me.driver, 40), car:text(me.car, 120), vehicle:text(me.vehicle, 80), cls:text(me.cls, 40), compound:text(me.compound, 40),

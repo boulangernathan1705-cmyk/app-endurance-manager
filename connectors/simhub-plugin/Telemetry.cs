@@ -83,7 +83,7 @@ namespace EnduranceManager.SimHub
                 ("Seance.FeuxDepart", s => s.StartLight),
                 ("Seance.Adherence", s => s.TrackGrip),
                 ("Seance.Nuages", s => s.Clouds),
-                ("Seance.Heure", s => R(s.TimeOfDay, 2)),
+                ("Seance.Heure_s", s => s.TimeOfDay >= 0 && s.TimeOfDay <= 86400 ? R(s.TimeOfDay, 0) : null),
                 ("Seance.HumiditeMoyenne", s => s.WetAverage >= 0 && s.WetAverage <= 1 ? R(s.WetAverage * 100, 0) : null),
                 ("Seance.Vent_ms", s => R(s.Wind, 1)),
                 ("Seance.TempsRestant", s => R(s.SessionLeft, 0)),

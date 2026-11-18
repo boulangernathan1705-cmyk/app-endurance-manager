@@ -82,7 +82,7 @@ namespace EnduranceManager.SimHub
         // The game's own estimate of this lap (s) and where the pit lane starts (metres into the lap).
         public double EstimatedLap, PitLapDist;
         // The session (LMUStaticInfo): the yellow flag of each sector, the start lights, the track's grip level and cloud
-        // cover as the game counts them, the time of day (hours into the day), the average wetness of the line, the wind
+        // cover as the game counts them, the time of day (seconds into the day, checked in game), the average wetness of the line, the wind
         // (m/s) and how many track limits steps make a penalty and a point.
         public int[] SectorFlags;
         public int StartLight, RedLights, TrackGrip, Clouds, LimitsPerPenalty, LimitsPerPoint;
