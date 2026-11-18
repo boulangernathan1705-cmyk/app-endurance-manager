@@ -210,8 +210,8 @@ namespace EnduranceManager.SimHub
                     R(b[at + 578] / 2.55, 1),
                     compound, damage, used.TryGetValue(DriverKey(driver), out double lap) ? R(lap, 2) : null,
                     // Plugin 2.5: wheels' compounds, the game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving),
-                    // the flag shown to the car (6 blue), under yellow, and the game's estimate of the car's lap (s).
-                    wheels, b[at + 457], b[at + 504], b[at + 505], T(F64(b, at + 472))
+                    // the flag shown to the car (6 blue) and under yellow.
+                    wheels, b[at + 457], b[at + 504], b[at + 505]
                 });
             }
             // A car without virtual energy (LMP2) shows its fuel instead: energy counts once the game gave some.
@@ -276,13 +276,13 @@ namespace EnduranceManager.SimHub
                 ["battery"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null, ["regen"] = R(s.Regen, 1), ["delta"] = R(s.DeltaBest, 2),
                 ["water"] = R(s.Water, 1), ["oil"] = R(s.Oil, 1),
                 // Plugin 2.5: the aids at work, limiters, wipers, lift and coast, the hybrid motor, the game's gaps to the
-                // cars a place ahead and behind, the last impact, the flag shown to us.
+                // cars ahead and behind (s), the last impact, the flag shown to us.
                 ["aids"] = new Dictionary<string, object> { ["abs"] = s.AbsOn, ["tc"] = s.TcOn, ["pitLimiter"] = s.PitLimiter, ["limiter"] = s.SpeedLimiter, ["wipers"] = s.Wipers, ["lights"] = s.Headlights },
                 ["liftCoast"] = s.LiftCoast,
-                ["motor"] = s.MotorState == 0 ? null : new Dictionary<string, object> { ["state"] = s.MotorState, ["temp"] = R(s.MotorTemp, 1), ["water"] = R(s.MotorWater, 1), ["rpm"] = R(s.MotorRpm, 0), ["torque"] = R(s.MotorTorque, 1), ["soc"] = R(s.Soc * 100, 1) },
-                ["gaps"] = new[] { R(s.GapAhead, 3), R(s.GapBehind, 3), R(s.GapPlaceAhead, 3), R(s.GapPlaceBehind, 3) },
+                ["motor"] = s.MotorState == 0 ? null : new Dictionary<string, object> { ["state"] = s.MotorState, ["temp"] = R(s.MotorTemp, 1), ["water"] = R(s.MotorWater, 1), ["rpm"] = R(s.MotorRpm, 0), ["torque"] = R(s.MotorTorque, 1), ["soc"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null },
+                ["gaps"] = new[] { R(Math.Abs(s.GapAhead), 3), R(s.GapBehind, 3) },
                 ["impact"] = s.ImpactET > 0 ? new[] { R(s.ImpactET, 2), R(s.ImpactForce, 0) } : null,
-                ["flag"] = s.Flag, ["pitState"] = s.PitStateScoring, ["estimate"] = T(s.EstimatedLap)
+                ["flag"] = s.Flag, ["pitState"] = s.PitStateScoring
             };
             // The outline once per connection (the room keeps it).
             if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }

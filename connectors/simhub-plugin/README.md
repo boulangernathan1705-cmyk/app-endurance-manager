@@ -89,14 +89,15 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   `LMUCarTelemetry`, `LMUWheel`, `LMUVehicleScoringInfo`, `LMUStaticInfo`) : par roue, la couche intérieure du pneu
   (intérieur, milieu, extérieur), la température idéale de la gomme, la gomme de la roue (indice et type du jeu), crevaison,
   roue perdue, carrossage, charge, adhérence, suspension ; ABS et TC au travail, limiteurs, essuie-glaces, phares, lift
-  and coast, turbo, hybride (état, charge, températures moteur et eau, régime, couple), écarts du jeu avec les voitures et
-  les places devant et derrière, dernier choc, drapeau montré, tour compté, estimation du tour par le jeu ; pour la séance,
+  and coast, turbo, hybride (état, charge, températures moteur et eau, régime, couple), écarts du jeu avec les voitures
+  devant et derrière, dernier choc, drapeau montré, tour compté ; pour la séance,
   drapeau jaune par secteur, feux de départ, adhérence de la piste, nuages, heure, humidité moyenne, vent, pas de track
   limits par pénalité et par point. Propriétés `EnduranceManagerPlugin.Voiture.*` et `.Seance.*` (pneus sous
   `Voiture.Pneus.AVG|AVD|ARG|ARD.*`). Envoyé aussi au mur : `wheels` (6e à 11e valeurs), `aids`, `liftCoast`, `motor`,
   `gaps`, `impact`, `flag`, `pitState`, `estimate` dans `me`, `sectorFlags`, `grip`, `clouds`, `tod`, `wetAvg`, `wind`,
-  `limitsPenalty` en tête, et pour chaque voiture `wcmp` (gomme des 4 roues), `pst`, `flag`, `yellow`, `est`. À vérifier
-  en piste : la correspondance indice/type et nom de gomme, et l'unité de la température idéale.
+  `limitsPenalty` en tête, et pour chaque voiture `wcmp` (gomme des 4 roues), `pst`, `flag`, `yellow`. Vérifié en piste (19/11) :
+  températures, gomme, stands, hybride, chocs. Écartés car faux en piste : « SoC » (772), écarts de place (788/792),
+  estimation du tour (472). À revoir : nom de gomme selon l'indice, lift and coast (toujours 0), drapeaux de secteur (11).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 

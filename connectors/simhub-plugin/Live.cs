@@ -74,13 +74,12 @@ namespace EnduranceManager.SimHub
         public double RearBrakeBias, Battery, Regen, GapAhead, GapBehind, DeltaBest;
         // Plugin 2.5, the rest of LMU's telemetry that LMU Drive reads: the aids at work right now, the limiters, the
         // wipers, lift and coast (the game's progress, 0 to 255), the hybrid (state of charge 0 to 1, the motor's and its
-        // water's temperature °C, rpm, torque Nm, state 0 unavailable 1 off 2 drawing 3 regenerating), the gaps to the
-        // cars a place ahead and behind (s), the last impact (game time and strength), the turbo (kPa) and the engine torque.
+        // water's temperature °C, rpm, torque Nm, state 0 unavailable 1 off 2 drawing 3 regenerating), the last impact (game time and strength), the turbo (kPa) and the engine torque.
         public bool AbsOn, TcOn, PitLimiter, SpeedLimiter, LimiterAvailable, AntiStall;
         public int Wipers, LiftCoast, MotorState, Headlights, Flag, UnderYellow, CountLap, PitStateScoring, Sector;
-        public double Soc, MotorTemp, MotorWater, MotorRpm, MotorTorque, GapPlaceAhead, GapPlaceBehind, ImpactET, ImpactForce, Boost, EngineTorque;
-        // The game's own estimate of this lap (s) and where the pit lane starts (metres into the lap).
-        public double EstimatedLap, PitLapDist;
+        public double MotorTemp, MotorWater, MotorRpm, MotorTorque, ImpactET, ImpactForce, Boost, EngineTorque;
+        // Where the pit lane starts (metres into the lap).
+        public double PitLapDist;
         // The session (LMUStaticInfo): the yellow flag of each sector, the start lights, the track's grip level and cloud
         // cover as the game counts them, the time of day (seconds into the day, checked in game), the average wetness of the line, the wind
         // (m/s) and how many track limits steps make a penalty and a point.
@@ -163,9 +162,10 @@ namespace EnduranceManager.SimHub
             s.PitLimiter = b[t + 604] != 0; s.LimiterAvailable = b[t + 656] != 0; s.AntiStall = b[t + 657] != 0; s.Boost = F64(b, t + 672);
             s.MotorTorque = F64(b, t + 712); s.MotorRpm = F64(b, t + 720); s.MotorTemp = F64(b, t + 728); s.MotorWater = F64(b, t + 736); s.MotorState = b[t + 744];
             s.AbsOn = b[t + 746] != 0; s.TcOn = b[t + 747] != 0; s.SpeedLimiter = b[t + 748] != 0; s.Wipers = b[t + 749]; s.LiftCoast = b[t + 766];
-            s.Soc = F32(b, t + 772); s.GapPlaceAhead = F32(b, t + 788); s.GapPlaceBehind = F32(b, t + 792);
+            // Not read: 772 (LMU Drive's « SoC », 457 to 9857 on track, not a percent) and 788/792 (« place gaps », -800 to
+            // -1200 on track, not seconds): checked on Nathan's PC, 2026-11-19. The battery stays at 704.
             // LMUVehicleScoringInfo: headlights, pit state, the flag shown to the car, yellow, whether the lap counts,
-            // the game's lap estimate and where the pit lane starts.
+            // and where the pit lane starts (the game's lap estimate at 472 is not read: stuck on track, 2026-11-19).
             s.Headlights = b[v + 456]; s.PitStateScoring = b[v + 457]; s.Flag = b[v + 504]; s.UnderYellow = b[v + 505]; s.CountLap = b[v + 506];
             for (int k = 0; k < 3; k++) s.SectorFlags[k] = (sbyte)b[ScoringInfo + 110 + k];
             s.StartLight = b[ScoringInfo + 113]; s.RedLights = b[ScoringInfo + 114]; s.TrackGrip = b[ScoringInfo + 349]; s.Clouds = b[ScoringInfo + 350];
@@ -173,7 +173,7 @@ namespace EnduranceManager.SimHub
             s.WetAverage = F64(b, ScoringInfo + 332); s.SessionLeft = F32(b, ScoringInfo + 340);
             double wx = F64(b, ScoringInfo + 244), wy = F64(b, ScoringInfo + 252), wz = F64(b, ScoringInfo + 260);
             s.Wind = Math.Sqrt(wx * wx + wy * wy + wz * wz);
-            s.EstimatedLap = F64(b, v + 472); s.PitLapDist = F32(b, v + 524); s.Sector = (sbyte)b[v + 102];
+            s.PitLapDist = F32(b, v + 524); s.Sector = (sbyte)b[v + 102];
             string model = Text(b, t + 796, 30);
             if (model != "") s.Car = model;
             if (s.Car != radiusCar) { radiusCar = s.Car; radius = new double[4]; }

@@ -17,10 +17,10 @@ export const DELTA_VERSION = 2;
 // energy (or fuel) its last lap used, as the game shows them of every car (later plugins; null from older ones).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
   'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank', 'cmp', 'dmg', 'veLap',
-  'wcmp', 'pst', 'flag', 'yellow', 'est'];
+  'wcmp', 'pst', 'flag', 'yellow'];
 // Plugin 2.5: wcmp, the compound of each wheel (FL FR RL RR) as the game's index and type (« 1.0 1.0 2.0 2.0 »); pst, the
 // game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving); flag, the flag shown to the car (6 blue); yellow,
-// under yellow; est, the game's estimate of the car's lap (s).
+// under yellow.
 const TEXT = new Set(['cls', 'driver', 'vehicle', 'num', 'cmp', 'wcmp']);
 const WHEEL_COMPOUNDS = /^\d{1,3}\.\d{1,3}( \d{1,3}\.\d{1,3}){3}$/;
 const PERCENT = new Set(['tank', 'dmg', 'veLap']);
@@ -67,7 +67,7 @@ function cleanWheel(input) {
     type:Number.isInteger(type) && type >= 0 && type < 256 ? type : null, flat:flat === true, off:off === true};
 }
 
-// Plugin 2.5: the aids at work, the hybrid motor, the game's gaps (car ahead, behind, place ahead, behind) and last impact.
+// Plugin 2.5: the aids at work, the hybrid motor, the game's gaps (s to the car ahead, behind) and last impact.
 const flag = value => value === true;
 function cleanAids(input) {
   if (!input || typeof input !== 'object') return null;
@@ -139,9 +139,9 @@ export function cleanSnapshot(input) {
       water:num(me.water, -50, 250), oil:num(me.oil, -50, 250), control:control && Object.values(control).some(value => value !== null) ? control : null,
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile,
       aids:cleanAids(me.aids), liftCoast:num(me.liftCoast, 0, 255), motor:cleanMotor(me.motor),
-      gaps:Array.isArray(me.gaps) ? [0, 1, 2, 3].map(index => num(me.gaps[index], -3600, 3600)) : null,
+      gaps:Array.isArray(me.gaps) ? [0, 1].map(index => num(me.gaps[index], -3600, 3600)) : null,
       impact:Array.isArray(me.impact) && num(me.impact[0], 0, 1e7) !== null ? [me.impact[0], num(me.impact[1], 0, 1e9)] : null,
-      flag:num(me.flag, 0, 20), pitState:num(me.pitState, 0, 10), estimate:time(me.estimate)},
+      flag:num(me.flag, 0, 20), pitState:num(me.pitState, 0, 10)},
     field, map:map && map.length >= 50 ? map : null
   };
 }
