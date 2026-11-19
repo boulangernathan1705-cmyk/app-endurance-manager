@@ -43,9 +43,6 @@ namespace EnduranceManager.SimHub
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
             page.Children.Add(new TextBlock { Text = "Seul le module Profils change quelque chose dans le jeu, quand tu appuies sur un de ses boutons.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
-            // The recorder for the tests (Tape.cs): off at each start of SimHub.
-            page.Children.Add(Switch("Enregistrer ma séance pour les tests (fichier sur ce PC, rien n'est envoyé)", Tape.Recording, on => plugin.SetRecording(on)));
-            page.Children.Add(recordText);
 
             // One tab per module, its switch at the top. The site first: the fiches combo and the mur need it.
             var site = Page("Site", "Relie le plugin au site de ton équipe : fiches combo, mur des stands, valeurs de l'équipe dans les overlays, mises à jour.");
@@ -73,6 +70,31 @@ namespace EnduranceManager.SimHub
             companion.Children.Add(companionText);
             var screen = plugin.Companion.Running ? plugin.Companion.Screen(plugin.PluginManager) : null;
             if (screen != null) companion.Children.Add(screen);
+            // Retours de test: the journal, « Signaler un problème », and the full recording for the replay tests.
+            var report = Page("Retours de test", "Pour les pilotes qui essaient le plugin : ce qu'il fait est noté, et tu peux signaler un problème. Avec le module Site, tout part sur le site.");
+            report.Children.Add(Switch("Activer ce module : noter ce que fait le plugin", plugin.Settings.Report, on => plugin.SetModule(x => x.Report = on)));
+            report.Children.Add(reportText);
+            var note = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 60, Margin = new Thickness(0, 10, 0, 8) };
+            var signal = Action("Signaler un problème", true);
+            var folder = Action("Ouvrir le dossier", false);
+            signal.Click += (sender, args) =>
+            {
+                reportSaid = DateTime.Now.AddSeconds(15);
+                if (string.IsNullOrWhiteSpace(note.Text)) { reportText.Text = "Écris d'abord en une phrase ce qui ne va pas."; return; }
+                plugin.Signal(note.Text.Trim());
+                note.Text = "";
+                reportText.Text = plugin.Link != null ? "Merci, c'est noté : il part sur le site dès que tu n'es plus en piste." : "Merci, c'est noté dans le dossier des retours (module Site coupé : à envoyer à la main).";
+            };
+            folder.Click += (sender, args) => { try { System.IO.Directory.CreateDirectory(Report.Folder); Process.Start(new ProcessStartInfo(Report.Folder) { UseShellExecute = true }); } catch { } };
+            report.Children.Add(new TextBlock { Text = "Ce qui ne va pas, en une phrase :", Margin = new Thickness(0, 14, 0, 0) });
+            report.Children.Add(note);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 18) };
+            row.Children.Add(signal);
+            row.Children.Add(folder);
+            report.Children.Add(row);
+            // The recorder for the replay tests (Tape.cs): off at each start of SimHub, heavy, kept on the PC.
+            report.Children.Add(Switch("Enregistrer ma séance complète pour les tests (gros fichier, reste sur ce PC)", Tape.Recording, on => plugin.SetRecording(on)));
+            report.Children.Add(recordText);
             var tabs = new TabControl { Margin = new Thickness(8) };
             tabs.Items.Add(Tab("Général", page));
             // SimHub alone first; then the site and the two modules that go through it.
@@ -85,6 +107,7 @@ namespace EnduranceManager.SimHub
             tabs.Items.Add(Tab("Site", site));
             tabs.Items.Add(Tab("Fiches combo", combos));
             tabs.Items.Add(Tab("Mur des stands", wall));
+            tabs.Items.Add(Tab("Retours de test", report));
 
             paste.Click += (sender, args) => PasteCode(false);
             update.Click += (sender, args) => StartUpdate();
@@ -104,7 +127,9 @@ namespace EnduranceManager.SimHub
 
         // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
         // by itself every two seconds (automatic): the pilot only clicks « Créer mon code » on the site.
-        readonly TextBlock sessionText = Detail(), wallText = Detail(), recordText = Detail(), companionText = Detail();
+        readonly TextBlock sessionText = Detail(), wallText = Detail(), recordText = Detail(), companionText = Detail(), reportText = Detail();
+        // A message after « Signaler » stays a few seconds before the state comes back.
+        DateTime reportSaid;
 
         static StackPanel Page(string title, string intro)
         {
@@ -203,6 +228,14 @@ namespace EnduranceManager.SimHub
             if (plugin.Settings.Enabled && !siteOn) sessionText.Text += "\nModule Site coupé : les séances restent sur ce PC, elles partiront s'il est réactivé.";
             if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
             recordText.Text = Tape.Status;
+            if (DateTime.Now > reportSaid)
+            {
+                int files = Report.WaitingCount;
+                reportText.Text = !plugin.Settings.Report ? "Module coupé : rien n'est noté." : "Journal en cours, écrit à la fin de chaque séance."
+                    + (files > 0 ? $" {files} fichier{(files > 1 ? "s" : "")} en attente d'envoi." : "")
+                    + (Report.LastSent is string at ? $" Dernier envoi à {at}." : "")
+                    + (plugin.Link == null ? " Module Site coupé : les fichiers restent dans Documents\\Endurance Manager\\Retours." : "");
+            }
             companionText.Text = plugin.Settings.CompanionOn == plugin.Companion.Running ? plugin.Companion.Status
                 : plugin.Settings.CompanionOn ? "Activé : FMT companion démarre au prochain lancement de SimHub." + (plugin.Companion.Status.StartsWith("Module") ? "" : "\n" + plugin.Companion.Status)
                 : "Coupé : FMT companion s'arrête au prochain lancement de SimHub.";

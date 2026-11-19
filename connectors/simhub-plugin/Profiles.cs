@@ -152,6 +152,7 @@ namespace EnduranceManager.SimHub
         public void Press(int slot)
         {
             if (!enabled() || slot < 0 || slot >= Slots) return;
+            Report.Log("bouton", "Profil" + (slot + 1) + " appuyé");
             pressedAt[slot] = DateTime.UtcNow;
             holds[slot]?.Dispose();
             holds[slot] = new Timer(_ => { pressedAt[slot] = DateTime.MinValue; Memorise(slot); }, null, HoldMs, Timeout.Infinite);
@@ -162,8 +163,9 @@ namespace EnduranceManager.SimHub
             if (!enabled() || slot < 0 || slot >= Slots) return;
             holds[slot]?.Dispose();
             holds[slot] = null;
-            if (pressedAt[slot] == DateTime.MinValue) return;
+            if (pressedAt[slot] == DateTime.MinValue) { Report.Log("bouton", "Profil" + (slot + 1) + " relâché après 2 s : mémorisé"); return; }
             pressedAt[slot] = DateTime.MinValue;
+            Report.Log("bouton", "Profil" + (slot + 1) + " relâché : appliqué");
             Apply(slot);
         }
 

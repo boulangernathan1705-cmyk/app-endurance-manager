@@ -401,11 +401,32 @@ export async function combosPlugin(path, request, env) {
     if (path.endsWith('/pass')) return relayPass(env, community.id, who);
     return openLive(request, env, community.id, who);
   }
+  // Module « Retours de test » (Report.cs): a session's journal or a problem the pilot reports, kept REPORT_DAYS days.
+  if (path === '/api/combos/plugin/report') {
+    if (method !== 'POST') fail(405, 'Méthode non prise en charge.');
+    const {community, user} = await pluginAccess(request, env);
+    return json(await saveReport(env, community.id, user.id, await largeBody(request)), 201);
+  }
   if (path === '/api/combos/plugin/sheet' && method === 'GET') {
     const {community, user} = await pluginAccess(request, env);
     return pluginSheet(env, community, user.id, new URL(request.url));
   }
   notFound();
+}
+
+const REPORT_KINDS = new Set(['journal', 'signal']), REPORT_MAX = 256 * 1024, REPORT_DAYS = 60;
+async function saveReport(env, communityId, userId, input) {
+  const kind = String(input?.kind || '');
+  if (!REPORT_KINDS.has(kind)) fail(400, 'Retour illisible.');
+  const body = JSON.stringify(input.data ?? null);
+  if (body.length > REPORT_MAX) fail(413, 'Retour trop lourd.');
+  const at = now(), reportId = id();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO plugin_reports (id, community_id, user_id, created_at, version, kind, note, body) VALUES (?,?,?,?,?,?,?,?)')
+      .bind(reportId, communityId, userId, at, String(input.version || '').slice(0, 20), kind, String(input.note || '').slice(0, 2000), body),
+    env.DB.prepare('DELETE FROM plugin_reports WHERE created_at < ?').bind(at - REPORT_DAYS * 86400),
+  ]);
+  return {id:reportId};
 }
 
 // A pass for the live relay, valid a few minutes: where to connect, or 404 while the site has no relay (the plugin and
