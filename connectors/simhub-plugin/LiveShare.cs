@@ -155,11 +155,11 @@ namespace EnduranceManager.SimHub
 
         // One snapshot from the copy of the game's memory, handed to the sending thread; the previous one, if not
         // sent yet, is replaced (only the latest state matters).
-        public void Offer(byte[] b, Sample s, Recorder recorder, LmuApi api)
+        public void Offer(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed = null)
         {
             if (s.Control < 0 || s.Control > 1) return;
             Snapshot message;
-            try { message = Build(b, s, recorder, api); } catch { return; }
+            try { message = Build(b, s, recorder, api, computed); } catch { return; }
             lock (gate) { pending = message; offeredAt = DateTime.Now; }
             wake.Set();
             if (DateTime.Now - numbersAt > TimeSpan.FromSeconds(20) && Interlocked.Exchange(ref reading, 1) == 0)
@@ -172,7 +172,7 @@ namespace EnduranceManager.SimHub
             }
         }
 
-        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api)
+        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed)
         {
             int count = Math.Min(I32(b, ScoringInfo + 104), MaxVehicles);
             double length = F64(b, ScoringInfo + 88);
@@ -187,10 +187,12 @@ namespace EnduranceManager.SimHub
             {
                 int at = VehScoring + i * VehSize, id = I32(b, at);
                 string vehicle = Text(b, at + 36, 64), driver = Text(b, at + 4, 32);
-                string compound = null;
+                string compound = null, wheels = null;
                 double? damage = null;
                 if (telemetry.TryGetValue(id, out int t))
                 {
+                    // Plugin 2.5: the compound of each wheel (FL, FR, RL, RR) as the game's index and type, « 1.0 1.0 2.0 2.0 ».
+                    wheels = string.Join(" ", Enumerable.Range(0, 4).Select(w => b[t + 848 + w * 260 + 240] + "." + b[t + 848 + w * 260 + 241]));
                     string front = Text(b, t + 620, 18), rear = Text(b, t + 638, 18);
                     compound = front == "" ? null : rear == "" || rear == front ? front : front + " / " + rear;
                     int dents = 0;
@@ -206,7 +208,12 @@ namespace EnduranceManager.SimHub
                     null, null, null, null, (sbyte)b[at + 103], positions ? R(F64(b, at + 264), 1) : null, positions ? R(F64(b, at + 280), 1) : null,
                     // What the game says the car has left in its tank (or of its virtual energy), 0 to 255.
                     R(b[at + 578] / 2.55, 1),
-                    compound, damage, used.TryGetValue(DriverKey(driver), out double lap) ? R(lap, 2) : null
+                    compound, damage, used.TryGetValue(DriverKey(driver), out double lap) ? R(lap, 2) : null,
+                    // Plugin 2.5: wheels' compounds, the game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving),
+                    // the flag shown to the car (6 blue) and under yellow.
+                    wheels, b[at + 457], b[at + 504], b[at + 505],
+                    // Computed.cs: laps since the car left the pits, its last lane and box times (s).
+                    computed?.OutLaps(id, I16(b, at + 100)), computed?.Pit(id)?.Lane, computed?.Pit(id)?.Box
                 });
             }
             // A car without virtual energy (LMP2) shows its fuel instead: energy counts once the game gave some.
@@ -226,7 +233,12 @@ namespace EnduranceManager.SimHub
                 ["track"] = s.Track, ["session"] = s.Session, ["et"] = R(F64(b, ScoringInfo + 68), 2), ["end"] = R(F64(b, ScoringInfo + 76), 1),
                 ["maxLaps"] = I32(b, ScoringInfo + 84), ["length"] = R(length, 1), ["phase"] = b[ScoringInfo + 108], ["yellow"] = (sbyte)b[ScoringInfo + 109],
                 ["air"] = R(s.AirTemp, 1), ["trackTemp"] = R(s.TrackTemp, 1), ["rain"] = R(s.Rain, 2), ["wet"] = s.Wet >= 0 && s.Wet <= 1 ? R(s.Wet, 2) : null,
-                ["light"] = api.CurrentLight()
+                ["light"] = api.CurrentLight(),
+                // Plugin 2.5: yellow per sector, start lights, the track's grip and cloud cover (the game's levels), the
+                // time of day (hours), the line's average wetness, the wind (m/s), track limits steps for a penalty.
+                ["sectorFlags"] = s.SectorFlags, ["lights"] = s.StartLight, ["grip"] = s.TrackGrip, ["clouds"] = s.Clouds,
+                ["tod"] = s.TimeOfDay >= 0 && s.TimeOfDay <= 86400 ? R(s.TimeOfDay, 0) : null, ["wetAvg"] = s.WetAverage >= 0 && s.WetAverage <= 1 ? R(s.WetAverage, 2) : null, ["wind"] = R(s.Wind, 1),
+                ["limitsPenalty"] = s.LimitsPerPenalty
             };
             var me = new Dictionary<string, object>
             {
@@ -236,7 +248,11 @@ namespace EnduranceManager.SimHub
                 ["fuel"] = R(s.Fuel, 2), ["capacity"] = R(s.FuelCapacity, 1),
                 // Per wheel: wear, carcass, pressure, brake and (2.4.0) the tread's inner, middle and outer temperatures.
                 ["wheels"] = s.Wheels.Select(w => new object[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0),
-                    new[] { R(w.TreadIn, 0), R(w.TreadMid, 0), R(w.TreadOut, 0) } }).ToArray(),
+                    new[] { R(w.TreadIn, 0), R(w.TreadMid, 0), R(w.TreadOut, 0) },
+                    // Plugin 2.5: inner layer (inner, middle, outer), the compound's best temperature, its index and type,
+                    // puncture, lost wheel.
+                    new[] { R(w.InnerIn, 0), R(w.InnerMid, 0), R(w.InnerOut, 0) }, w.Optimal > 0 ? R(w.Optimal, 0) : null,
+                    w.CompoundIndex, w.CompoundType, w.Flat, w.Off }).ToArray(),
                 // The eight dent zones, 0 to 2 each.
                 ["damage"] = R(s.Damage / 16.0 * 100, 0), ["dents"] = s.Dents, ["detached"] = s.Detached,
                 ["stops"] = (session?.Stops ?? new List<LiveStop>()).Select(stop => new Dictionary<string, object>
@@ -247,7 +263,7 @@ namespace EnduranceManager.SimHub
                 ["service"] = service == null ? null : new Dictionary<string, object>
                 {
                     ["connect"] = service.Connect, ["energyRate"] = service.EnergyRate, ["fuelRate"] = service.FuelRate, ["tyres4"] = service.Tyres4,
-                    ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong
+                    ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong, ["repair"] = service.Repair
                 },
                 ["profile"] = profile,
                 // The settings in the car (levels, 0 steps: the car has none), the hybrid and the track limits.
@@ -260,7 +276,16 @@ namespace EnduranceManager.SimHub
                 },
                 ["limits"] = b[ScoringInfo + 352] > 0 ? R((double)s.TrackLimitsSteps / b[ScoringInfo + 352], 2) : null,
                 ["battery"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null, ["regen"] = R(s.Regen, 1), ["delta"] = R(s.DeltaBest, 2),
-                ["water"] = R(s.Water, 1), ["oil"] = R(s.Oil, 1)
+                ["water"] = R(s.Water, 1), ["oil"] = R(s.Oil, 1),
+                // Plugin 2.5: the aids at work, limiters, wipers, lift and coast, the hybrid motor, the game's gaps to the
+                // cars ahead and behind (s), the last impact, the flag shown to us.
+                ["aids"] = new Dictionary<string, object> { ["abs"] = s.AbsOn, ["tc"] = s.TcOn, ["pitLimiter"] = s.PitLimiter, ["limiter"] = s.SpeedLimiter, ["wipers"] = s.Wipers, ["lights"] = s.Headlights },
+                ["liftCoast"] = s.LiftCoast,
+                ["motor"] = s.MotorState == 0 ? null : new Dictionary<string, object> { ["state"] = s.MotorState, ["temp"] = R(s.MotorTemp, 1), ["water"] = R(s.MotorWater, 1), ["rpm"] = R(s.MotorRpm, 0), ["torque"] = R(s.MotorTorque, 1), ["soc"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null },
+                ["gaps"] = new[] { R(Math.Abs(s.GapAhead), 3), R(s.GapBehind, 3) },
+                ["impact"] = s.ImpactET > 0 ? new[] { R(s.ImpactET, 2), R(s.ImpactForce, 0) } : null,
+                ["flag"] = s.Flag, ["pitState"] = s.PitStateScoring,
+                ["optimal"] = computed?.Optimal, ["predicted"] = computed?.Predicted, ["impacts"] = computed?.Impacts, ["lockups"] = computed?.LockupsLastLap
             };
             // The outline once per connection (the room keeps it).
             if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }
@@ -368,7 +393,7 @@ namespace EnduranceManager.SimHub
         }
 
         // Seconds from the line at each percent of the lap, from the best lap's points (time and distance).
-        static double[] Profile(LapTrace trace, double length)
+        internal static double[] Profile(LapTrace trace, double length)
         {
             if (trace.Dist.Count < 50 || trace.Time <= 0) return null;
             var times = new double[101];
@@ -390,7 +415,7 @@ namespace EnduranceManager.SimHub
 
         // What the lane costs on top of the same stretch at racing speed (the stretch from our best lap), without the
         // time stopped: the part of a stop that does not depend on the service.
-        static double? Drive(LiveStop stop, double[] profile, double length)
+        internal static double? Drive(LiveStop stop, double[] profile, double length)
         {
             if (profile == null || length <= 100) return null;
             double At(double dist) { double x = Math.Max(0, Math.Min(0.99999, dist / length)) * 100; int k = (int)x; return profile[k] + (profile[k + 1] - profile[k]) * (x - k); }

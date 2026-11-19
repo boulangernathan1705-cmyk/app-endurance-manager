@@ -7,7 +7,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>EnduranceManager.SimHub</AssemblyName>
     <!-- The plugin's version: raised for each new build given to the pilots (release/plugin.json, README.md). -->
-    <Version>2.4.0</Version>
+    <Version>2.5.0</Version>
     <RootNamespace>EnduranceManager.SimHub</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
@@ -25,5 +25,9 @@
     <!-- L'installeur en double-clic, à donner aux pilotes avec la DLL. -->
     <None Update="Installer le plugin.cmd" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Convertir un dash NeoRed.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Le dash du mur, écrit par dash/build.mjs depuis la maquette dash/mur.html. -->
+    <EmbeddedResource Include="dash\mur.json" LogicalName="EnduranceManager.SimHub.mur.json" />
+    <!-- Ses polices, installées pour l'utilisateur (Fonts.cs). -->
+    <EmbeddedResource Include="dash\fonts\*.ttf" LogicalName="EnduranceManager.SimHub.fonts.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

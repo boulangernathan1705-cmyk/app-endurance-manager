@@ -25,6 +25,8 @@ namespace EnduranceManager.SimHub
         public bool Share { get; set; } = true;
         // The overlays' stint length in laps (Practice.cs): it sets the energy per lap aimed at.
         public int StintLaps { get; set; } = 12;
+        // The mur in SimHub (Wall.cs): follow the team's room for the dash « Endurance Manager · Mur ». Off by default.
+        public bool Wall { get; set; } = false;
     }
 
     [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
@@ -62,11 +64,15 @@ namespace EnduranceManager.SimHub
         public Updater Updater => updater;
         public LmuApi Api => api;
         public LiveShare Live => live;
+        public Wall Wall => wall;
+        Wall wall;
         public Practice Practice { get; } = new Practice();
         // The race figures a dashboard reads (Course.cs), and the game's pit menu they come with.
         public Course Course { get; } = new Course();
         public PitMenu Menu { get; } = new PitMenu();
         public GameApi Game { get; } = new GameApi();
+        // Our own calculations after LMU Drive's ideas (Computed.cs): pit timing and out-laps per car, optimal and predicted lap.
+        public Computed Computed { get; } = new Computed();
         // The game's live standings (penalties by kind, finish status) and Lovely's track and car files.
         Standings standings;
         Lovely lovely;
@@ -75,6 +81,8 @@ namespace EnduranceManager.SimHub
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
         public volatile string LastSession;
+        // The last reading while driving (boxed: the dashboards read it on SimHub's thread), null otherwise.
+        volatile object latest;
         public string Status => !Settings.Enabled ? "En pause" : uploader?.Status ?? "";
 
         public void Init(PluginManager pluginManager)
@@ -85,6 +93,8 @@ namespace EnduranceManager.SimHub
             uploader = new Uploader(home);
             updater = new Updater(home);
             live = new LiveShare(() => LinkCode.Parse(Settings.Code));
+            wall = new Wall(() => LinkCode.Parse(Settings.Code), () => Settings.Wall);
+            foreach (var name in WallDash.Properties()) { string key = name; this.AttachDelegate("Mur." + key, () => wall.View[key]); }
             lovely = new Lovely(home);
             standings = new Standings(() => Settings.Enabled && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
             standings.Start();
@@ -123,6 +133,21 @@ namespace EnduranceManager.SimHub
             }
             // The race figures under NeoRed's names (EnduranceManagerPlugin.Energy.VE.Current_%…), for any dashboard.
             foreach (var (name, get) in Course.Properties) this.AttachDelegate(name, () => get(Course.View));
+            // What LMU Drive reads of the car and the session (Telemetry.cs, plugin 2.5), from the last reading.
+            foreach (var (name, get) in Telemetry.Properties) this.AttachDelegate(name, () => latest is Sample s ? get(s) : null);
+            this.AttachDelegate("Voiture.TourOptimal", () => Computed.Optimal);
+            this.AttachDelegate("Voiture.TourPrevu", () => Computed.Predicted);
+            this.AttachDelegate("Voiture.ChocsRelais", () => Computed.Impacts);
+            this.AttachDelegate("Voiture.BlocagesDernierTour", () => Computed.LockupsLastLap);
+            this.AttachDelegate("Voiture.PlacePrevue", () => Computed.PredictedPlace);
+            this.AttachDelegate("Voiture.Sortie.TempsPerdu", () => Computed.RejoinLoss);
+            this.AttachDelegate("Voiture.Sortie.Place", () => Computed.RejoinPlace);
+            this.AttachDelegate("Voiture.Sortie.EcartDevant", () => Computed.RejoinAhead);
+            this.AttachDelegate("Voiture.Sortie.VoitureDevant", () => Computed.RejoinAheadCar);
+            this.AttachDelegate("Voiture.Sortie.EcartDerriere", () => Computed.RejoinBehind);
+            this.AttachDelegate("Voiture.Sortie.VoitureDerriere", () => Computed.RejoinBehindCar);
+            this.AttachDelegate("Voiture.MicroSecteurs.Optimal", () => Computed.MicroOptimal);
+            for (int k = 0; k < Computed.Micro; k++) { int part = k; this.AttachDelegate("Voiture.MicroSecteurs.Ecart" + (part + 1), () => Computed.MicroDelta[part]); }
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
@@ -130,13 +155,14 @@ namespace EnduranceManager.SimHub
             reader.Start();
             sender.Start();
             // The overlays « Endurance Manager · Bandeau » and « · Colonne » in Dash Studio's templates.
-            ThreadPool.QueueUserWorkItem(_ => Dashes.Install(home));
+            ThreadPool.QueueUserWorkItem(_ => { Dashes.Install(home); Fonts.Install(); });
         }
 
         public void End(PluginManager pluginManager)
         {
             running = false;
             live?.Stop();
+            wall?.Stop();
             standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
@@ -155,6 +181,13 @@ namespace EnduranceManager.SimHub
             Settings.Code = code?.Trim() ?? "";
             this.SaveCommonSettings("GeneralSettings", Settings);
             uploader.Reset();
+        }
+
+        // The mur in SimHub switch: on, the plugin follows the team's room (Wall.cs).
+        public void SetWall(bool on)
+        {
+            Settings.Wall = on;
+            this.SaveCommonSettings("GeneralSettings", Settings);
         }
 
         // The live sharing switch (mur des stands): off, nothing more leaves for the team's pit wall.
@@ -234,10 +267,13 @@ namespace EnduranceManager.SimHub
                             lastEt = sample.ET;
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
+                            latest = driving ? (object)sample : null;
+                            // Each car's pit lane and our optimal and predicted lap (Computed.cs), ten times a second.
+                            if (driving) try { Computed.Update(buffer, sample, recorder.Current); } catch { }
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share) live.Frame(sample);
-                            if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
+                            if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api, Computed);
                             // Between two, nine quick messages a second: our car's frames and the cars on the map.
                             else if (driving && Settings.Share) live.Fast(buffer);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
