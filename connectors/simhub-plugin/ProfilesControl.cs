@@ -13,8 +13,8 @@ namespace EnduranceManager.SimHub
 {
     public class ProfilesControl : UserControl
     {
-        static readonly Brush Card = Fill("#14FFFFFF"), Edge = Fill("#26FFFFFF"), Accent = Fill("#E8562A"), Cyan = Fill("#00E5FF");
-        static Brush Fill(string color) { var brush = (Brush)new BrushConverter().ConvertFromString(color); brush.Freeze(); return brush; }
+        // The site's colours (Theme.cs).
+        static readonly Brush Card = Theme.Panel, Edge = Theme.Border, Accent = Theme.Accent, Cyan = Theme.Accent;
 
         readonly EnduranceManagerPlugin plugin;
         Profiles Profiles => plugin.Profiles;
@@ -27,8 +27,8 @@ namespace EnduranceManager.SimHub
         {
             this.plugin = plugin;
             var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
-            page.Children.Add(new TextBlock { Text = "Réglages voiture en course", FontSize = 22, FontWeight = FontWeights.SemiBold });
-            page.Children.Add(new TextBlock { Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap,
+            page.Children.Add(new TextBlock { Text = "Réglages voiture en course", FontSize = 22, FontWeight = FontWeights.Bold });
+            page.Children.Add(new TextBlock { Foreground = Theme.Muted, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap,
                 Text = "Un bouton du volant par profil : appui court, la voiture passe dans ce profil ; appui de 2 s, il mémorise ses réglages actuels. "
                     + "Relie « Profil1 », « Profil2 »… à tes boutons dans SimHub › Contrôles et événements (plugin EnduranceManagerPlugin)." });
             page.Children.Add(SettingsControl.Switch("Activer ce module", plugin.Settings.Profiles, on => plugin.SetModule(x => x.Profiles = on)));
@@ -37,12 +37,12 @@ namespace EnduranceManager.SimHub
             page.Children.Add(car);
             page.Children.Add(list);
             page.Children.Add(Heading("Commandes LMU"));
-            page.Children.Add(new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
+            page.Children.Add(new TextBlock { Foreground = Theme.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
                 Text = "Pour chaque réglage, les rôles du Control Mapper qui appuient sur « + » et « − » dans LMU, par ta sortie vJoy ou bridge USB "
                     + "(les mêmes que pour tes boutons du volant). Le menu des stands, lui, est réglé directement, sans rôle." });
             page.Children.Add(roles);
             car.SelectionChanged += (sender, args) => { if (car.SelectedItem is string chosen && chosen != shown) { shown = chosen; Rebuild(); } };
-            list.Children.Add(new TextBlock { Text = "Active le module puis charge une voiture dans LMU (garage ou piste) : ses profils Sec, Inter et Pluie apparaissent ici.", Opacity = 0.6 });
+            list.Children.Add(new TextBlock { Text = "Active le module puis charge une voiture dans LMU (garage ou piste) : ses profils Sec, Inter et Pluie apparaissent ici.", Foreground = Theme.Muted });
             BuildRoles();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (sender, args) => Refresh();
@@ -93,7 +93,7 @@ namespace EnduranceManager.SimHub
         {
             var profile = profiles[index];
             var inside = new StackPanel();
-            inside.Children.Add(new TextBlock { Text = "BOUTON « PROFIL" + (index + 1) + " »", FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 6) });
+            inside.Children.Add(new TextBlock { Text = "BOUTON « PROFIL" + (index + 1) + " »", FontSize = 11.5, FontWeight = FontWeights.Bold, Foreground = Theme.Muted, Margin = new Thickness(0, 0, 0, 6) });
 
             var name = new TextBox { Text = profile.Name, Width = 200, FontSize = 15, FontWeight = FontWeights.SemiBold };
             name.LostFocus += (sender, args) => { profile.Name = name.Text.Trim() == "" ? "Profil " + (index + 1) : name.Text.Trim(); Profiles.Save(); };
@@ -158,7 +158,7 @@ namespace EnduranceManager.SimHub
             try { available = Profiles.ButtonRoles(plugin.PluginManager) ?? new List<string>(); } catch { available = new List<string>(); }
             available = available.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList();
             if (available.Count == 0)
-                roles.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 8),
+                roles.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Theme.Muted, Margin = new Thickness(0, 0, 0, 8),
                     Text = "Aucun rôle de bouton dans le Control Mapper. Dans SimHub › Control Mapper, choisis ta sortie (vJoy ou bridge), donne un rôle à chaque bouton "
                         + "de sortie (« TC + », « TC - »…), relie ces boutons dans les contrôles de LMU, puis reviens ici." });
             var choices = new List<string> { "" };
@@ -220,12 +220,12 @@ namespace EnduranceManager.SimHub
             return box;
         }
 
-        static TextBlock Heading(string text) => new TextBlock { Text = text.ToUpperInvariant(), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 8, 0, 8) };
+        static TextBlock Heading(string text) => new TextBlock { Text = text.ToUpperInvariant(), FontSize = 11.5, FontWeight = FontWeights.Bold, Foreground = Theme.Muted, Margin = new Thickness(0, 8, 0, 8) };
 
         static Button Button(string text, bool main)
         {
-            var button = new Button { Content = text, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(0, 0, 8, 0), Cursor = System.Windows.Input.Cursors.Hand };
-            if (main) { button.Background = Accent; button.BorderBrush = Accent; button.Foreground = Brushes.White; }
+            var button = main ? Theme.Primary(text) : Theme.Secondary(text);
+            button.Padding = new Thickness(14, 6, 14, 6);
             return button;
         }
     }

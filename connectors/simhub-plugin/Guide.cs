@@ -21,6 +21,7 @@ namespace EnduranceManager.SimHub
         public Shell(EnduranceManagerPlugin plugin)
         {
             this.plugin = plugin;
+            Theme.Apply(this);
             if (plugin.Settings.GuideDone) ShowModules(); else ShowGuide();
         }
 
@@ -30,9 +31,8 @@ namespace EnduranceManager.SimHub
 
     public class Guide : UserControl
     {
-        static readonly Brush Blue = Fill("#2F81F7"), Track = Fill("#333C46"), Muted = Fill("#9AA4AE"), Green = Fill("#3FB950"), Orange = Fill("#F0B429"),
-            Card = Fill("#14FFFFFF"), Edge = Fill("#26FFFFFF");
-        static Brush Fill(string color) { var brush = (Brush)new BrushConverter().ConvertFromString(color); brush.Freeze(); return brush; }
+        // The site's colours (Theme.cs).
+        static readonly Brush Blue = Theme.Accent, Track = Theme.Border, Muted = Theme.Muted, Green = Theme.Ok, Orange = Theme.Warn, Card = Theme.Panel, Edge = Theme.Border;
 
         // A module of the first step: its name, what it does, read and saved on the plugin's settings.
         class Choice
@@ -233,6 +233,15 @@ namespace EnduranceManager.SimHub
             return Frame("ÉTAPE 3 SUR 3", body, true, null, "Terminer");
         }
 
+        // One screen at once, for the pictures of the screen (tests/Preview): nothing is saved.
+        public void Jump(int screen, int which = 0)
+        {
+            Plan();
+            step = screen == 1 && settings.Count == 0 ? 2 : screen;
+            setting = Math.Min(which, Math.Max(0, settings.Count - 1));
+            Show();
+        }
+
         // ---------- Moving on ----------
 
         void Next()
@@ -283,7 +292,7 @@ namespace EnduranceManager.SimHub
             var buttons = new DockPanel { Margin = new Thickness(0, 20, 0, 0) };
             if (back)
             {
-                var b = new Button { Content = "Retour", Padding = new Thickness(18, 8, 18, 8), Cursor = System.Windows.Input.Cursors.Hand };
+                var b = Theme.Secondary("Retour");
                 b.Click += (sender, args) => Back();
                 buttons.Children.Add(b);
             }
@@ -296,7 +305,8 @@ namespace EnduranceManager.SimHub
                 later.Click += (sender, args) => Next();
                 right.Children.Add(later);
             }
-            var go = new Button { Content = next, Padding = new Thickness(22, 8, 22, 8), Background = Blue, BorderBrush = Blue, Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, Cursor = System.Windows.Input.Cursors.Hand };
+            var go = Theme.Primary(next);
+            go.Margin = new Thickness(0);
             go.Click += (sender, args) => Next();
             right.Children.Add(go);
             DockPanel.SetDock(right, Dock.Right);
@@ -317,7 +327,7 @@ namespace EnduranceManager.SimHub
             return body;
         }
 
-        static TextBlock Heading(string text) => new TextBlock { Text = text, FontSize = 24, FontWeight = FontWeights.SemiBold };
+        static TextBlock Heading(string text) => new TextBlock { Text = text, FontSize = 24, FontWeight = FontWeights.Bold };
 
         static StackPanel Steps(params string[] lines)
         {
@@ -334,7 +344,7 @@ namespace EnduranceManager.SimHub
             return list;
         }
 
-        static Border Box(UIElement inside) => new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(16, 14, 16, 14), Child = inside };
+        static Border Box(UIElement inside) => new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = Theme.Medium, Padding = new Thickness(16, 14, 16, 14), Child = inside };
 
         static UIElement Row(string name, string state, Brush color)
         {
@@ -343,9 +353,9 @@ namespace EnduranceManager.SimHub
             DockPanel.SetDock(right, Dock.Right);
             line.Children.Add(right);
             line.Children.Add(new TextBlock { Text = name });
-            return new Border { Background = Card, CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 11, 16, 11), Margin = new Thickness(0, 0, 0, 8), Child = line };
+            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = Theme.Small, Padding = new Thickness(16, 11, 16, 11), Margin = new Thickness(0, 0, 0, 8), Child = line };
         }
 
-        static Button Link(string text) => new Button { Content = text, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = Muted, Padding = new Thickness(0, 8, 0, 8), Cursor = System.Windows.Input.Cursors.Hand };
+        static Button Link(string text) => Theme.Link(text);
     }
 }

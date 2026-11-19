@@ -24,6 +24,9 @@ jobs:
     name: compilation et rejeu
     runs-on: windows-latest
     timeout-minutes: 20
+    # Write: the pictures of the plugin's screen go back on the pull request's branch (step « Ranger les photos »).
+    permissions:
+      contents: write
     defaults:
       run:
         shell: pwsh
@@ -49,6 +52,42 @@ jobs:
 
       - name: Rejouer les séances (moteur .NET Framework 4.8, celui de SimHub)
         run: dotnet run --project tests/Replay -c Release -f net48
+
+      - name: Photos de l'écran du plugin (guide et onglets, thème du site)
+        run: dotnet run --project tests/Preview -c Release -- "$env:GITHUB_WORKSPACE\apercus"
+
+      - name: Joindre les photos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apercus-${{ github.sha }}
+          path: apercus/*.png
+          if-no-files-found: ignore
+
+      # The pictures on the pull request's branch (tests/Preview/apercus), to look at without SimHub. [skip ci]: the
+      # commit starts no new run.
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          ref: ${{ github.head_ref }}
+          path: branche
+      - name: Ranger les photos sur la branche
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        working-directory: branche
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          $to = "connectors/simhub-plugin/tests/Preview/apercus"
+          New-Item -ItemType Directory -Force $to | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\apercus\*.png" $to -Force
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $to
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { "Photos inchangées."; exit 0 }
+          git commit -m "Plugin : photos de l'écran (guide et onglets) [skip ci]"
+          git push origin "HEAD:refs/heads/$env:HEAD_REF"
 
       - name: Résumé
         if: always()

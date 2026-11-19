@@ -13,7 +13,7 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\*.cs" Exclude="..\..\Plugin.cs;..\..\SettingsControl.cs;..\..\ProfilesControl.cs;..\..\Profiles.cs;..\..\Companion.cs;..\..\Guide.cs" LinkBase="Plugin" />
+    <Compile Include="..\..\*.cs" Exclude="..\..\Plugin.cs;..\..\SettingsControl.cs;..\..\ProfilesControl.cs;..\..\Profiles.cs;..\..\Companion.cs;..\..\Guide.cs;..\..\Theme.cs" LinkBase="Plugin" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- .NET Framework 4.8 sans son Developer Pack (n'agit que sur net48). -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

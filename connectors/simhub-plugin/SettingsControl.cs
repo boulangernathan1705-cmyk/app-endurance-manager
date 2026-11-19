@@ -14,17 +14,15 @@ namespace EnduranceManager.SimHub
 {
     public class SettingsControl : UserControl
     {
-        static readonly Brush Green = Fill("#2EAD5B"), Orange = Fill("#E8A33D"), Red = Fill("#D9534F"), Grey = Fill("#8A8F98"),
-            Card = Fill("#14FFFFFF"), Edge = Fill("#26FFFFFF"), Accent = Fill("#E8562A");
-
-        static Brush Fill(string color) { var brush = (Brush)new BrushConverter().ConvertFromString(color); brush.Freeze(); return brush; }
+        // The site's colours (Theme.cs, styles/tokens.css).
+        static readonly Brush Green = Theme.Ok, Orange = Theme.Warn, Red = Theme.Danger, Grey = Theme.Faint, Card = Theme.Panel, Edge = Theme.Border, Accent = Theme.Accent;
 
         readonly EnduranceManagerPlugin plugin;
         readonly Ellipse linkDot = Dot(), gameDot = Dot();
         readonly TextBlock linkTitle = Title(), linkDetail = Detail(), gameTitle = Title(), gameDetail = Detail();
         readonly TextBlock message = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
         readonly Button paste = Action("Coller mon code", true), open = Action("Ouvrir le site", false), update = Action("Mettre à jour", true);
-        readonly TextBlock version = new TextBlock { Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
+        readonly TextBlock version = new TextBlock { Foreground = Theme.Faint, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
         readonly Border updateBox;
         readonly TextBlock updateText = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
 
@@ -38,11 +36,11 @@ namespace EnduranceManager.SimHub
             updatePanel.Children.Add(updateText);
             update.HorizontalAlignment = HorizontalAlignment.Left;
             updatePanel.Children.Add(update);
-            updateBox = new Border { Background = Card, BorderBrush = Accent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = updatePanel, Visibility = Visibility.Collapsed };
+            updateBox = new Border { Background = Card, BorderBrush = Accent, BorderThickness = new Thickness(1), CornerRadius = Theme.Medium, Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = updatePanel, Visibility = Visibility.Collapsed };
             page.Children.Add(updateBox);
 
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
-            page.Children.Add(new TextBlock { Text = "Seuls Réglages voiture en course et Black box sur boutons changent quelque chose dans le jeu, quand tu appuies sur un de leurs boutons.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
+            page.Children.Add(new TextBlock { Text = "Seuls Réglages voiture en course et Black box sur boutons changent quelque chose dans le jeu, quand tu appuies sur un de leurs boutons.", Foreground = Theme.Faint, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
             // The guided path again (Guide.cs).
             var again = Action("Relancer le guide", false);
@@ -144,8 +142,8 @@ namespace EnduranceManager.SimHub
         static StackPanel Page(string title, string intro)
         {
             var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
-            page.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold });
-            page.Children.Add(new TextBlock { Text = intro, Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap });
+            page.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Theme.Text });
+            page.Children.Add(new TextBlock { Text = intro, Foreground = Theme.Muted, Margin = new Thickness(0, 4, 0, 18), TextWrapping = TextWrapping.Wrap });
             return page;
         }
 
@@ -153,7 +151,7 @@ namespace EnduranceManager.SimHub
         static UIElement Group(string intro, TabControl modules)
         {
             var panel = new DockPanel { Margin = new Thickness(12, 10, 12, 0) };
-            var text = new TextBlock { Text = intro, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+            var text = new TextBlock { Text = intro, Foreground = Theme.Muted, TextWrapping = TextWrapping.Wrap };
             DockPanel.SetDock(text, Dock.Top);
             panel.Children.Add(text);
             panel.Children.Add(modules);
@@ -281,27 +279,22 @@ namespace EnduranceManager.SimHub
 
         static Ellipse Dot() => new Ellipse { Width = 12, Height = 12, Margin = new Thickness(0, 4, 10, 0), VerticalAlignment = VerticalAlignment.Top };
         static TextBlock Title() => new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-        static TextBlock Detail() => new TextBlock { Opacity = 0.7, Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
+        static TextBlock Detail() => new TextBlock { Foreground = Theme.Muted, Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
 
-        static Button Action(string text, bool main)
-        {
-            var button = new Button { Content = text, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0), Cursor = System.Windows.Input.Cursors.Hand };
-            if (main) { button.Background = Accent; button.BorderBrush = Accent; button.Foreground = Brushes.White; }
-            return button;
-        }
+        static Button Action(string text, bool main) => main ? Theme.Primary(text) : Theme.Secondary(text);
 
         // The overlays: where to find them in Dash Studio, and the stint length that sets the energy aimed at.
         Border BannerBox()
         {
             var inside = new StackPanel();
-            inside.Children.Add(new TextBlock { Text = "DANS DASH STUDIO", FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 8) });
-            inside.Children.Add(new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
+            inside.Children.Add(Theme.Kicker("Dans Dash Studio"));
+            inside.Children.Add(new TextBlock { Foreground = Theme.Muted, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
                 Text = "Ton dernier tour (temps, énergie, usure des 4 pneus) face à la valeur visée, avec ta moyenne, celle de l'équipe et la meilleure. "
                     + "Dans SimHub › Dash Studio › Overlays : « Endurance Manager · Bandeau » ou « Endurance Manager · Colonne ». Ils s'affichent en essais et en course, voiture en piste. "
                     + "En roulant, les tours par relais se changent avec les boutons A (+1) et B (−1) des dashs, s'ils sont reliés à ton volant, "
                     + "ou avec les actions « ToursParRelaisPlus » et « ToursParRelaisMoins » du plugin, dans Contrôles et événements." });
             inside.Children.Add(Setting("Tours par relais", 1, 60, 1, plugin.Settings.StintLaps, value => $"{value:0} tours", value => plugin.SetStintLaps((int)Math.Round(value)), out stint));
-            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
+            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = Theme.Medium, Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
         }
 
         // One slider line: its name, the slider, its value.
@@ -336,10 +329,10 @@ namespace EnduranceManager.SimHub
             line.Children.Add(dot);
             line.Children.Add(text);
             var inside = new StackPanel();
-            inside.Children.Add(new TextBlock { Text = heading.ToUpperInvariant(), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 8) });
+            inside.Children.Add(Theme.Kicker(heading));
             inside.Children.Add(line);
             foreach (var element in below) inside.Children.Add(element);
-            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
+            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = Theme.Medium, Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
         }
     }
 }

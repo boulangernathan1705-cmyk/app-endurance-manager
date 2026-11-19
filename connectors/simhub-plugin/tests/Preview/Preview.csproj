@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Photos de l'écran du plugin (guide et onglets), faites sans SimHub sur la machine Windows de GitHub :
+       dotnet run, projet tests/Preview, avec le dossier en argument. Windows seulement (WPF). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF Condition="'$(OS)' == 'Windows_NT'">true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>EnduranceManager.SimHub.Preview</RootNamespace>
+    <AssemblyName>Preview</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="EnduranceManager.SimHub"><HintPath>..\..\bin\Release\EnduranceManager.SimHub.dll</HintPath></Reference>
+    <ProjectReference Include="..\..\reference\SimHub.Plugins\SimHub.Plugins.csproj" />
+    <ProjectReference Include="..\..\reference\GameReaderCommon\GameReaderCommon.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Reference Include="System.Net.Http" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- Hors Windows : compilé seulement (vérification), par les DLL de référence de WPF. -->
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+  </ItemGroup>
+</Project>

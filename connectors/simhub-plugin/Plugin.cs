@@ -205,6 +205,20 @@ namespace EnduranceManager.SimHub
             EnduranceManager.SimHub.Report.State("fmt companion", Companion.Status);
         }
 
+        // The plugin's screen without SimHub (tests/Preview, the pictures of the screen made on GitHub): what Init makes,
+        // without SimHub's settings, properties or game reading.
+        public void Preview(Settings settings)
+        {
+            Settings = settings;
+            home = Path.Combine(Path.GetTempPath(), "EnduranceManagerPreview");
+            Directory.CreateDirectory(home);
+            uploader = new Uploader(home);
+            updater = new Updater(home);
+            live = new LiveShare(() => Link);
+            wall = new Wall();
+            Profiles = new Profiles(home, () => null, () => PluginManager, () => Settings.Profiles);
+        }
+
         public void End(PluginManager pluginManager)
         {
             running = false;
