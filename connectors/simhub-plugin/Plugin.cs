@@ -302,7 +302,7 @@ namespace EnduranceManager.SimHub
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
                             latest = driving ? (object)sample : null;
-                            if (driving && Settings.Profiles) Profiles.Seen(sample);
+                            if (ok && Settings.Profiles) Profiles.Seen(sample);
                             // Each car's pit lane and our optimal and predicted lap (Computed.cs), ten times a second.
                             if (driving) try { Computed.Update(buffer, sample, recorder.Current); } catch { }
                             GameState = driving ? "track" : "menu";

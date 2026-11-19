@@ -42,7 +42,7 @@ namespace EnduranceManager.SimHub
                     + "(les mêmes que pour tes boutons du volant). Le menu des stands, lui, est réglé directement, sans rôle." });
             page.Children.Add(roles);
             car.SelectionChanged += (sender, args) => { if (car.SelectedItem is string chosen && chosen != shown) { shown = chosen; Rebuild(); } };
-            list.Children.Add(new TextBlock { Text = "Roule une fois avec une voiture pour créer ses profils.", Opacity = 0.6 });
+            list.Children.Add(new TextBlock { Text = "Active le module puis charge une voiture dans LMU (garage ou piste) : ses profils Sec, Inter et Pluie apparaissent ici.", Opacity = 0.6 });
             BuildRoles();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (sender, args) => Refresh();
@@ -64,7 +64,7 @@ namespace EnduranceManager.SimHub
             if (next != shown) { shown = next; car.SelectedItem = shown; Rebuild(); }
             if (!plugin.Settings.Profiles) { state.Text = "Module coupé : les boutons ne font rien."; return; }
             var lines = new List<string>();
-            if (Profiles.Car == null) lines.Add("Roule une fois avec une voiture pour créer ses profils (Sec, Inter, Pluie).");
+            if (Profiles.Car == null) lines.Add("Charge une voiture dans LMU (garage ou piste) : ses profils Sec, Inter et Pluie apparaissent ici.");
             else lines.Add("Profil actif : " + (Profiles.Active ?? "aucun") + (Profiles.Wetness is double wet ? $" · piste humide à {wet:0} %" : ""));
             if (Profiles.ToChange) lines.Add("La piste correspond au profil « " + Profiles.ForWeather + " ».");
             if (!string.IsNullOrEmpty(Profiles.Message)) lines.Add(Profiles.Message);

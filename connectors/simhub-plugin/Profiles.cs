@@ -136,10 +136,16 @@ namespace EnduranceManager.SimHub
         public List<Profile> Current => For(Car);
 
         // Each reading of the game: the car driven, for the buttons and the screen.
+        // Also in the garage and the menus with a car loaded: its profiles are made and can be memorised from there.
         public void Seen(Sample s)
         {
-            if (!string.IsNullOrEmpty(s.Car) && s.Car != Car) { Car = s.Car; Applied = null; }
+            if (string.IsNullOrEmpty(s.Car)) return;
+            seen = s;
+            if (s.Car != Car) { Car = s.Car; Applied = null; }
         }
+        volatile object seen;
+        // The car as last read, on track or not: what « Mémoriser » takes.
+        Sample? Last => latest() ?? (seen is Sample s ? s : (Sample?)null);
 
         // ── The wheel buttons ────────────────────────────────────────────────────────────────────────────────────────
         // Pressed: a timer starts; still held after 2 s, the profile memorises the car's state. Released before: applied.
@@ -167,7 +173,7 @@ namespace EnduranceManager.SimHub
         {
             var list = Current;
             if (slot >= list.Count) { Message = "Pas de profil n° " + (slot + 1) + " pour cette voiture."; return; }
-            if (!(latest() is Sample s)) { Message = "Mémorisation impossible : la voiture n'est pas en piste."; return; }
+            if (!(Last is Sample s)) { Message = "Mémorisation impossible : lance une séance avec la voiture."; return; }
             var profile = list[slot];
             var drive = new Dictionary<string, double>();
             foreach (var setting in Setting.All)
