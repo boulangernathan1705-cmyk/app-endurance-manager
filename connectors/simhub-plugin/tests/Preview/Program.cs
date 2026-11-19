@@ -55,7 +55,17 @@ namespace EnduranceManager.SimHub.Preview
             Shot("guide-3-pret", () => new Shell(Plugin(false)), e => GuideOf(e).Jump(2));
             Shot("onglet-general", () => new Shell(Plugin(true)));
             Shot("onglet-pour-moi-overlay-relais", () => new Shell(Plugin(true)), e => Open(e, 1, 0));
-            Shot("onglet-pour-moi-reglages-voiture", () => new Shell(Plugin(true)), e => Open(e, 1, 1));
+            // Module on, one car with its three profiles memorised (example values).
+            EnduranceManagerPlugin WithProfiles()
+            {
+                var p = Plugin(true);
+                p.Settings.Profiles = true;
+                var list = p.Profiles.For("Porsche 963 LMDh");
+                void Fill(int i, double tc, double abs, double bias, double map) { list[i].Drive = new System.Collections.Generic.Dictionary<string, double> { ["TC"] = tc, ["TCCut"] = tc + 1, ["ABS"] = abs, ["Bias"] = bias, ["MotorMap"] = map }; }
+                Fill(0, 3, 4, 54.2, 1); Fill(1, 6, 6, 53.6, 2); Fill(2, 9, 8, 52.8, 3);
+                return p;
+            }
+            Shot("onglet-pour-moi-reglages-voiture", () => new Shell(WithProfiles()), e => Open(e, 1, 1));
             Shot("onglet-pour-moi-mur-des-stands", () => new Shell(Plugin(true)), e => Open(e, 1, 3));
             Shot("onglet-equipe-relier-au-site", () => new Shell(Plugin(true)), e => Open(e, 2, 0));
             Shot("onglet-equipe-aide-au-developpement", () => new Shell(Plugin(true)), e => Open(e, 2, 3));
