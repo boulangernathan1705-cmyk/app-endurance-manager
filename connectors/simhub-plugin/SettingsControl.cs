@@ -1,5 +1,6 @@
-// Écran du plugin dans SimHub : où en est la liaison avec le site, ce que fait LMU, et un seul geste à faire,
-// coller le code de liaison donné par la page des fiches combo.
+// Écran du plugin dans SimHub, en onglets : « Général » (liaison avec le site, ce que fait LMU, mise à jour), puis un
+// onglet par module, chacun avec son interrupteur en haut : Fiches combo, Mur des stands, Overlays, Chiffres de course,
+// Profils.
 using System;
 using System.Diagnostics;
 using System.Windows;
@@ -25,26 +26,11 @@ namespace EnduranceManager.SimHub
         readonly TextBlock version = new TextBlock { Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
         readonly Border updateBox;
         readonly TextBlock updateText = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
-        readonly CheckBox enabled = new CheckBox { Content = "Plugin activé : enregistrer et envoyer mes séances", FontSize = 14, Margin = new Thickness(0, 0, 0, 6), Cursor = System.Windows.Input.Cursors.Hand };
-        readonly CheckBox share = new CheckBox { Content = "Partager ma voiture en direct avec l'équipe (mur des stands)", FontSize = 14, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
 
         public SettingsControl(EnduranceManagerPlugin plugin)
         {
             this.plugin = plugin;
-            var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
-            page.Children.Add(new TextBlock { Text = "Fiches combo", FontSize = 22, FontWeight = FontWeights.SemiBold });
-            page.Children.Add(new TextBlock { Text = "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.", Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap });
-
-            // The on/off switch: off, the plugin reads nothing from the game and sends nothing.
-            enabled.IsChecked = plugin.Settings.Enabled;
-            enabled.Checked += (sender, args) => { plugin.SetEnabled(true); Refresh(); };
-            enabled.Unchecked += (sender, args) => { plugin.SetEnabled(false); Refresh(); };
-            page.Children.Add(enabled);
-            // Live sharing: on by default, the teammates follow the car on the site's mur des stands.
-            share.IsChecked = plugin.Settings.Share;
-            share.Checked += (sender, args) => { plugin.SetShare(true); Refresh(); };
-            share.Unchecked += (sender, args) => { plugin.SetShare(false); Refresh(); };
-            page.Children.Add(share);
+            var page = Page("Endurance Manager", "Un seul plugin pour l'équipe. Chaque onglet est un module : active seulement ceux que tu utilises.");
 
             // A newer version on the site: one button, the installer does the rest.
             var updatePanel = new StackPanel();
@@ -59,9 +45,28 @@ namespace EnduranceManager.SimHub
             buttons.Children.Add(open);
             page.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
-            page.Children.Add(BannerBox());
-            page.Children.Add(new TextBlock { Text = "Le plugin ne fait que lire : il ne change rien dans le jeu ni dans SimHub.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
+            page.Children.Add(new TextBlock { Text = "Seul le module Profils change quelque chose dans le jeu, quand tu appuies sur un de ses boutons.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
+
+            // One tab per module, its switch at the top.
+            var combos = Page("Fiches combo", "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.");
+            combos.Children.Add(Switch("Activer ce module : enregistrer et envoyer mes séances", plugin.Settings.Enabled, on => plugin.SetEnabled(on)));
+            combos.Children.Add(sessionText);
+            var wall = Page("Mur des stands", "Tes coéquipiers suivent ta voiture en direct sur le mur des stands.");
+            wall.Children.Add(Switch("Activer ce module : partager ma voiture en direct", plugin.Settings.Share, on => plugin.SetShare(on)));
+            wall.Children.Add(wallText);
+            var overlays = Page("Overlays", "Bandeau et colonne dans Dash Studio, en essais et en course.");
+            overlays.Children.Add(Switch("Activer ce module", plugin.Settings.Overlays, on => plugin.SetModule(x => x.Overlays = on)));
+            overlays.Children.Add(BannerBox());
+            var course = Page("Chiffres de course", "Énergie, carburant, écarts, menu des stands… en propriétés pour tes dashs, sous les noms de NeoRed.");
+            course.Children.Add(Switch("Activer ce module", plugin.Settings.Course, on => plugin.SetModule(x => x.Course = on)));
+            var tabs = new TabControl { Margin = new Thickness(8) };
+            tabs.Items.Add(Tab("Général", page));
+            tabs.Items.Add(Tab("Fiches combo", combos));
+            tabs.Items.Add(Tab("Mur des stands", wall));
+            tabs.Items.Add(Tab("Overlays", overlays));
+            tabs.Items.Add(Tab("Chiffres de course", course));
+            tabs.Items.Add(new TabItem { Header = "Profils", Content = new ProfilesControl(plugin) });
 
             paste.Click += (sender, args) => PasteCode(false);
             update.Click += (sender, args) => StartUpdate();
@@ -76,11 +81,32 @@ namespace EnduranceManager.SimHub
             timer.Start();
             Unloaded += (sender, args) => timer.Stop();
             Refresh();
-            Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            Content = tabs;
         }
 
         // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
         // by itself every two seconds (automatic): the pilot only clicks « Créer mon code » on the site.
+        readonly TextBlock sessionText = Detail(), wallText = Detail();
+
+        static StackPanel Page(string title, string intro)
+        {
+            var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
+            page.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold });
+            page.Children.Add(new TextBlock { Text = intro, Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap });
+            return page;
+        }
+
+        static TabItem Tab(string header, UIElement page) => new TabItem { Header = header, Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
+
+        // A module's on/off switch.
+        public static CheckBox Switch(string text, bool on, Action<bool> save)
+        {
+            var box = new CheckBox { Content = text, FontSize = 14, IsChecked = on, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
+            box.Checked += (sender, args) => save(true);
+            box.Unchecked += (sender, args) => save(false);
+            return box;
+        }
+
         void PasteCode(bool automatic)
         {
             string text = "";
@@ -151,18 +177,19 @@ namespace EnduranceManager.SimHub
             var api = plugin.Api;
             string service = api.ReadAt is DateTime read ? $"Temps de service de la voiture lus à {read:HH:mm}." : "Les temps de service seront lus dès que tu rouleras.";
             if (api.Setup is string setup) service += "\nRéglage chargé : " + setup;
-            service += "\n" + (plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.");
-            service += "\n" + (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
-                + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""));
-            if (uploader?.LastRefusal is string refusal) service += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
-            if (!plugin.Settings.Enabled)
+            sessionText.Text = !plugin.Settings.Enabled ? "Module coupé : aucune séance enregistrée. Celles déjà enregistrées attendent sur le PC."
+                : plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.";
+            if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
+            wallText.Text = !plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
+                + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : "");
+            if (plugin.GameState == "paused")
             {
-                Show(gameDot, Grey, gameTitle, "En pause", gameDetail, "Le plugin ne lit rien du jeu et n'envoie rien. Les séances déjà enregistrées attendent sur le PC. Coche « Plugin activé » pour reprendre.");
+                Show(gameDot, Grey, gameTitle, "Tous les modules sont coupés", gameDetail, "Le plugin ne lit rien du jeu et n'envoie rien.");
                 return;
             }
             switch (plugin.GameState)
             {
-                case "track": Show(gameDot, Green, gameTitle, "En piste · séance enregistrée", gameDetail, service); break;
+                case "track": Show(gameDot, Green, gameTitle, plugin.Settings.Enabled ? "En piste · séance enregistrée" : "En piste", gameDetail, service); break;
                 case "menu": Show(gameDot, Grey, gameTitle, "Ouvert, au menu ou au garage", gameDetail, service); break;
                 default: Show(gameDot, Grey, gameTitle, "Fermé", gameDetail, "Lance le jeu et roule : le plugin enregistre tout seul."); break;
             }

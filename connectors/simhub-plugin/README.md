@@ -109,7 +109,22 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   d'après le profil de notre meilleur tour) et dix micro-secteurs (`Voiture.MicroSecteurs.Ecart1..10` contre le meilleur
   de la séance, `.Optimal`).
 
-Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
+- est organisé, depuis la 2.6.0, en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin :
+  Général (liaison, état du jeu, mise à jour), Fiches combo (`Enabled`), Mur des stands (`Share`), Overlays (`Overlays`),
+  Chiffres de course (`Course`), Profils (`Profiles`, coupé par défaut). Le jeu n'est lu que si un module au moins est actif.
+- garde, depuis la 2.6.0, les profils de réglages du pilote, voiture par voiture (`Profiles.cs`, `ProfilesControl.cs`,
+  fichier `%LOCALAPPDATA%\EnduranceManager\profils.json`) : Sec, Inter et Pluie au départ (plages d'humidité 0-5, 5-12,
+  12-100 %), renommables, supprimables, six au plus. Une action par profil (`Profil1` … `Profil6`, Contrôles et
+  événements) : appui court = appliquer, appui de 2 s = mémoriser l'état actuel. En roulant (TC, coupure, slip, ABS,
+  répartition, migration, carto, barres) le plugin appuie sur les rôles du Control Mapper choisis pour « + » et « − »
+  (`GetControlMapperInterface().StartStopRole`, sortie vJoy ou bridge USB) et relit la mémoire du jeu après chaque appui ;
+  le menu des stands est écrit par l'API du jeu (`garage/PitMenu/loadPitMenu`, menu entier renvoyé puis relu), lignes
+  dégâts et pilote non appliquées par défaut. Rien d'automatique : propriétés `Profils.Actif`, `Applique`, `NonActif`,
+  `Meteo`, `AChanger`, `Humidite`, `Message`, `Profils.1.Nom` … `6.Nom` pour les dashs. La régén ne se lit pas en
+  roulant : pas dans les profils pour l'instant.
+
+Seul le module Profils change quelque chose dans le jeu, quand le pilote appuie sur un de ses boutons. Il n'envoie plus
+les fichiers de résultats XML.
 
 ## Ressources et stabilité
 
