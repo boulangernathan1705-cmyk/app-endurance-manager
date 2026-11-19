@@ -20,6 +20,8 @@ namespace EnduranceManager.SimHub
     public class Settings
     {
         public string Code { get; set; } = "";
+        // The site module: off, the plugin works alone on this PC (no link, nothing sent or fetched, no update check).
+        public bool Site { get; set; } = true;
         // Off: nothing is read from the game and nothing is sent; the sessions waiting stay on the disk.
         public bool Enabled { get; set; } = true;
         // Mur des stands: the car shared live with the team while driving (LiveShare.cs). On unless the pilot turns it off.
@@ -102,8 +104,8 @@ namespace EnduranceManager.SimHub
             Directory.CreateDirectory(home);
             uploader = new Uploader(home);
             updater = new Updater(home);
-            live = new LiveShare(() => LinkCode.Parse(Settings.Code));
-            wall = new Wall(() => LinkCode.Parse(Settings.Code), () => Settings.Wall);
+            live = new LiveShare(() => Link);
+            wall = new Wall(() => Link, () => Settings.Wall);
             foreach (var (name, get) in WallProperties.All) this.AttachDelegate(name, () => get(wall.View));
             lovely = new Lovely(home);
             standings = new Standings(() => Reading && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
@@ -203,6 +205,9 @@ namespace EnduranceManager.SimHub
         public void DataUpdate(PluginManager pluginManager, ref GameData data) { }
 
         public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsControl(this);
+
+        // The team's site, when its module is on and a code is saved: everything that talks to the site goes through it.
+        public LinkCode Link => Settings.Site ? LinkCode.Parse(Settings.Code) : null;
 
         public void SaveCode(string code)
         {
@@ -343,7 +348,7 @@ namespace EnduranceManager.SimHub
                             // Once a second, the overlays' figures, in every session.
                             if (tick % 10 == 0)
                             {
-                                if (driving && Settings.Overlays) try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
+                                if (driving && Settings.Overlays) try { Practice.Update(sample, recorder.Current, Link, Settings.StintLaps); } catch { Practice.Hide(); }
                                 else Practice.Hide();
                             }
                             misses = driving ? 0 : misses + 1;
@@ -410,9 +415,9 @@ namespace EnduranceManager.SimHub
             Thread.Sleep(10000);
             while (running)
             {
-                if (Settings.Enabled && GameState != "track") try { uploader.SendAll(LinkCode.Parse(Settings.Code)); } catch { }
+                if (Settings.Enabled && GameState != "track") try { uploader.SendAll(Link); } catch { }
                 // A newer version on the site, looked for once an hour: offered on the plugin's screen.
-                updater.Check(LinkCode.Parse(Settings.Code));
+                updater.Check(Link);
                 for (int i = 0; running && i < 60; i++) Thread.Sleep(1000);
             }
         }

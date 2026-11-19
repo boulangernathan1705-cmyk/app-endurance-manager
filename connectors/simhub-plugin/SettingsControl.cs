@@ -30,7 +30,7 @@ namespace EnduranceManager.SimHub
         public SettingsControl(EnduranceManagerPlugin plugin)
         {
             this.plugin = plugin;
-            var page = Page("Endurance Manager", "Un seul plugin pour l'équipe. Chaque onglet est un module : active seulement ceux que tu utilises.");
+            var page = Page("Endurance Manager", "Un seul plugin. Chaque onglet est un module : active seulement ceux que tu utilises. Sans le module Site, tout reste sur ce PC.");
 
             // A newer version on the site: one button, the installer does the rest.
             var updatePanel = new StackPanel();
@@ -40,10 +40,6 @@ namespace EnduranceManager.SimHub
             updateBox = new Border { Background = Card, BorderBrush = Accent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = updatePanel, Visibility = Visibility.Collapsed };
             page.Children.Add(updateBox);
 
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
-            buttons.Children.Add(paste);
-            buttons.Children.Add(open);
-            page.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
             page.Children.Add(new TextBlock { Text = "Seul le module Profils change quelque chose dans le jeu, quand tu appuies sur un de ses boutons.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
@@ -51,7 +47,13 @@ namespace EnduranceManager.SimHub
             page.Children.Add(Switch("Enregistrer ma séance pour les tests (fichier sur ce PC, rien n'est envoyé)", Tape.Recording, on => plugin.SetRecording(on)));
             page.Children.Add(recordText);
 
-            // One tab per module, its switch at the top.
+            // One tab per module, its switch at the top. The site first: the fiches combo and the mur need it.
+            var site = Page("Site", "Relie le plugin au site de ton équipe : fiches combo, mur des stands, valeurs de l'équipe dans les overlays, mises à jour.");
+            site.Children.Add(Switch("Activer ce module : relier le plugin au site", plugin.Settings.Site, on => plugin.SetModule(x => x.Site = on)));
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
+            buttons.Children.Add(paste);
+            buttons.Children.Add(open);
+            site.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
             var combos = Page("Fiches combo", "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.");
             combos.Children.Add(Switch("Activer ce module : enregistrer et envoyer mes séances", plugin.Settings.Enabled, on => plugin.SetEnabled(on)));
             combos.Children.Add(sessionText);
@@ -67,6 +69,7 @@ namespace EnduranceManager.SimHub
             course.Children.Add(Switch("Activer ce module", plugin.Settings.Course, on => plugin.SetModule(x => x.Course = on)));
             var tabs = new TabControl { Margin = new Thickness(8) };
             tabs.Items.Add(Tab("Général", page));
+            tabs.Items.Add(Tab("Site", site));
             tabs.Items.Add(Tab("Fiches combo", combos));
             tabs.Items.Add(Tab("Mur des stands", wall));
             tabs.Items.Add(Tab("Overlays", overlays));
@@ -77,7 +80,7 @@ namespace EnduranceManager.SimHub
             update.Click += (sender, args) => StartUpdate();
             open.Click += (sender, args) =>
             {
-                var code = LinkCode.Parse(plugin.Settings.Code);
+                var code = plugin.Link;
                 if (code != null) try { Process.Start(new ProcessStartInfo(code.Origin + "/") { UseShellExecute = true }); } catch { }
             };
 
@@ -132,7 +135,7 @@ namespace EnduranceManager.SimHub
         // Never while driving: the installer closes SimHub. Fetched aside, so the screen never freezes.
         void StartUpdate()
         {
-            var code = LinkCode.Parse(plugin.Settings.Code);
+            var code = plugin.Link;
             if (code == null) return;
             if (plugin.GameState == "track") { updateText.Text = "Termine d'abord ta séance : la mise à jour ferme et relance SimHub."; return; }
             update.IsEnabled = false;
@@ -153,8 +156,9 @@ namespace EnduranceManager.SimHub
         void Refresh()
         {
             if (stint != null && (int)Math.Round(stint.Value) != plugin.Settings.StintLaps) stint.Value = plugin.Settings.StintLaps;
-            if (LinkCode.Parse(plugin.Settings.Code) == null) PasteCode(true);
-            var code = LinkCode.Parse(plugin.Settings.Code);
+            bool siteOn = plugin.Settings.Site;
+            if (siteOn && LinkCode.Parse(plugin.Settings.Code) == null) PasteCode(true);
+            var code = plugin.Link;
             var uploader = plugin.Uploader;
             string host = code == null ? "" : new Uri(code.Origin).Host;
             paste.Content = code == null ? "Coller mon code" : "Changer de code";
@@ -162,7 +166,9 @@ namespace EnduranceManager.SimHub
 
             int waiting = uploader?.Waiting ?? 0;
             string kept = waiting > 0 ? $" {waiting} séance{(waiting > 1 ? "s" : "")} en attente, rien n'est perdu." : "";
-            if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Créer mon code ». Le plugin le trouve tout seul ici.");
+            paste.IsEnabled = siteOn;
+            if (!siteOn) Show(linkDot, Grey, linkTitle, "Module coupé", linkDetail, "Le plugin marche seul : rien n'est envoyé ni lu sur le site." + kept);
+            else if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Créer mon code ». Le plugin le trouve tout seul ici.");
             else if (uploader?.Refused is string refused) Show(linkDot, Red, linkTitle, "Liaison refusée", linkDetail, refused + kept);
             else if (uploader?.Reached == false) Show(linkDot, Orange, linkTitle, "Site injoignable", linkDetail, "Nouvel essai dans une minute." + kept);
             else if (uploader?.Reached == true) Show(linkDot, Green, linkTitle, "Relié à " + host, linkDetail,
@@ -184,9 +190,10 @@ namespace EnduranceManager.SimHub
             if (api.Setup is string setup) service += "\nRéglage chargé : " + setup;
             sessionText.Text = !plugin.Settings.Enabled ? "Module coupé : aucune séance enregistrée. Celles déjà enregistrées attendent sur le PC."
                 : plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.";
+            if (plugin.Settings.Enabled && !siteOn) sessionText.Text += "\nModule Site coupé : les séances restent sur ce PC, elles partiront s'il est réactivé.";
             if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
             recordText.Text = Tape.Status;
-            wallText.Text = (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
+            wallText.Text = !siteOn ? "Le mur des stands passe par le site : active le module Site." : (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
                 + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""))
                 + (plugin.Settings.Wall ? "\nMur dans SimHub : " + plugin.Wall.Status : "");
             if (plugin.GameState == "paused")
