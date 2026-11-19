@@ -394,6 +394,13 @@ export async function combosPlugin(path, request, env) {
     if (path.endsWith('/pass')) return relayPass(env, community.id, who);
     return openLive(request, env, community.id, who);
   }
+  // The mur in SimHub (plugin 2.5, Wall.cs): a teammate's plugin follows the team's cars as a page does (viewer).
+  if (path === '/api/combos/plugin/live/watch' || path === '/api/combos/plugin/live/watch/pass') {
+    const {community, user} = await pluginAccess(request, env);
+    const who = {Role:'viewer', User:user.id};
+    if (path.endsWith('/pass')) return relayPass(env, community.id, who);
+    return openLive(request, env, community.id, who);
+  }
   if (path === '/api/combos/plugin/sheet' && method === 'GET') {
     const {community, user} = await pluginAccess(request, env);
     return pluginSheet(env, community, user.id, new URL(request.url));

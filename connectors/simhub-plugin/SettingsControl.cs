@@ -54,6 +54,8 @@ namespace EnduranceManager.SimHub
             combos.Children.Add(sessionText);
             var wall = Page("Mur des stands", "Tes coéquipiers suivent ta voiture en direct sur le mur des stands.");
             wall.Children.Add(Switch("Activer ce module : partager ma voiture en direct", plugin.Settings.Share, on => plugin.SetShare(on)));
+            // The mur in SimHub: off by default, on it follows the team's room like a page of the site.
+            wall.Children.Add(Switch("Mur dans SimHub : suivre la voiture de l'équipe en piste (dash « Endurance Manager · Mur »)", plugin.Settings.Wall, on => plugin.SetWall(on)));
             wall.Children.Add(wallText);
             var overlays = Page("Overlays", "Bandeau et colonne dans Dash Studio, en essais et en course.");
             overlays.Children.Add(Switch("Activer ce module", plugin.Settings.Overlays, on => plugin.SetModule(x => x.Overlays = on)));
@@ -180,8 +182,9 @@ namespace EnduranceManager.SimHub
             sessionText.Text = !plugin.Settings.Enabled ? "Module coupé : aucune séance enregistrée. Celles déjà enregistrées attendent sur le PC."
                 : plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.";
             if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
-            wallText.Text = !plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
-                + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : "");
+            wallText.Text = (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
+                + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""))
+                + (plugin.Settings.Wall ? "\nMur dans SimHub : " + plugin.Wall.Status : "");
             if (plugin.GameState == "paused")
             {
                 Show(gameDot, Grey, gameTitle, "Tous les modules sont coupés", gameDetail, "Le plugin ne lit rien du jeu et n'envoie rien.");

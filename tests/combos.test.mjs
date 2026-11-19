@@ -505,6 +505,10 @@ test('mur des stands: the plugin opens the team\'s room with its key, a page wit
   assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${'0'.repeat(64)}`, Upgrade:'websocket'})).status, 401);
   assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${key}`, Upgrade:'websocket'})).status, 200);
   assert.deepEqual(opened.pop(), {roomId:`room:${DEV_COMMUNITY}`, role:'driver', user:NATHAN, name:'Nathan', upgrade:'websocket'});
+  // The mur in SimHub: a teammate's plugin follows the room as a page does.
+  assert.equal((await open('/api/combos/plugin/live/watch', {Authorization:`Bearer ${'0'.repeat(64)}`, Upgrade:'websocket'})).status, 401);
+  assert.equal((await open('/api/combos/plugin/live/watch', {Authorization:`Bearer ${key}`, Upgrade:'websocket'})).status, 200);
+  assert.deepEqual(opened.pop(), {roomId:`room:${DEV_COMMUNITY}`, role:'viewer', user:NATHAN, name:'', upgrade:'websocket'});
 
   const page = (userId, headers = {}) => req('/api/combos/live', 'GET', null, userId, {Upgrade:'websocket', ...headers});
   assert.equal((await page(NATHAN)).status, 403, 'no Origin: another site could open it with the cookie');
