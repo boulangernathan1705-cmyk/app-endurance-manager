@@ -44,6 +44,7 @@ test('the room keeps each car\'s laps and stops, our energy and tyres per lap, s
   let feed = publicFeed(feeds[Object.keys(feeds)[0]]);
   assert.equal(feed.ours.ve5, 7);
   assert.equal(feed.ours.wear5[0], 0.6);
+  assert.equal(feed.ours.lastWear[0], 0.6, 'the last lap\'s wear per tyre, for the mur in SimHub');
   assert.ok(Math.abs(feed.cars[2].avg5 - 211.16) < 0.01, 'the rival\'s last 5 laps');
   assert.deepEqual(feed.ours.drivers, {'N. Boulanger':6});
   assert.equal(feed.pilot.name, 'Nathan');

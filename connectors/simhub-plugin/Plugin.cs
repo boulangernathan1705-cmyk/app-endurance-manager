@@ -94,7 +94,7 @@ namespace EnduranceManager.SimHub
             updater = new Updater(home);
             live = new LiveShare(() => LinkCode.Parse(Settings.Code));
             wall = new Wall(() => LinkCode.Parse(Settings.Code), () => Settings.Wall);
-            foreach (var (name, get) in WallProperties.All) this.AttachDelegate(name, () => get(wall.View));
+            foreach (var name in WallDash.Properties()) { string key = name; this.AttachDelegate("Mur." + key, () => wall.View[key]); }
             lovely = new Lovely(home);
             standings = new Standings(() => Settings.Enabled && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
             standings.Start();
@@ -155,7 +155,7 @@ namespace EnduranceManager.SimHub
             reader.Start();
             sender.Start();
             // The overlays « Endurance Manager · Bandeau » and « · Colonne » in Dash Studio's templates.
-            ThreadPool.QueueUserWorkItem(_ => Dashes.Install(home));
+            ThreadPool.QueueUserWorkItem(_ => { Dashes.Install(home); Fonts.Install(); });
         }
 
         public void End(PluginManager pluginManager)

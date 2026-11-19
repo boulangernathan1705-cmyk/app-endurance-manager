@@ -263,7 +263,7 @@ namespace EnduranceManager.SimHub
                 ["service"] = service == null ? null : new Dictionary<string, object>
                 {
                     ["connect"] = service.Connect, ["energyRate"] = service.EnergyRate, ["fuelRate"] = service.FuelRate, ["tyres4"] = service.Tyres4,
-                    ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong
+                    ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong, ["repair"] = service.Repair
                 },
                 ["profile"] = profile,
                 // The settings in the car (levels, 0 steps: the car has none), the hybrid and the track limits.

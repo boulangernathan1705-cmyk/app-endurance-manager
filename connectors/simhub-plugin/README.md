@@ -110,9 +110,13 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   de la séance, `.Optimal`).
 - affiche, depuis la 2.5.0, le mur des stands dans SimHub : case « Mur dans SimHub » (coupée par défaut) → le plugin suit
   le salon de l'équipe comme une page du site (`Wall.cs`, `GET /api/combos/plugin/live/watch`, viewer) et publie chaque
-  case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
-  (2560 × 1440, `WallDash.cs`, installé avec les overlays) les affiche : classement de notre catégorie, pneus et dégâts,
-  réglages, bande du rythme, piste à plat centrée sur notre voiture, relatif, énergie et carburant, entrées. Une alerte
+  case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`Wall.Make`). Le dash « Endurance Manager · Mur »
+  (2560 × 1440, installé avec les overlays) est la maquette validée elle-même : `dash/mur.html` (styles du mur du site),
+  lue par `node dash/build.mjs` qui écrit `dash/mur.json` (incorporé à la DLL ; le relancer après chaque changement de la
+  maquette). Classement de notre catégorie, pneus et dégâts, réglages, bande du rythme, piste à plat centrée sur notre
+  voiture, relatif, énergie et carburant, entrées avec la trace des pédales. Polices du site (Chakra Petch, JetBrains
+  Mono, `dash/fonts`, licence OFL) installées pour l'utilisateur Windows (`Fonts.cs`) : visibles au redémarrage de SimHub.
+  Une alerte
   fait clignoter le cadre concerné, rien ne masque le reste.
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.

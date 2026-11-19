@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Mur des stands SimHub</title>
+<!--
+  The SimHub dash « Endurance Manager · Mur » is drawn from this page: the mockup Nathan approved (2026-11-18), with the
+  site's pit wall styles. dash/build.mjs opens it in Chromium, reads every box and text where the browser put them and
+  writes dash/mur.json (Dash Studio items, embedded in the plugin). Change the dash here, then run the build again.
+
+  Bindings, on an element (a property name means [EnduranceManagerPlugin.Mur.<name>]; "=" starts a formula where
+  {Name} stands for that property):
+    data-t   its text          data-c   its text colour     data-bg  its background colour
+    data-v   shown or not (for everything inside too)       data-off hidden in the sample shown here
+    data-xf  moves it (and what is inside) along its [data-xref] parent: 0 = left edge, 1 = right edge; data-xs its sample
+    data-wf  its width, a fraction of its parent's          data-hf  its height, a fraction of its parent's, from the bottom
+    data-blink  the frame flashes red while this is true (nothing covers the rest)
+  The values written in the page are the mockup's sample, shown only by the preview.
+-->
+<link rel="stylesheet" href="/styles/pit-wall.css">
+<style>
+html, body { width: 2560px; height: 1440px; overflow: hidden; }
+.dash { box-sizing: border-box; width: 2560px; height: 1440px; padding: 14px; display: grid; gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr) auto 190px 408px; }
+.dash > .pw-card { display: flex; flex-direction: column; }
+.dash > .top { grid-row: 2; grid-column: 1 / -1; flex-direction: row; flex-wrap: nowrap; align-items: center; }
+.board { grid-column: 1; grid-row: 1; display: grid; grid-template-columns: minmax(0, 1fr) 780px; gap: 12px; min-width: 0; }
+.board > .pw-card { display: flex; flex-direction: column; min-width: 0; }
+.flat { grid-column: 1 / -1; grid-row: 3; }
+.tyres4 { display: inline-grid; grid-template-columns: repeat(2, 20px); column-gap: 3px; row-gap: 2px; vertical-align: middle; }
+.pw-body .tyres4 .pw-compound { width: 18px; height: 18px; line-height: 1; border-width: 2px; font-size: 11px; }
+.bottom { grid-column: 1 / -1; grid-row: 4; display: grid; grid-template-columns: 880px minmax(0, 1fr) 620px; gap: 12px; min-height: 0; }
+.bottom > .pw-card { display: flex; flex-direction: column; min-height: 0; }
+.setcol { grid-column: 2; grid-row: 1; }
+
+.pw-body .pw-driver { padding: 8px 16px; gap: 10px 30px; }
+.pw-body .pw-facts { gap: 20px; }
+.pw-body .pw-facts span { white-space: nowrap; }
+.pw-body .pw-table table { font-size: 17px; }
+.pw-body .board .pw-table table { font-size: 20px; }
+.pw-body .board .pw-table td { padding: 5px 12px; height: 44px; box-sizing: border-box; }
+.pw-body .board .pw-table td.pw-name { max-width: none; }
+.pw-body .board .pw-team { margin-left: 10px; font-size: 15px; }
+.pw-body .pw-facts b { font-size: 22px; }
+.tyres { flex: 1 1 auto; }
+.sets .pw-set { padding: 10px 12px; }
+.sets .pw-set b { font-size: 24px; }
+.pw-body .pw-table td { padding: 8px 10px; }
+.bottom .pw-table td { padding: 6px 10px; }
+.pw-body .pw-card-head { padding-bottom: 8px; margin-bottom: 8px; }
+
+/* Tyres: wheel cards around the site's damage drawing */
+.tyres { display: grid; grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr); grid-template-rows: 1fr 1fr auto; gap: 10px; align-items: stretch; }
+.tyres .pw-wheel { padding: 8px 10px; gap: 6px; position: relative; }
+.tyres .pw-tyre { width: 96px; height: 96px; }
+.tyres .pw-tyre b { font-size: 22px; }
+.tyres .pw-wheel-body { flex: 1 1 auto; gap: 22px; }
+.tyres .wearbox { grid-column: 1 / -1; grid-row: 3; }
+.pw-body .tyres .wearbox .pw-table td { padding: 4px 10px; }
+.tyres .pw-wear i { height: 70px; }
+.tyres .pw-brake i { height: 60px; }
+.tyres .car { grid-column: 2; grid-row: 1 / span 2; display: grid; justify-items: center; align-content: center; gap: 10px; position: relative; }
+.tyres .car .pw-car-dents { width: 132px; }
+
+/* Flat track: one line, our car fixed in the middle */
+.lane { position: relative; height: 118px; background: var(--pw-inset); border: 1px solid var(--pw-line); border-radius: 6px; overflow: hidden; }
+.lane .seg { position: absolute; top: 74px; height: 6px; }
+.lane .segname { position: absolute; top: 6px; width: 60px; margin-left: -30px; text-align: center; font-family: var(--pw-mono); font-size: 18px; font-weight: 700; }
+.lane .grid { position: absolute; left: 0; right: 0; top: 76px; height: 2px; background: var(--pw-grid); }
+.lane .mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #3a4462; }
+.lane .mark span { position: absolute; top: 4px; left: 6px; font-family: var(--pw-mono); font-size: 16px; font-weight: 700; color: var(--pw-text2); white-space: nowrap; }
+.lane .mark.finish { border-left: 3px solid var(--pw-text); }
+.lane .mark.finish span { color: var(--pw-text); }
+.lane .dot { position: absolute; top: 59px; width: 36px; height: 36px; margin-left: -18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--pw-mono); font-size: 16px; font-weight: 700; color: #fff; box-shadow: 0 0 0 2px var(--pw-inset); }
+.lane .dot .ring { position: absolute; inset: -4px; border-radius: 50%; background: #fff; }
+.lane .dot .face { position: absolute; inset: 0; border-radius: 50%; }
+.lane .dot .hole { position: absolute; inset: 3px; border-radius: 50%; background: var(--pw-inset); }
+.lane .dot b { position: relative; width: 36px; text-align: center; }
+.lane .dot small { position: absolute; bottom: 100%; left: -12px; width: 60px; text-align: center; margin-bottom: 3px; font-family: var(--pw-mono); font-size: 13px; font-weight: 700; color: var(--pw-text2); white-space: nowrap; }
+.lane .dot.us { top: 51px; width: 52px; height: 52px; margin-left: -26px; font-size: 22px; color: #04121a; background: var(--pw-cyan); box-shadow: 0 0 0 3px #fff; z-index: 2; }
+.lane .dot.us b { width: 52px; }
+
+/* Energy */
+.energy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.energy .pw-row2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.energy .pw-tank-card { padding: 10px; gap: 6px; position: relative; }
+.energy .pw-box { grid-template-columns: 1fr auto; align-items: center; padding: 5px 10px; position: relative; }
+.pw-body .pw-tank-card .pw-box > b { font-size: 17px; }
+.pw-body .pw-level { position: relative; background: var(--pw-accent) !important; }
+.pw-level .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.ve .pw-level .fill { background: linear-gradient(90deg, var(--pw-blue), var(--pw-cyan)); }
+.fuel .pw-level .fill { background: linear-gradient(90deg, var(--pw-orange), var(--pw-yellow)); }
+
+/* Inputs */
+.inputs { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 12px; flex: 1 1 auto; min-height: 0; }
+.inputs .trace { position: relative; background: var(--pw-inset); border: 1px solid var(--pw-line); border-radius: 6px; box-sizing: border-box; overflow: hidden; }
+.inputs .trace .mid { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #1c2233; }
+.inputs .trace .area { position: absolute; left: 4px; right: 4px; top: 6px; bottom: 6px; }
+.inputs .trace i { position: absolute; width: 3px; }
+.inputs .side { display: grid; gap: 12px; align-content: space-between; }
+.inputs .pw-pedals { gap: 26px; }
+.inputs .pw-pedal i { height: 110px; position: relative; background: var(--pw-accent) !important; box-sizing: border-box; }
+.pw-pedal i .fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 3px; }
+.pw-pedal.gas i .fill { background: var(--pw-green); }
+.pw-pedal.brake i .fill { background: var(--pw-red); }
+.pw-body .pw-wear i::after { display: none; }
+.pw-wear i .fill { position: absolute; left: 0; right: 0; bottom: 0; }
+.pw-body .pw-steer::before { display: none; }
+.pw-steer .zero { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; background: var(--pw-text2); }
+
+/* Settings column: applied | advised */
+.sets { display: grid; gap: 8px; }
+.sets .head { display: grid; grid-template-columns: minmax(0, 1fr) 100px 100px; padding: 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--pw-text2); }
+.sets .head span + span { text-align: right; }
+.sets .pw-set { grid-template-columns: minmax(0, 1fr) 100px 100px; justify-items: stretch; align-items: center; padding: 10px 12px; }
+.sets .pw-set b { text-align: right; }
+.sets .pw-set b.reco { color: var(--pw-muted); }
+.sets .pw-set.change { --tone: var(--pw-cyan); }
+.sets .pw-set.change b.reco { color: var(--pw-cyan); }
+.sets .pw-set.grey { --tone: var(--pw-text2); }
+
+/* Readability pass: bigger labels and figures, no grey hints */
+.pw-body .pw-card-head h2 { font-size: 17px; }
+.pw-body .pw-card-head h2 small { font-size: 14px; }
+.pw-body .pw-chip { font-size: 14px; padding: 4px 10px; }
+.pw-body .pw-table th { font-size: 13px; }
+.pw-body .pw-facts span { font-size: 13px; }
+.pw-body .pw-facts b { font-size: 28px; }
+.pw-body .pw-who b { font-size: 22px; }
+.pw-body .pw-carnum { font-size: 28px; }
+.pw-body .pw-box > span { font-size: 14px; }
+.pw-body .pw-box > small, .pw-body .pw-wear small, .pw-body .pw-brake small, .pw-body .pw-tyre small { display: none; }
+.pw-body .bottom .pw-table table { font-size: 21px; }
+.pw-body .bottom .pw-table td { padding: 6px 10px; }
+.pw-body .bottom .pw-table th { padding-bottom: 2px; }
+.pw-body .pw-cls { font-size: 13px; }
+.energy .pw-box { padding: 8px 12px; }
+.pw-body .energy .pw-box > b, .pw-body .pw-tank-card .pw-box > b { font-size: 24px; }
+.pw-body .pw-tank-card .pw-tank-head span { font-size: 17px; }
+.pw-body .pw-tank-card .pw-tank-head b { font-size: 34px; }
+.pw-body .bottom .pw-row3 .pw-box > b { font-size: 28px; }
+.pw-body .pw-level { height: 10px; }
+.pw-body .pw-wheel .pw-wheel-head > b { font-size: 18px; }
+.pw-body .pw-wheel .pw-wheel-head > span b { font-size: 22px; }
+.pw-body .tyres .pw-wear b, .pw-body .tyres .pw-brake b { font-size: 22px; }
+.pw-body .tyres .pw-tyre b { font-size: 26px; }
+.pw-body .tyres .pw-tread i { font-size: 13px; }
+.pw-body .tyres .wearbox .pw-table table { font-size: 20px; }
+.pw-body .sets .pw-set span { font-size: 16px; }
+.pw-body .sets .pw-set b { font-size: 28px; }
+.pw-body .pw-speedo.small .pw-gear { font-size: 84px; }
+.pw-body .inputs .pw-speed { font-size: 54px !important; }
+.pw-body .pw-pedal b { font-size: 20px; }
+.pw-body .pw-legend { font-size: 15px; }
+.pw-body .pw-curve-now { font-size: 17px; }
+.pw-body .pw-wheelbar > span { font-size: 16px; }
+.pw-body .pw-wheel .pw-wheel-head > span { font-size: 15px; }
+.pw-body .pw-set b + b { margin-left: 8px; }
+
+/* Overlays drawn only in some states (a highlighted row, an alert): positioned by the script below. */
+.over { position: absolute; pointer-events: none; box-sizing: border-box; }
+.over.us { background: rgba(0,229,255,.09); border-radius: 4px; }
+.over.us i { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pw-cyan); border-radius: 4px 0 0 4px; }
+.over.worn { border: 1px solid var(--pw-orange); border-radius: 6px; }
+/* Room for the longest texts (the dash cannot move a text after another one), and the second state of a chip at the same place. */
+.pw-body .board .pw-name b { display: inline-block; min-width: 150px; }
+.pw-body .pw-who { min-width: 180px; }
+.pw-body .pw-track { min-width: 250px; text-align: center; }
+.pw-body .pw-cls { min-width: 96px; text-align: center; box-sizing: border-box; }
+.pw-card-head .pw-chip.good, .pw-card-head .pw-chip.bad { min-width: 200px; justify-content: center; box-sizing: border-box; }
+.pw-card-head, .dash > .top { position: relative; }
+.pw-card-head .alt { position: absolute; right: 0; top: 0; }
+.dash > .top .alt { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); }
+.pw-body .pw-table td.pw-stand { position: relative; min-width: 150px; }
+.pw-stand .pw-chip { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+</style>
+</head>
+<body class="pw-body">
+<div class="dash">
+
+  <section class="pw-card pw-driver top">
+    <span class="pw-carnum" data-t="Numero">#17</span>
+    <div class="pw-who" style="flex: 0 0 auto;"><b data-t="Pilote">Nathan</b><span data-t="Voiture">Peugeot 9X8 · FMT</span></div>
+    <div class="pw-facts">
+      <div><span>Delta</span><b data-t="Chrono.Delta" data-c="Chrono.DeltaCouleur" class="pw-red">+0,418</b></div>
+      <div><span>S1</span><b data-t="Chrono.S1" data-c="Chrono.S1Couleur" class="pw-green">33,045</b></div>
+      <div><span>S2</span><b data-t="Chrono.S2" data-c="Chrono.S2Couleur">82,274</b></div>
+      <div><span>S3</span><b data-t="Chrono.S3" data-c="Chrono.S3Couleur">94,856</b></div>
+      <div><span>Dernier</span><b data-t="Chrono.Dernier">3:30,175</b></div>
+      <div><span>Meilleur</span><b data-t="Chrono.Meilleur" class="pw-green">3:28,912</b></div>
+      <div><span>Meilleur catégorie</span><b data-t="Chrono.MeilleurCategorie" class="pw-purple">3:27,604</b></div>
+      <div><span>Position</span><b class="pw-cyan"><em style="font-style: normal" data-t="PlaceCourte">P4</em> <small data-t="PlaceSur">/ 10</small></b></div>
+      <div><span>Temps restant</span><b data-t="TempsRestant">1:18:24</b></div>
+      <div><span>Tour</span><b><em style="font-style: normal" data-t="Tour">81</em> <small data-t="ToursRestants">· 22 restants</small></b></div>
+      <div><span>Météo · piste / air</span><b><em style="font-style: normal" data-t="Meteo">Sec</em> <small data-t="Pluie">0 %</small> <em style="font-style: normal" data-t="TempPiste">47°</em> <small data-t="TempAir">/ 30°</small></b></div>
+    </div>
+    <span class="pw-track" style="margin-left: auto;" data-t="PisteSeance">Le Mans · Course</span>
+    <span class="pw-pill on" data-v="EnDirect"><i></i>En direct</span>
+    <span class="pw-pill off alt" data-v="=!{EnDirect}" data-off><i></i>Coupé</span>
+  </section>
+
+  <div class="board">
+    <section class="pw-card">
+      <div class="pw-card-head"><h2><span data-t="Classement.Titre">🏆 Classement Hypercar</span> <small data-t="Classement.Nombre">10 voitures</small></h2></div>
+      <div class="pw-table"><table>
+        <thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote · voiture</th><th>Pneus</th><th class="pw-n">Écart leader</th><th class="pw-n">Écart devant</th><th class="pw-n">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n">Relais</th><th>Stands</th></tr></thead>
+        <tbody id="board"></tbody>
+      </table></div>
+    </section>
+
+    <section class="pw-card">
+      <div class="pw-card-head"><h2>🛞 Pneus et dégâts</h2><span class="pw-chip compound" data-t="PneusBandeau">MEDIUM · 19 TOURS</span>
+        <span class="pw-chip good" data-v="=!{Degats.Alerte}">AUCUN DÉGÂT</span><span class="pw-chip bad alt" data-v="Degats.Alerte" data-t="Degats.Texte" data-off>DÉGÂTS AVANT</span></div>
+      <div class="tyres" id="tyres"></div>
+    </section>
+  </div>
+
+  <section class="pw-card flat">
+    <div class="pw-card-head"><h2>🗺️ Piste à plat</h2>
+      <span class="pw-legend"><span><i style="background: var(--pw-hyper)"></i>Hypercar</span><span><i style="background: var(--pw-lmp2)"></i>LMP2</span><span><i style="background: var(--pw-gt3)"></i>LMGT3</span><span><i class="us"></i>Nous</span></span>
+      <span class="pw-chip" data-t="Piste.Leader" data-v="=&quot;&quot; != {Piste.Leader}">LEADER HYPERCAR 2,7 KM DEVANT</span></div>
+    <div class="lane" id="lane" data-xref></div>
+  </section>
+
+  <div class="bottom">
+    <section class="pw-card">
+      <div class="pw-card-head"><h2>📍 Relatif</h2></div>
+      <div class="pw-table"><table>
+        <thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Cat</th><th>Pilote</th><th class="pw-n">Sur nous</th><th class="pw-n">Tours</th><th class="pw-n">Dernier tour</th><th></th></tr></thead>
+        <tbody id="rel"></tbody>
+      </table></div>
+    </section>
+
+    <section class="pw-card">
+      <div class="pw-card-head"><h2>⚡ Énergie et consommation</h2><span class="pw-chip" data-t="RelaisTexte">RELAIS : TOUR 7 / 12</span></div>
+      <div class="energy">
+        <div class="pw-tank-card ve" data-blink="Energie.Alerte"><div class="pw-tank-head"><span>⚡ Énergie virtuelle</span><b data-t="Energie.Valeur" id="veLeft">46,1 %</b></div>
+          <i class="pw-level"><b class="fill" data-wf="Energie.Remplissage" style="width: 46.1%"></b></i>
+          <div class="pw-row2"><div class="pw-box"><span>Dernier tour</span><b data-t="Energie.DernierTour">7,64 %</b></div><div class="pw-box"><span>Moy. 5 tours</span><b data-t="Energie.Moy5">7,69 %</b></div><div class="pw-box"><span>Depuis le relais</span><b data-t="Energie.Relais">7,71 %</b></div><div class="pw-box" data-blink="Energie.Alerte"><span>Tours restants</span><b data-t="Energie.ToursRestants">6,0 t</b></div></div></div>
+        <div class="pw-tank-card fuel" data-blink="Carburant.Alerte"><div class="pw-tank-head"><span>⛽ Carburant</span><b data-t="Carburant.Valeur">37,8 L</b></div>
+          <i class="pw-level"><b class="fill" data-wf="Carburant.Remplissage" style="width: 42%"></b></i>
+          <div class="pw-row2"><div class="pw-box"><span>Dernier tour</span><b data-t="Carburant.DernierTour">6,29 L</b></div><div class="pw-box"><span>Moy. 5 tours</span><b data-t="Carburant.Moy5">6,31 L</b></div><div class="pw-box"><span>Depuis le relais</span><b data-t="Carburant.Relais">6,33 L</b></div><div class="pw-box" data-blink="Carburant.Alerte"><span>Tours restants</span><b data-t="Carburant.ToursRestants">6,0 t</b></div></div></div>
+      </div>
+      <div class="pw-row3" style="margin-top: 12px;">
+        <div class="pw-box"><span>Ratio carburant</span><b data-t="Ratio">0,82</b></div>
+        <div class="pw-box warn"><span>Cible par tour</span><b data-t="Cible">7,68 %</b></div>
+        <div class="pw-box"><span>Arrêt prévu</span><b data-t="ArretPrevu">T87</b></div>
+      </div>
+    </section>
+
+    <section class="pw-card">
+      <div class="pw-card-head"><h2>🎮 Inputs</h2><span class="pw-curve-now" style="margin-left: 0;">Accél. <b class="pw-green" data-t="Entrees.GazTexte">100%</b> Frein <b class="pw-red" data-t="Entrees.FreinTexte">0%</b></span></div>
+      <div class="inputs">
+        <div class="trace"><div class="mid"></div><div class="area" id="trace"></div></div>
+        <div class="side">
+          <div class="pw-speedo small"><b class="pw-gear" data-t="Entrees.Rapport">6</b><div><b class="pw-speed" style="font-size: 40px;" data-t="Entrees.Vitesse">287</b><span>km/h</span></div></div>
+          <div class="pw-pedals">
+            <div class="pw-pedal gas"><i><b class="fill" data-hf="Entrees.Gaz" style="height: 100%"></b></i><b data-t="Entrees.GazTexte">100%</b><span>Gaz</span></div>
+            <div class="pw-pedal brake"><i><b class="fill" data-hf="Entrees.Frein" style="height: 0%"></b></i><b data-t="Entrees.FreinTexte">0%</b><span>Frein</span></div>
+          </div>
+          <div class="pw-wheelbar"><span>Volant <b data-t="Entrees.VolantTexte">+4%</b></span><div class="pw-steer" data-xref><b class="zero"></b><i data-xf="Entrees.Volant" data-xs="0.52" style="left:52%"></i></div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="pw-card setcol">
+    <div class="pw-card-head"><h2>🎛️ Réglages</h2><span class="pw-chip line cyan" data-t="Preco.Profil" data-v="Preco.Visible">PROFIL SEC</span></div>
+    <div class="sets" id="sets"></div>
+    <div class="pw-box" data-v="Preco.Visible" style="margin-top: 14px; border-color: rgba(0,229,255,.45); background: rgba(0,229,255,.06);">
+      <span class="pw-cyan">Préco</span><b style="font-family: inherit; font-size: 17px; white-space: normal;" data-t="Preco.Titre">Changement de pilote au T87</b>
+      <em style="font-style: normal; font-size: 15px; color: var(--pw-text2);" data-t="Preco.Texte">Leo, son profil Sec : les lignes en cyan changent.</em>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = text => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+// Attributes from an object: {t: 'Classement.1.Pos'} → data-t="Classement.1.Pos".
+const a = attrs => Object.entries(attrs).filter(([, value]) => value !== undefined && value !== false)
+  .map(([key, value]) => value === true ? ` data-${key}` : ` data-${key}="${esc(value)}"`).join('');
+
+// Class standings: 10 rows, around our car.
+const board = [
+  [1, 8, 'R. Lambert', 'Toyota GR010', 'MMMM', '', '', '3:29,412', '3:27,604', 9, 6],
+  [2, 51, 'L. Ferri', 'Ferrari 499P', 'MMMM', '+4,8', '+4,8', '3:29,880', '3:27,951', 3, 6],
+  [3, 6, 'M. Kessler', 'Porsche 963', 'MMHH', '+21,3', '+16,5', '3:30,214', '3:28,377', 11, 6],
+  [4, 17, 'Nathan', 'Peugeot 9X8', 'MMMM', '+38,6', '+17,3', '3:30,175', '3:28,912', 7, 6, 'us'],
+  [5, 2, 'J. Carter', 'Cadillac V-Series.R', 'MMMM', '+52,1', '+13,5', '3:30,602', '3:28,744', 2, 7, '', 'out:2'],
+  [6, 36, 'T. Girard', 'Alpine A424', 'HHHH', '+1:14,9', '+22,8', '3:30,941', '3:29,210', 0, 7, '', 'pit'],
+  [7, 20, 'S. Vogel', 'BMW M Hybrid V8', 'MMMM', '+1:41,2', '+26,3', '3:31,086', '3:29,488', 8, 6],
+  [8, 7, 'K. Mori', 'Toyota GR010', 'MMMM', '+2:33,0', '+51,8', '3:30,377', '3:28,630', 1, 7, '', 'out:1'],
+  [9, 50, 'A. Russo', 'Ferrari 499P', 'HHMM', '+1 T', '+38,4', '3:31,522', '3:29,105', 10, 6],
+  [10, 63, 'D. Bianchi', 'Lamborghini SC63', 'MMMM', '+1 T', '+44,7', '3:31,903', '3:30,016', 6, 6],
+];
+const tone = { S: '#FFFF3366', M: '#FFFFEA00', H: '#FFF0F3FA', W: '#FF00B0FF' };
+$('board').innerHTML = board.map(r => {
+  const n = r[0], at = `Classement.${n}.`, pit = r[12] || '';
+  return `<tr${a({v: at + 'Visible', off: r[13], row: at + 'Nous', us: r[11] === 'us'})}><td class="pw-pos"${a({t: at + 'Pos'})}>P${n}</td><td class="pw-num"${a({t: at + 'Num'})}>#${r[1]}</td>
+  <td class="pw-name"><b${a({t: at + 'Pilote', c: at + 'PiloteCouleur'})}>${r[2]}</b><span class="pw-team"${a({t: at + 'Voiture', c: at + 'VoitureCouleur'})} style="${r[11] ? 'color: var(--pw-text)' : ''}">${r[3]}</span></td>
+  <td><span class="tyres4">${[...r[4]].map((c, k) => `<span class="pw-compound ${c}"${a({t: at + 'Pneu' + (k + 1), c: at + 'Pneu' + (k + 1) + 'Couleur', bc: at + 'Pneu' + (k + 1) + 'Couleur'})}>${c}</span>`).join('')}</span></td>
+  <td class="pw-n"><span${a({t: at + 'Leader', c: at + 'LeaderCouleur'})} class="${n === 1 ? 'pw-green' : ''}">${n === 1 ? 'LEADER' : r[5]}</span></td><td class="pw-n"${a({t: at + 'Devant'})}>${r[6] || '—'}</td>
+  <td class="pw-n"${a({t: at + 'Dernier'})}>${r[7]}</td><td class="pw-n"><span class="${n === 1 ? 'pw-purple' : 'pw-green'}"${a({t: at + 'Meilleur', c: at + 'MeilleurCouleur'})}>${r[8]}</span></td>
+  <td class="pw-n"${a({t: at + 'Relais'})}>${pit === 'pit' ? '—' : r[9] + ' t'}</td>
+  <td class="pw-stand"><span class="pw-chip warn"${a({v: at + 'AuxStands', off: pit !== 'pit'})} >AUX STANDS</span><span class="pw-chip stop"${a({v: at + 'Sortie', off: !pit.startsWith('out'), t: at + 'SortieTexte'})} style="margin-left: 0;">SORTIE · ${pit.slice(4) || 1}/3</span></td></tr>`;
+}).join('');
+
+// Tyres: wear from the recorded 1,1 / 0,85 / 1,15 % a lap over 19 laps, pressures and brakes recorded.
+const temp = v => v < 60 ? 'var(--pw-blue)' : v < 75 ? 'var(--pw-cyan)' : v <= 100 ? 'var(--pw-green)' : v <= 110 ? 'var(--pw-yellow)' : 'var(--pw-red)';
+const brakeC = v => v < 250 ? 'var(--pw-blue)' : v <= 650 ? 'var(--pw-green)' : 'var(--pw-orange)';
+const corners = ['AVG', 'AVD', 'ARG', 'ARD'];
+const wheels = [['Avant gauche', 20.9, [96, 93, 89], 165, 270, 1.10, 1.08], ['Avant droit', 16.1, [90, 86, 83], 162, 268, 0.85, 0.83],
+  ['Arrière gauche', 21.8, [92, 90, 87], 163, 245, 1.15, 1.17], ['Arrière droit', 20.5, [89, 86, 84], 161, 247, 1.15, 1.12]];
+const fr2 = v => v.toFixed(2).replace('.', ',');
+const wheel = ([name, worn, tread, kpa, brake], i) => {
+  const right = i % 2, at = `Pneus.${corners[i]}.`, mean = Math.round(tread.reduce((x, y) => x + y) / 3);
+  // Inside of the car towards the drawing: the left wheels show outside · middle · inside, the right ones inside · middle · outside.
+  const keys = right ? ['Interieur', 'Milieu', 'Exterieur'] : ['Exterieur', 'Milieu', 'Interieur'];
+  const row = right ? tread : [...tread].reverse();
+  return `<div class="pw-wheel" style="grid-column: ${right ? 3 : 1}; grid-row: ${i < 2 ? 1 : 2};" data-blink="${at}Alerte"><div class="over worn"${a({v: at + 'Use', off: true})} style="inset: -1px;"></div><div class="pw-wheel-head${right ? ' right' : ''}"><b>${name}</b><span><b class="pw-cyan"${a({t: at + 'Pression'})}>${kpa}</b> kPa</span></div>
+    <div class="pw-wheel-body${right ? ' right' : ''}">
+      <div class="pw-wear" style="--wear:${worn}%;--bar:var(--pw-green)"><b${a({t: at + 'Usure', c: at + 'UsureCouleur'})}>${String(worn).replace('.', ',')}%</b><i><b class="fill"${a({hf: at + 'UsureFraction', bg: at + 'UsureCouleur'})} style="height: ${worn}%; background: var(--bar)"></b></i></div>
+      <div class="pw-tyre" style="--temp:${temp(mean)}"${a({bg: at + 'BandeCouleur'})}><b${a({t: at + 'Bande'})}>${mean}°C</b><span class="pw-tread">${row.map((v, k) => `<i style="--temp:${temp(v)}"${a({t: at + keys[k], bg: at + keys[k] + 'Couleur'})}>${v}</i>`).join('')}</span></div>
+      <div class="pw-brake" style="--temp:${brakeC(brake)}"><i${a({bg: at + 'FreinCouleur'})}></i><b${a({t: at + 'Frein'})}>${brake}°C</b></div>
+    </div></div>`;
+};
+// The car seen from above, the site's drawing: eight outline zones (0 front, round by the left to 7 front right).
+const outline = ['M52 16H88', 'M52 16Q32 18 30 42V64', 'M30 64Q34 117 30 170', 'M30 170V194Q30 212 48 214', 'M48 214H92', 'M92 214Q110 212 110 194V170', 'M110 170Q106 117 110 64', 'M110 64V42Q108 18 88 16'];
+const hub = (x, y) => `<rect x="${x}" y="${y}" width="14" height="30" rx="4" class="pw-dent-wheel"/>`;
+const car = `<div class="car" data-blink="Degats.Alerte"><svg class="pw-car-dents" viewBox="0 0 140 240" role="img" aria-label="Dégâts par zone">
+  <g class="pw-dent-arms"><path d="M26 51L52 38L52 64ZM26 183L52 170L52 196ZM114 51L88 38L88 64ZM114 183L88 170L88 196Z"/></g>
+  ${hub(12, 36)}${hub(114, 36)}${hub(12, 168)}${hub(114, 168)}<rect x="50" y="78" width="40" height="70" rx="16" class="pw-dent-cockpit"/>
+  ${outline.map((d, i) => `<path d="${d}" stroke="var(--pw-text2)" class="pw-dent-zone"${a({c: 'Degats.Zone' + i})}/>`).join('')}
+  <path d="M56 214V222M84 214V222" class="pw-dent-pillar"/><rect x="34" y="222" width="72" height="9" rx="2" class="pw-dent-wing"${a({c: 'Degats.AileronCouleur'})}/></svg>
+  <div class="pw-wing good"><span>Aileron arrière</span><b${a({t: 'Degats.Aileron', c: 'Degats.AileronCouleur'})}>En place</b></div>
+  <div class="pw-box" style="text-align: center;"><span>Réparation</span><b class="pw-green"${a({t: 'Degats.Reparation', c: 'Degats.ReparationCouleur'})}>0 s</b></div></div>`;
+const wearbox = `<div class="wearbox pw-table"><table><thead><tr><th>Usure par tour</th>${wheels.map(w => `<th class="pw-n">${w[0]}</th>`).join('')}</tr></thead>
+  <tbody><tr><td>Moyenne 5 tours</td>${wheels.map((w, i) => `<td class="pw-n"${a({t: `Pneus.${corners[i]}.UsureMoy5`})}>${fr2(w[5])} %</td>`).join('')}</tr><tr><td>Dernier tour</td>${wheels.map((w, i) => `<td class="pw-n"${a({t: `Pneus.${corners[i]}.UsureDernier`})}>${fr2(w[6])} %</td>`).join('')}</tr></tbody></table></div>`;
+$('tyres').innerHTML = wheels.map(wheel).join('') + car + wearbox;
+
+// Flat track: the lap as one line, our car fixed at 50 %. We are at 40 % of the lap: the finish line is 40 % behind us.
+// The line in its 3 sectors, each always the same colour; a sector cut by the edge is drawn in two pieces (6 pieces).
+const L = 13626, cls = { H: '#ff3366', P: '#2f8cff', G: '#ffab00' };
+const sectors = [[0, 0.17, '#c6ff00', 'S1'], [0.17, 0.57, '#ffffff', 'S2'], [0.57, 1, '#1de9b6', 'S3']];
+const at = v => 50 + (v - 0.40) * 100;
+let pieces = [], names = [];
+sectors.forEach(([from, to, colour, name]) => {
+  const list = [];
+  for (const shift of [-1, 0, 1]) {
+    const left = Math.max(0, at(from + shift)), right = Math.min(100, at(to + shift));
+    if (right > left) list.push([left, right, colour]);
+    const mid = at((from + to) / 2 + shift);
+    if (mid > 2 && mid < 98) names.push([mid, colour, name]);
+  }
+  while (list.length < 2) list.push(null);
+  pieces.push(...list);
+});
+let lane = '<div class="grid"></div>';
+pieces.forEach((p, k) => {
+  const id = `Piste.Morceau${k + 1}.`;
+  lane += `<div class="seg"${a({v: id + 'Visible', off: !p, xf: id + 'X', xs: p ? p[0] / 100 : 0, wf: id + 'Largeur', bg: id + 'Couleur'})} style="left:${p ? p[0] : 0}%;width:${p ? p[1] - p[0] : 5}%;background:${p ? p[2] : '#fff'}"></div>`;
+});
+for (let k = 0; k < 3; k++) {
+  const p = names[k], id = `Piste.Nom${k + 1}.`;
+  lane += `<span class="segname"${a({v: id + 'Visible', xf: id + 'X', xs: p[0] / 100, t: id + 'Texte', c: id + 'Couleur'})} style="left:${p[0]}%;color:${p[1]}">${p[2]}</span>`;
+}
+[[0, 'ARRIVÉE', 'finish', 'Piste.Arrivee'], [0.17, '', '', 'Piste.FinS1'], [0.57, '', '', 'Piste.FinS2']].forEach(([where, label, kind, id]) => {
+  let rel = where - 0.40; rel = ((rel + 1.5) % 1) - 0.5;
+  lane += `<div class="mark ${kind}"${a({v: id + 'Visible', xf: id, xs: 0.5 + rel})} style="left:${50 + rel * 100}%"><span>${label}</span></div>`;
+});
+// [metres from us (+ ahead), class, place in class, laps vs us, in the pits]: 40 places, the mockup's 28 shown.
+const field = [[2710, 'H', 1, 0], [6300, 'H', 2, 0], [1180, 'H', 3, 0], [-960, 'H', 5, 0], [-2050, 'H', 6, 0], [-3300, 'H', 7, 0], [-5900, 'H', 8, 0], [4700, 'H', 9, -1], [3400, 'H', 10, -1],
+  [500, 'P', 1, -1], [-420, 'P', 2, -1], [-1500, 'P', 3, -1], [-4300, 'P', 4, -2], [5600, 'P', 5, -2], [-6500, 'P', 6, -2],
+  [250, 'G', 4, -3], [880, 'G', 5, -3], [1600, 'G', 6, -3], [2300, 'G', 2, -3], [-250, 'G', 7, -3, 1], [-1200, 'G', 9, -4], [-2600, 'G', 1, -3],
+  [-3700, 'G', 3, -3], [-4800, 'G', 11, -4], [3900, 'G', 8, -4], [5200, 'G', 10, -4], [-5400, 'G', 12, -4], [6650, 'G', 13, -4]];
+const pale = (hex, k) => hex; // opacity is applied by the page (and given by the plugin as a colour)
+for (let k = 0; k < 40; k++) {
+  const f = field[k] || [0, 'G', 1, 0, 0, true], [m, c, p, laps, pit, hidden] = f, x = 0.5 + m / L, id = `Piste.${k + 1}.`;
+  const lead = c === 'H' && p === 1, badge = pit ? 'STAND' : laps && c === 'H' ? `${laps}T` : '';
+  lane += `<div class="dot"${a({v: id + 'Visible', off: hidden, xf: id + 'X', xs: x})} style="left:${x * 100}%;${laps < 0 ? 'opacity: .55;' : ''}">`
+    + `<i class="ring"${a({v: id + 'Leader', off: !lead})}></i><i class="face" style="background:${cls[c]}"${a({bg: id + 'Couleur'})}></i>`
+    + `<i class="hole"${a({v: id + 'Stand', off: !pit})}></i><b style="color:${pit ? cls[c] : c === 'G' ? '#111' : '#fff'}"${a({t: id + 'Pos', c: id + 'TexteCouleur'})}>${p}</b>`
+    + `<small style="color:${pit ? 'var(--pw-orange)' : ''}"${a({t: id + 'Badge', c: id + 'BadgeCouleur'})}>${badge}</small></div>`;
+}
+lane += '<div class="dot us" style="left:50%"><b data-t="PlaceNumero">4</b></div>';
+$('lane').innerHTML = lane;
+
+// Relative: 3 ahead, us, 3 behind, seconds at our pace.
+const rel = [[1, 8, 'H', 'R. Lambert', '+41,6', '', '3:29,412'], [6, 81, 'G', 'P. Sauer', '+6,9', '−3 T', '3:58,207'], [1, 22, 'P', 'E. Larsen', '+7,7', '−1 T', '3:36,118'],
+  [4, 17, 'H', 'Nathan', '', '', '3:30,175', 'us'], [7, 87, 'G', 'H. Ito', '−3,8', '−3 T', '3:59,644', '', 1], [2, 28, 'P', 'C. Petit', '−6,5', '−1 T', '3:35,902'], [5, 2, 'H', 'J. Carter', '−14,8', '', '3:30,602']];
+const clsName = { H: 'HYPERCAR', P: 'LMP2', G: 'LMGT3' };
+$('rel').innerHTML = rel.map((r, k) => {
+  const id = `Relatif.${k + 1}.`, down = !r[7] && r[5];
+  return `<tr${a({v: id + 'Visible', row: r[7] ? 'Toujours' : undefined, us: !!r[7]})} class="${down ? 'down' : ''}"><td class="pw-pos"${a({t: id + 'Pos', c: id + 'TexteCouleur'})}>P${r[0]}</td><td class="pw-num"${a({t: id + 'Num'})}>#${r[1]}</td>
+  <td><span class="pw-cls" style="--cls:${cls[r[2]]}"${a({t: id + 'Cat', c: id + 'CatCouleur', bg: id + 'CatFond', bc: id + 'CatBord'})}>${clsName[r[2]]}</span></td>
+  <td class="pw-name"><b${a({t: id + 'Pilote', c: id + 'TexteCouleur'})}>${r[3]}</b></td><td class="pw-n pw-big"${a({t: id + 'Ecart', c: id + 'TexteCouleur'})}>${r[4]}</td><td class="pw-n"${a({t: id + 'Tours', c: id + 'TexteCouleur'})}>${r[5]}</td>
+  <td class="pw-n"${a({t: id + 'Dernier', c: id + 'TexteCouleur'})}>${r[6]}</td><td class="pw-stand"><span class="pw-chip warn"${a({v: id + 'Stands', off: !r[8]})}>STANDS</span></td></tr>`;
+}).join('');
+
+// Settings: applied now and advised (a teammate's profile). Préco stays empty until profiles exist.
+const sets = [['TC', 'TC', '5', '6', 'blue'], ['TC Cut', 'Coupure', '3', '3', 'blue'], ['ABS', 'ABS', '4', '5', 'red'], ['Répartition', 'Repartition', '52,4%', '53,0%', 'red'],
+  ['Carto moteur', 'Carto', '1', '1', 'yellow'], ['Régénération', 'Regen', '3', '3', 'yellow']];
+$('sets').innerHTML = `<div class="head"><span></span><span>Actuel</span><span class="pw-cyan">Préco</span></div>`
+  + sets.map(([label, key, now, reco, colour]) => `<div class="pw-set ${now !== reco ? 'change' : colour}"><span>${label}</span><b data-t="Reglages.${key}">${now}</b><b class="reco" data-t="Preco.${key}" data-c="Preco.${key}Couleur">${now !== reco ? reco : '='}</b></div>`).join('')
+  + `<div class="pw-set grey"><span>Batterie</span><b data-t="Reglages.Batterie">64%</b><b class="reco"></b></div>`;
+
+// Pedal trace: the last 10 s as 100 steps per pedal (each step a thin bar from the value before to its value).
+const STEPS = 100;
+let trace = '';
+const value = (x, brake) => {
+  const ph = (x % 0.5) / 0.5;
+  if (brake) return ph < 0.08 ? 1 - ph * 6 : (ph > 0.62 && ph < 0.66) ? 0.45 : 0;
+  return ph < 0.1 ? 0 : ph < 0.16 ? (ph - 0.1) / 0.06 : ph < 0.62 ? 1 : ph < 0.7 ? 0.35 : ph < 0.78 ? 0.8 : 1;
+};
+for (const [pedal, colour, brake] of [['Gaz', '#00e676', false], ['Frein', '#ff3366', true]]) {
+  for (let k = 1; k < STEPS; k++) {
+    const before = value((k - 1) / STEPS, brake), now = value(k / STEPS, brake);
+    trace += `<i style="left:${(k - 1) / (STEPS - 1) * 100}%;top:${(1 - Math.max(before, now)) * 100}%;height:calc(${Math.abs(now - before) * 100}% + 3px);background:${colour}"${a({trace: `${pedal}.${k}`})}></i>`;
+  }
+}
+$('trace').innerHTML = trace;
+
+// Overlays: the highlighted row of each table, placed over the row (body coordinates).
+for (const row of document.querySelectorAll('tr[data-row]')) {
+  const box = row.getBoundingClientRect(), over = document.createElement('div');
+  over.className = 'over us';
+  over.style.cssText = `left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`;
+  over.innerHTML = '<i></i>';
+  if (row.dataset.row !== 'Toujours') over.dataset.v = row.dataset.row;
+  if (!row.hasAttribute('data-us')) over.dataset.off = '';
+  document.body.appendChild(over);
+}
+</script>
+</body>
+</html>

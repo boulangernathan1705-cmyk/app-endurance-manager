@@ -99,7 +99,7 @@ function cleanStop(input) {
 }
 
 const CONTROL = ['tc', 'cut', 'slip', 'abs', 'map', 'mig', 'arbF', 'arbR', 'bias'];
-const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'driver', 'driverAlong'];
+const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'driver', 'driverAlong', 'repair'];
 
 // Throws on a message that is not a snapshot; anything odd inside is dropped, never trusted.
 export function cleanSnapshot(input) {
@@ -399,6 +399,7 @@ export function publicFeed(feed, gaps = null) {
       ve5:avgOf(ours.laps.slice(-5), lap => lap.ve), fuel5:avgOf(ours.laps.slice(-5), lap => lap.fuel),
       wear5:[0, 1, 2, 3].map(index => avgOf(ours.laps.slice(-5), lap => lap.wear[index])),
       lastVe:ours.laps.at(-1)?.ve ?? null, lastFuel:ours.laps.at(-1)?.fuel ?? null,
+      lastWear:ours.laps.at(-1)?.wear ?? null,
       stintVe:avgOf(stintLaps, lap => lap.ve), stintFuel:avgOf(stintLaps, lap => lap.fuel), stintAvg:avgOf(cleanLaps(stintLaps), lap => lap.t),
       bestSectors:[0, 1, 2].map(index => { const values = laps.filter(lap => lap.s).map(lap => lap.s[index]); return values.length ? Math.min(...values) : null; }),
       stints:ours.stints.map((item, index) => {

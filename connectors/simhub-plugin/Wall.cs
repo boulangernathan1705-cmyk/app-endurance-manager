@@ -19,58 +19,11 @@ using Newtonsoft.Json.Linq;
 
 namespace EnduranceManager.SimHub
 {
-    // What the dash shows, made once per message from the room. Strings are ready to print; null shows nothing.
+    // What the dash shows, made once per message from the room: one value per property of the dash (Wall.Make).
     public class WallView
     {
-        public bool Live;
-        public string Track, Session, TimeLeft, LapsLeft, Weather, TrackTemp, AirTemp, Driver, Car, Class, ClassColor, Place, Status = "";
-        // Ready-made texts for the dash (its formulas only read properties): « P4 », « 4 », « Medium · 7 tours »,
-        // « Relais : tour 7 », « Sec · piste 0 %  31° / 22° », « GAZ 100 % », « FREIN 0 % ».
-        public string PlaceShort, PlaceNumber, TyreBand, StintText, Conditions, ThrottleText, BrakeText;
-        // The class standings (our class only), up to Rows lines.
-        public const int Rows = 12;
-        public Row[] Standing = Enumerable.Range(0, Rows).Select(_ => new Row()).ToArray();
-        // The flat track: every car on track, x from 0 to 1 with our car at 0.5.
-        public const int Dots = 40;
-        public Dot[] Track2 = Enumerable.Range(0, Dots).Select(_ => new Dot()).ToArray();
-        public double? Sector1At, Sector2At, LineAt;
-        // Relative: three ahead (1-3) and three behind (4-6) on track, whatever their class.
-        public Row[] Relative = Enumerable.Range(0, 6).Select(_ => new Row()).ToArray();
-        public Tyre[] Tyres = Enumerable.Range(0, 4).Select(_ => new Tyre()).ToArray();
-        public int[] Dents = new int[8];
-        public bool WingOff, DamageAlert;
-        // Energy (VE, or fuel for a car without) and fuel.
-        public string EnergyLabel, Energy, EnergyLast, EnergyAvg5, EnergyStint, EnergyLapsLeft, Fuel, FuelLast, FuelAvg5, FuelLapsLeft, Ratio;
-        public double? EnergyFill;
-        public bool EnergyAlert;
-        // Pace: last, best, 5-lap average, delta to best, sectors (last and best), optimal and predicted.
-        public string LastLap, BestLap, Avg5, Delta, DeltaColor, Optimal, Predicted, StintLaps, Stops;
-        public string[] LastSectors = new string[3], BestSectors = new string[3];
-        // Settings in the car.
-        public string TC, TCCut, TCSlip, ABS, Map, Migration, Bias, Battery, Regen, Compound;
-        // Inputs (0-100, steer -100 to 100), gear, km/h.
-        public double Throttle, Brake, Steer;
-        public string Gear, Speed;
-
-        public class Row
-        {
-            public bool Visible, Us, Best, Down, Up;
-            public string Pos, Num, Name, Car, Ahead, Leader, Last, BestLap, Stint, Tyres, Pit, PitColor, Gap, ClassColor;
-        }
-
-        public class Dot
-        {
-            public bool Visible, Us, Pit;
-            public double X;
-            public string Pos, Color;
-        }
-
-        public class Tyre
-        {
-            public string Left, In, Mid, Out, Tread, Carcass, Brake, Pressure, Wear5, Compound;
-            public double? LeftValue;
-            public bool Worn, VeryWorn, Flat;
-        }
+        readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> values = new System.Collections.Concurrent.ConcurrentDictionary<string, object>();
+        public object this[string name] { get => values.TryGetValue(name, out var value) ? value : null; set => values[name] = value; }
     }
 
     public class Wall
@@ -81,7 +34,7 @@ namespace EnduranceManager.SimHub
         readonly Dictionary<string, JToken> feeds = new Dictionary<string, JToken>();
         readonly Thread thread;
         volatile bool running = true;
-        List<JToken> lastFrames;
+        readonly List<JToken> frames = new List<JToken>();
         public volatile WallView View = new WallView();
         public string Status { get; private set; } = "Coupé";
 
@@ -146,7 +99,7 @@ namespace EnduranceManager.SimHub
                 catch
                 {
                     Status = "Coupé, nouvel essai dans " + backoff + " s";
-                    var view = View; view.Live = false;
+                    View["EnDirect"] = false;
                     Thread.Sleep(backoff * 1000);
                     backoff = Math.Min(backoff * 2, 60);
                 }
@@ -196,8 +149,9 @@ namespace EnduranceManager.SimHub
                 feeds[key] = Patch(before, message["patch"]);
             }
             else if (type != "fast") return;
-            if (message["tm"] is JArray frames && frames.Count > 0) lastFrames = frames.ToList();
-            try { View = Make(feeds.Values, lastFrames); } catch { }
+            // Our car's frames, kept for the pedal trace (the last Trace ones).
+            if (message["tm"] is JArray tm) { frames.AddRange(tm); if (frames.Count > Trace) frames.RemoveRange(0, frames.Count - Trace); }
+            try { View = Make(feeds.Values, frames); } catch { }
         }
 
         const string Size = "\u0001n", Gone = "\u0001d", Whole = "\u0001w";
@@ -225,7 +179,10 @@ namespace EnduranceManager.SimHub
             return before;
         }
 
+
         // ---------- What the dash shows ----------
+        // One value per property of the dash (dash/mur.html names them): texts ready to print, colours #AARRGGBB,
+        // fractions 0..1, true/false. A value not set shows nothing.
 
         static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
         static double? D(JToken t) => t != null && (t.Type == JTokenType.Float || t.Type == JTokenType.Integer) ? (double)t : (double?)null;
@@ -240,6 +197,8 @@ namespace EnduranceManager.SimHub
             return minutes > 0 ? minutes + ":" + (seconds.Value - minutes * 60).ToString("00.000", Fr) : seconds.Value.ToString("0.000", Fr);
         }
         static string Signed(double? value, int digits) => value.HasValue ? (value.Value > 0 ? "+" : value.Value < 0 ? "−" : "") + Math.Abs(value.Value).ToString("F" + digits, Fr) : "—";
+        // A gap in seconds as the site writes it: +4,8, +1:14,9.
+        static string Gap(double seconds) => seconds >= 60 ? "+" + (int)(seconds / 60) + ":" + (seconds % 60).ToString("00.0", Fr) : "+" + seconds.ToString("0.0", Fr);
         static string Clock(double seconds)
         {
             if (seconds < 0) seconds = 0;
@@ -247,11 +206,31 @@ namespace EnduranceManager.SimHub
             return t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes}:{t.Seconds:00}";
         }
 
+        // The site's pit wall colours (styles/pit-wall.css).
+        public const string Text = "#FFF0F3FA", Text2 = "#FF9AA5C4", Muted = "#FF6E7A99", Red = "#FFFF3366", Green = "#FF00E676", Blue = "#FF00B0FF",
+            Yellow = "#FFFFEA00", Purple = "#FFD500F9", Cyan = "#FF00E5FF", Orange = "#FFFF9100", Dark = "#FF111111", White = "#FFFFFFFF";
+
         public static string ClassColor(string cls)
         {
             string c = (cls ?? "").ToLowerInvariant();
-            return c.Contains("hyper") ? "#FFFF3366" : c.Contains("lmp2") ? "#FF2F8CFF" : c.Contains("gt3") || c.Contains("lmgt3") ? "#FFFFAB00" : c.Contains("lmp3") ? "#FFB07AFF" : "#FFFFFFFF";
+            return c.Contains("hyper") ? "#FFFF3366" : c.Contains("lmp2") ? "#FF2F8CFF" : c.Contains("gt3") ? "#FFFFAB00" : c.Contains("lmp3") ? "#FFB07AFF" : Text2;
         }
+        static string ClassName(string cls)
+        {
+            string c = (cls ?? "").ToLowerInvariant();
+            return c.Contains("hyper") ? "Hypercar" : c.Contains("lmp2") ? "LMP2" : c.Contains("gt3") ? "LMGT3" : c.Contains("lmp3") ? "LMP3" : cls ?? "";
+        }
+        // A colour with another opacity (alpha 0..1), or mixed with black (k of the colour, as CSS color-mix with #000).
+        static string Alpha(string argb, double alpha) => "#" + ((int)Math.Round(alpha * 255)).ToString("X2") + argb.Substring(3);
+        static string Dim(string argb, double k)
+        {
+            int c(int at) => (int)Math.Round(Convert.ToInt32(argb.Substring(at, 2), 16) * k);
+            return "#FF" + c(3).ToString("X2") + c(5).ToString("X2") + c(7).ToString("X2");
+        }
+        // The mockup's scales: tyre tread °C, brakes °C.
+        static string TreadColor(double t) => t < 60 ? Blue : t < 75 ? Cyan : t <= 100 ? Green : t <= 110 ? Yellow : Red;
+        static string BrakeColor(double t) => t < 250 ? Blue : t <= 650 ? Green : Orange;
+        static string CompoundColor(string letter) => letter == "S" ? Red : letter == "M" ? Yellow : letter == "H" ? Text : letter == "W" ? Blue : Text2;
 
         // A compound's letter as the site writes it (S M H W), from the game's name.
         static string Letter(string name)
@@ -266,227 +245,341 @@ namespace EnduranceManager.SimHub
             "wcmp", "pst", "flag", "yellow", "outLaps", "lane", "box" };
         static int F(string name) => Array.IndexOf(Field, name);
         static JToken V(JToken row, string name) { int k = F(name); return row is JArray a && k >= 0 && k < a.Count ? a[k] : null; }
+        static int Id(JArray row) => (int)(D(V(row, "id")) ?? -2);
 
-        // The feed shown: the one of ours updated last (the car on track now).
-        public static WallView Make(IEnumerable<JToken> feedList, List<JToken> lastFrames)
+        public const int Rows = 10, Dots = 40, Trace = 100;
+        static readonly string[] Corners = { "AVG", "AVD", "ARG", "ARD" };
+        static readonly string[] Sides = { "AVANT", "AVANT GAUCHE", "GAUCHE", "ARRIÈRE GAUCHE", "ARRIÈRE", "ARRIÈRE DROIT", "DROIT", "AVANT DROIT" };
+
+        // The feed shown: the one of ours updated last (the car on track now). frames: our car's last frames, oldest first.
+        public static WallView Make(IEnumerable<JToken> feedList, IList<JToken> frames)
         {
-            var feed = feedList.OrderByDescending(f => D(f["updated"]) ?? 0).FirstOrDefault();
             var v = new WallView();
-            if (feed == null) { v.Status = "Personne de l'équipe en piste"; return v; }
+            var feed = feedList.OrderByDescending(f => D(f["updated"]) ?? 0).FirstOrDefault();
+            if (feed == null) { v["Pilote"] = "Personne de l'équipe en piste"; return v; }
             var snap = feed["snap"] as JObject;
             var me = snap?["me"] as JObject;
             var rows = (snap?["field"] as JArray)?.OfType<JArray>().ToList();
             if (snap == null || me == null || rows == null) return v;
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            v.Live = now - (D(feed["updated"]) ?? 0) < 20000;
-            v.Status = v.Live ? "" : "Plus de données depuis " + Clock((now - (D(feed["updated"]) ?? now)) / 1000.0);
+            v["EnDirect"] = now - (D(feed["updated"]) ?? 0) < 20000;
             int myId = (int)(D(me["id"]) ?? -1);
-            var mine = rows.FirstOrDefault(r => (int)(D(V(r, "id")) ?? -2) == myId);
+            var mine = rows.FirstOrDefault(r => Id(r) == myId);
             var cars = feed["cars"] as JObject ?? new JObject();
             var ours = feed["ours"] as JObject ?? new JObject();
+            var myInfo = cars[myId.ToString()] as JObject ?? new JObject();
             int session = (int)(D(snap["session"]) ?? 0);
             bool race = session >= 10 && session <= 13;
             double length = D(snap["length"]) ?? 0, et = D(snap["et"]) ?? 0;
+            string myClass = S(me["cls"]);
 
-            v.Track = S(snap["track"]);
-            v.Session = race ? "Course" : session >= 5 && session <= 8 ? "Qualifications" : session == 9 ? "Warm-up" : "Essais";
-            double? end = D(snap["end"]);
-            v.TimeLeft = end.HasValue && end > et && end < 1e6 ? Clock(end.Value - et) : "—";
-            v.Driver = S(me["driver"]); v.Car = S(me["vehicle"]); v.Class = S(me["cls"]); v.ClassColor = ClassColor(v.Class);
-            double? rain = D(snap["rain"]), wet = D(snap["wet"]);
-            v.Weather = (rain > 0.05 ? "Pluie " + U(rain * 100, 0, "%") : "Sec") + (wet.HasValue ? " · piste " + U(wet * 100, 0, "%") : "");
-            v.TrackTemp = U(D(snap["trackTemp"]), 0, "°").Replace(" °", "°"); v.AirTemp = U(D(snap["air"]), 0, "°").Replace(" °", "°");
-
-            // ----- Class standings -----
-            var cls = rows.Where(r => S(V(r, "cls")) == v.Class).OrderBy(r => D(V(r, "place")) ?? 999).ToList();
-            double classBest = cls.Select(r => D(V(r, "best")) ?? 0).Where(t => t > 0).DefaultIfEmpty(0).Min();
-            int myClassPlace = cls.FindIndex(r => (int)(D(V(r, "id")) ?? -2) == myId) + 1;
-            v.Place = myClassPlace > 0 ? "P" + myClassPlace + " / " + cls.Count : "—";
-            int first = Math.Max(0, Math.Min(myClassPlace - 1 - WallView.Rows / 2, cls.Count - WallView.Rows));
-            for (int i = 0; i < WallView.Rows; i++)
+            // ----- The band: who, pace, place, time, weather -----
+            v["Numero"] = mine != null ? "#" + S(V(mine, "num")) : "";
+            v["Pilote"] = S(me["driver"]); v["Voiture"] = S(me["vehicle"]);
+            double? delta = D(me["delta"]);
+            v["Chrono.Delta"] = Signed(delta, 3); v["Chrono.DeltaCouleur"] = delta < 0 ? Green : delta > 0 ? Red : Text;
+            var lastSectors = myInfo["lastSectors"] as JArray;
+            var bestSectors = ours["bestSectors"] as JArray;
+            for (int k = 0; k < 3; k++)
             {
-                var row = v.Standing[i];
+                double? last = D(lastSectors?[k]), best = D(bestSectors?[k]);
+                v["Chrono.S" + (k + 1)] = N(last, 3);
+                v["Chrono.S" + (k + 1) + "Couleur"] = last > 0 && best > 0 && Math.Abs(last.Value - best.Value) < 0.0005 ? Green : Text;
+            }
+            v["Chrono.Dernier"] = Lap(D(V(mine, "last"))); v["Chrono.Meilleur"] = Lap(D(V(mine, "best")));
+            var cls = rows.Where(r => S(V(r, "cls")) == myClass).OrderBy(r => D(V(r, "place")) ?? 999).ToList();
+            double classBest = cls.Select(r => D(V(r, "best")) ?? 0).Where(t => t > 0).DefaultIfEmpty(0).Min();
+            v["Chrono.MeilleurCategorie"] = Lap(classBest);
+            int myPlace = cls.FindIndex(r => Id(r) == myId) + 1;
+            v["PlaceCourte"] = myPlace > 0 ? "P" + myPlace : "—"; v["PlaceSur"] = myPlace > 0 ? "/ " + cls.Count : "";
+            v["PlaceNumero"] = myPlace > 0 ? myPlace.ToString() : "";
+            double? end = D(snap["end"]);
+            v["TempsRestant"] = end.HasValue && end > et && end < 1e6 ? Clock(end.Value - et) : "—";
+            int lap = (int)(D(V(mine, "laps")) ?? 0) + 1;
+            v["Tour"] = mine != null ? lap.ToString() : "—";
+            double? pace = D(ours["avg5"]) ?? D(V(mine, "last")) ?? D(V(mine, "best"));
+            double? lapsToGo = race && mine != null ? LapsLeft(snap, rows, mine, pace) : null;
+            v["ToursRestants"] = lapsToGo.HasValue ? "· " + Math.Floor(lapsToGo.Value) + " restants" : "";
+            double? rain = D(snap["rain"]);
+            v["Meteo"] = rain > 0.05 ? "Pluie" : "Sec"; v["Pluie"] = U(rain * 100, 0, "%");
+            v["TempPiste"] = D(snap["trackTemp"]) is double tt ? tt.ToString("0", Fr) + "°" : "—";
+            v["TempAir"] = D(snap["air"]) is double air ? "/ " + air.ToString("0", Fr) + "°" : "";
+            string sessionName = race ? "Course" : session >= 5 && session <= 8 ? "Qualifications" : session == 9 ? "Warm-up" : "Essais";
+            v["PisteSeance"] = (S(snap["track"]) ?? "") + " · " + sessionName;
+
+            // ----- Class standings: the rows around ours -----
+            v["Classement.Titre"] = "🏆 CLASSEMENT " + ClassName(myClass).ToUpperInvariant();
+            v["Classement.Nombre"] = cls.Count + " voitures";
+            int first = Math.Max(0, Math.Min(myPlace - 1 - Rows / 2, cls.Count - Rows));
+            for (int i = 0; i < Rows; i++)
+            {
+                string at = "Classement." + (i + 1) + ".";
                 int index = first + i;
+                v[at + "Visible"] = index < cls.Count;
                 if (index >= cls.Count) continue;
                 var car = cls[index];
-                int id = (int)(D(V(car, "id")) ?? -2);
+                int id = Id(car);
                 var info = cars[id.ToString()] as JObject ?? new JObject();
-                row.Visible = true; row.Us = id == myId; row.Pos = "P" + (index + 1); row.Num = "#" + S(V(car, "num"));
-                row.Name = S(V(car, "driver")); row.Car = S(V(car, "vehicle"));
-                if (index == 0) { row.Leader = race ? "Leader" : "—"; row.Ahead = "—"; }
+                bool us = id == myId;
+                v[at + "Nous"] = us; v[at + "Pos"] = "P" + (index + 1); v[at + "Num"] = "#" + S(V(car, "num"));
+                v[at + "Pilote"] = S(V(car, "driver")); v[at + "PiloteCouleur"] = Text;
+                v[at + "Voiture"] = S(V(car, "vehicle")); v[at + "VoitureCouleur"] = us ? Text : Text2;
+                string leader, ahead;
+                if (index == 0) { leader = race ? "LEADER" : "—"; ahead = "—"; }
                 else if (race)
                 {
-                    row.Leader = D(info["leadLaps"]) is double ll && ll > 0 ? "+" + ll + " T" : D(info["lead"]) is double l ? "+" + N(l, 1) : "—";
-                    row.Ahead = D(info["aheadLaps"]) is double al && al > 0 ? "+" + al + " T" : D(info["ahead"]) is double a ? "+" + N(a, 1) : "—";
+                    leader = D(info["leadLaps"]) is double ll && ll > 0 ? "+" + ll + " T" : D(info["lead"]) is double l ? Gap(l) : "—";
+                    ahead = D(info["aheadLaps"]) is double al && al > 0 ? "+" + al + " T" : D(info["ahead"]) is double a ? Gap(a) : "—";
                 }
                 else
                 {
                     double? best = D(V(car, "best")), leaderBest = D(V(cls[0], "best")), aheadBest = D(V(cls[index - 1], "best"));
-                    row.Leader = best > 0 && leaderBest > 0 ? Signed(best - leaderBest, 3) : "—";
-                    row.Ahead = best > 0 && aheadBest > 0 ? Signed(best - aheadBest, 3) : "—";
+                    leader = best > 0 && leaderBest > 0 ? Signed(best - leaderBest, 3) : "—";
+                    ahead = best > 0 && aheadBest > 0 ? Signed(best - aheadBest, 3) : "—";
                 }
-                row.Last = Lap(D(V(car, "last")));
+                v[at + "Leader"] = leader; v[at + "LeaderCouleur"] = index == 0 && race ? Green : Text; v[at + "Devant"] = ahead;
+                v[at + "Dernier"] = Lap(D(V(car, "last")));
                 double? b = D(V(car, "best"));
-                row.BestLap = Lap(b); row.Best = b > 0 && Math.Abs(b.Value - classBest) < 0.0005;
-                row.Stint = D(info["sinceStop"]) is double since ? since.ToString(Fr) : "—";
-                string cmp = S(V(car, "cmp")) ?? (row.Us ? S(me["compound"]) : null);
-                if (cmp != null)
-                {
-                    var parts = cmp.Split('/');
-                    string front = Letter(parts[0].Trim()), rear = Letter(parts.Length > 1 ? parts[1].Trim() : parts[0].Trim());
-                    row.Tyres = front + front + rear + rear;
-                }
-                row.Pit = PitText(car, out row.PitColor);
-                row.ClassColor = ClassColor(v.Class);
+                v[at + "Meilleur"] = Lap(b); v[at + "MeilleurCouleur"] = b > 0 && Math.Abs(b.Value - classBest) < 0.0005 ? Purple : Green;
+                int pit = (int)(D(V(car, "pit")) ?? 0);
+                v[at + "Relais"] = pit > 0 ? "—" : D(info["sinceStop"]) is double since ? since.ToString(Fr) + " t" : "—";
+                string[] letters = Tyres(car, us ? S(me["compound"]) : null);
+                for (int k = 0; k < 4; k++) { v[at + "Pneu" + (k + 1)] = letters[k]; v[at + "Pneu" + (k + 1) + "Couleur"] = CompoundColor(letters[k]); }
+                double? outLaps = D(V(car, "outLaps"));
+                v[at + "AuxStands"] = pit > 0;
+                v[at + "Sortie"] = pit == 0 && outLaps.HasValue && outLaps < 3;
+                v[at + "SortieTexte"] = outLaps.HasValue ? "SORTIE · " + (outLaps + 1) + "/3" : "";
             }
 
             // ----- Flat track: our car in the middle, the others where they are around it -----
-            double myFrac = mine != null && length > 0 ? ((D(V(mine, "dist")) ?? 0) / length % 1 + 1) % 1 : 0;
+            double Frac(JArray car) => length > 0 ? ((D(V(car, "dist")) ?? 0) / length % 1 + 1) % 1 : 0;
+            double Run(JArray car) => (D(V(car, "laps")) ?? 0) + (length > 0 ? Math.Max(0, D(V(car, "dist")) ?? 0) / length : 0);
+            double myFrac = mine != null ? Frac(mine) : 0;
             double Centre(double fraction) => ((fraction - myFrac + 0.5) % 1 + 1) % 1;
-            var shown = rows.Where(r => (D(V(r, "pit")) ?? 0) != 2 && (D(V(r, "finish")) ?? 0) == 0).Take(WallView.Dots).ToList();
-            for (int i = 0; i < shown.Count; i++)
+            var shown = rows.Where(r => (D(V(r, "pit")) ?? 0) != 2 && (D(V(r, "finish")) ?? 0) == 0 && Id(r) != myId).Take(Dots).ToList();
+            for (int i = 0; i < Dots; i++)
             {
+                string at = "Piste." + (i + 1) + ".";
+                v[at + "Visible"] = i < shown.Count && length > 0 && mine != null;
+                if (i >= shown.Count) continue;
                 var car = shown[i];
-                int id = (int)(D(V(car, "id")) ?? -2);
                 string carClass = S(V(car, "cls"));
-                var order = rows.Where(r => S(V(r, "cls")) == carClass).OrderBy(r => D(V(r, "place")) ?? 999).ToList();
-                var dot = v.Track2[i];
-                dot.Visible = length > 0; dot.Us = id == myId; dot.Pit = (D(V(car, "pit")) ?? 0) == 1;
-                dot.X = Math.Round(Centre(((D(V(car, "dist")) ?? 0) / length % 1 + 1) % 1), 4);
-                dot.Pos = (order.FindIndex(r => (int)(D(V(r, "id")) ?? -2) == id) + 1).ToString();
-                dot.Color = ClassColor(carClass);
+                int place = rows.Where(r => S(V(r, "cls")) == carClass).OrderBy(r => D(V(r, "place")) ?? 999).ToList().FindIndex(r => Id(r) == Id(car)) + 1;
+                double x = Centre(Frac(car));
+                int laps = mine != null ? (int)Math.Round(Run(car) - Run(mine) - (x - 0.5)) : 0;
+                bool inPit = (D(V(car, "pit")) ?? 0) == 1, sameClass = carClass == myClass;
+                double alpha = laps < 0 ? 0.55 : 1;
+                string colour = ClassColor(carClass);
+                v[at + "X"] = Math.Round(x, 4); v[at + "Pos"] = place.ToString();
+                v[at + "Couleur"] = Alpha(colour, alpha);
+                v[at + "TexteCouleur"] = Alpha(inPit ? colour : carClass != null && carClass.ToLowerInvariant().Contains("gt3") ? Dark : White, alpha);
+                v[at + "Leader"] = sameClass && place == 1; v[at + "Stand"] = inPit;
+                v[at + "Badge"] = inPit ? "STAND" : sameClass && laps != 0 ? (laps > 0 ? "+" : "") + laps + "T" : "";
+                v[at + "BadgeCouleur"] = inPit ? Orange : Text2;
             }
-            // The line and the sector ends move along the bar (the game's sector ends, from our best lap's sectors).
-            if (length > 0)
+            // The line in its three sectors (fixed colours), from our best lap's sectors on our lap profile.
+            double? s1 = null, s2 = null;
+            var profile = me["profile"] as JArray;
+            if (length > 0 && mine != null)
             {
-                v.LineAt = Math.Round(Centre(0), 4);
-                var profile = me["profile"] as JArray;
                 double? bs1 = D(V(mine, "bs1")), bs2 = D(V(mine, "bs2")), best = D(V(mine, "best"));
                 if (profile != null && profile.Count == 101 && bs1 > 0 && bs2 > bs1 && best > bs2)
                 {
-                    v.Sector1At = Math.Round(Centre(FractionAt(profile, bs1.Value / best.Value * D(profile[100]).Value)), 4);
-                    v.Sector2At = Math.Round(Centre(FractionAt(profile, bs2.Value / best.Value * D(profile[100]).Value)), 4);
+                    s1 = FractionAt(profile, bs1.Value / best.Value * D(profile[100]).Value);
+                    s2 = FractionAt(profile, bs2.Value / best.Value * D(profile[100]).Value);
                 }
             }
-
-            // ----- Relative: seconds on track at our pace, three ahead and three behind -----
-            double? pace = D(ours["avg5"]) ?? D(V(mine, "last")) ?? D(V(mine, "best"));
-            var prof = me["profile"] as JArray;
-            if (pace > 0 && length > 0 && prof != null && prof.Count == 101 && mine != null)
+            var sectors = s1.HasValue
+                ? new[] { (0.0, s1.Value, "#FFC6FF00", "S1"), (s1.Value, s2.Value, White, "S2"), (s2.Value, 1.0, "#FF1DE9B6", "S3") }
+                : new[] { (0.0, 1.0, White, "") };
+            int piece = 0;
+            for (int k = 0; k < 3; k++)
             {
-                double lap = pace.Value;
-                double At(JArray car) => TimeAt(prof, (((D(V(car, "dist")) ?? 0) / length) % 1 + 1) % 1, lap);
-                double Run(JArray car) => (D(V(car, "laps")) ?? 0) + Math.Max(0, D(V(car, "dist")) ?? 0) / length;
+                string name = "Piste.Nom" + (k + 1) + ".";
+                v[name + "Visible"] = false;
+                for (int copy = 0; copy < 2; copy++) v["Piste.Morceau" + (piece + copy + 1) + ".Visible"] = false;
+                if (k >= sectors.Length || length <= 0 || mine == null) { piece += 2; continue; }
+                var (from, to, colour, label) = sectors[k];
+                int made = 0;
+                foreach (int shift in new[] { -1, 0, 1 })
+                {
+                    double left = Math.Max(0, from + shift - myFrac + 0.5), right = Math.Min(1, to + shift - myFrac + 0.5);
+                    if (right > left && made < 2)
+                    {
+                        string at = "Piste.Morceau" + (piece + made + 1) + ".";
+                        v[at + "Visible"] = true; v[at + "X"] = Math.Round(left, 4); v[at + "Largeur"] = Math.Round(right - left, 4); v[at + "Couleur"] = colour;
+                        made++;
+                    }
+                    double mid = (from + to) / 2 + shift - myFrac + 0.5;
+                    if (label != "" && mid > 0.02 && mid < 0.98) { v[name + "Visible"] = true; v[name + "X"] = Math.Round(mid, 4); v[name + "Texte"] = label; v[name + "Couleur"] = colour; }
+                }
+                piece += 2;
+            }
+            v["Piste.ArriveeVisible"] = length > 0 && mine != null; v["Piste.Arrivee"] = Math.Round(Centre(0), 4);
+            v["Piste.FinS1Visible"] = s1.HasValue; v["Piste.FinS1"] = s1.HasValue ? Math.Round(Centre(s1.Value), 4) : 0;
+            v["Piste.FinS2Visible"] = s2.HasValue; v["Piste.FinS2"] = s2.HasValue ? Math.Round(Centre(s2.Value), 4) : 0;
+            // How far ahead our class leader is on track (nothing when we lead).
+            v["Piste.Leader"] = cls.Count > 0 && mine != null && Id(cls[0]) != myId && length > 0
+                ? "LEADER " + ClassName(myClass).ToUpperInvariant() + " " + (((Frac(cls[0]) - myFrac) % 1 + 1) % 1 * length / 1000).ToString("0.0", Fr) + " KM DEVANT" : "";
+
+            // ----- Relative: seconds on track at our pace, three ahead, us, three behind -----
+            for (int i = 0; i < 7; i++) v["Relatif." + (i + 1) + ".Visible"] = false;
+            if (mine != null)
+            {
+                Relative(v, 4, mine, myPlace, myClass, "", 0, false);
+                v["Relatif.4.Dernier"] = Lap(D(V(mine, "last")));
+            }
+            if (pace > 0 && length > 0 && profile != null && profile.Count == 101 && mine != null)
+            {
+                double lapTime = pace.Value;
+                double At(JArray car) => TimeAt(profile, Frac(car), lapTime);
                 double mineAt = At(mine);
-                var list = rows.Where(r => (D(V(r, "pit")) ?? 0) != 2 && (int)(D(V(r, "id")) ?? -2) != myId).Select(r =>
+                var list = rows.Where(r => (D(V(r, "pit")) ?? 0) != 2 && Id(r) != myId).Select(r =>
                 {
                     double gap = At(r) - mineAt;
-                    gap = ((gap % lap) + lap * 1.5) % lap - lap / 2;
-                    return (row: r, gap, laps: (int)Math.Round(Run(r) - Run(mine) - gap / lap));
+                    gap = ((gap % lapTime) + lapTime * 1.5) % lapTime - lapTime / 2;
+                    return (row: r, gap, laps: (int)Math.Round(Run(r) - Run(mine) - gap / lapTime));
                 }).ToList();
                 var ahead = list.Where(x => x.gap > 0).OrderBy(x => x.gap).Take(3).ToList();
                 var behind = list.Where(x => x.gap <= 0).OrderByDescending(x => x.gap).Take(3).ToList();
                 for (int i = 0; i < 3; i++)
                 {
-                    if (i < ahead.Count) FillRelative(v.Relative[2 - i], ahead[i], rows);
-                    if (i < behind.Count) FillRelative(v.Relative[3 + i], behind[i], rows);
+                    if (i < ahead.Count) Relative(v, 3 - i, ahead[i].row, Place(rows, ahead[i].row), S(V(ahead[i].row, "cls")), Signed(ahead[i].gap, 1), ahead[i].laps, true);
+                    if (i < behind.Count) Relative(v, 5 + i, behind[i].row, Place(rows, behind[i].row), S(V(behind[i].row, "cls")), Signed(behind[i].gap, 1), behind[i].laps, true);
                 }
             }
 
             // ----- Tyres and damage -----
             var wheels = me["wheels"] as JArray;
             var wear5 = ours["wear5"] as JArray;
-            string[] compounds = (S(me["compound"]) ?? "").Split('/').Select(x => x.Trim()).ToArray();
+            var lastWear = ours["lastWear"] as JArray;
             for (int i = 0; i < 4; i++)
             {
+                string at = "Pneus." + Corners[i] + ".";
                 var w = wheels?[i] as JObject;
-                var t = v.Tyres[i];
                 if (w == null) continue;
                 double? left = D(w["left"]);
-                t.LeftValue = left; t.Left = U(left, 0, "%"); t.Worn = left < 30; t.VeryWorn = left < 15;
-                var tread = w["tread"] as JArray;
-                t.In = N(D(tread?[0]), 0); t.Mid = N(D(tread?[1]), 0); t.Out = N(D(tread?[2]), 0);
-                t.Carcass = U(D(w["carcass"]), 0, "°").Replace(" °", "°"); t.Brake = U(D(w["brake"]), 0, "°").Replace(" °", "°"); t.Pressure = U(D(w["kpa"]), 0, "kPa");
-                t.Tread = t.In + "  " + t.Mid + "  " + t.Out;
-                t.Wear5 = D(wear5?[i]) is double per ? U(per, 2, "%") : "—";
-                t.Flat = w["flat"]?.Type == JTokenType.Boolean && (bool)w["flat"];
-                t.Compound = Letter(compounds.Length > 1 && i >= 2 ? compounds[1] : compounds[0]);
+                double? used = left.HasValue ? 100 - left : null;
+                string wearColour = used > 85 ? Red : used > 70 ? Orange : Green;
+                bool flat = w["flat"]?.Type == JTokenType.Boolean && (bool)w["flat"];
+                v[at + "Usure"] = used.HasValue ? used.Value.ToString("0.0", Fr) + "%" : "—"; v[at + "UsureCouleur"] = wearColour;
+                v[at + "UsureFraction"] = used.HasValue ? Math.Max(0, Math.Min(1, used.Value / 100)) : 0;
+                v[at + "Use"] = used > 70; v[at + "Alerte"] = flat || used > 85;
+                var tread = (w["tread"] as JArray)?.Select(D).ToArray();
+                string[] keys = { "Interieur", "Milieu", "Exterieur" };
+                for (int k = 0; k < 3; k++)
+                {
+                    double? t = tread != null && tread.Length > k ? tread[k] : null;
+                    v[at + keys[k]] = N(t, 0); v[at + keys[k] + "Couleur"] = t.HasValue ? Dim(TreadColor(t.Value), 0.7) : Dim(Text2, 0.5);
+                }
+                double? mean = tread != null && tread.All(t => t.HasValue) && tread.Length == 3 ? tread.Average() : null;
+                v[at + "Bande"] = mean.HasValue ? mean.Value.ToString("0", Fr) + "°C" : "—";
+                v[at + "BandeCouleur"] = mean.HasValue ? Dim(TreadColor(mean.Value), 0.65) : Dim(Text2, 0.4);
+                double? brake = D(w["brake"]);
+                v[at + "Frein"] = brake.HasValue ? brake.Value.ToString("0", Fr) + "°C" : "—";
+                v[at + "FreinCouleur"] = brake.HasValue ? Dim(BrakeColor(brake.Value), 0.7) : Dim(Text2, 0.5);
+                v[at + "Pression"] = N(D(w["kpa"]), 0);
+                v[at + "UsureMoy5"] = U(D(wear5?[i]), 2, "%");
+                v[at + "UsureDernier"] = U(D(lastWear?[i]), 2, "%");
             }
-            if (me["dents"] is JArray dents && dents.Count == 8) for (int i = 0; i < 8; i++) v.Dents[i] = (int)(D(dents[i]) ?? 0);
-            v.WingOff = me["detached"]?.Type == JTokenType.Boolean && (bool)me["detached"];
-            v.DamageAlert = v.Dents.Any(x => x > 0) || v.WingOff || v.Tyres.Any(t => t.Flat);
+            var dents = me["dents"] as JArray;
+            var hit = new List<string>();
+            for (int z = 0; z < 8; z++)
+            {
+                int level = (int)(D(dents?[z]) ?? 0);
+                v["Degats.Zone" + z] = level >= 2 ? Red : level >= 1 ? Orange : Text2;
+                if (level > 0) hit.Add(Sides[z]);
+            }
+            bool wingOff = me["detached"]?.Type == JTokenType.Boolean && (bool)me["detached"];
+            bool anyFlat = wheels != null && wheels.OfType<JObject>().Any(w => w["flat"]?.Type == JTokenType.Boolean && (bool)w["flat"]);
+            v["Degats.Aileron"] = wingOff ? "Arraché" : "En place"; v["Degats.AileronCouleur"] = wingOff ? Red : Green;
+            double damage = D(me["damage"]) ?? 0;
+            double? repair = D((me["service"] as JObject)?["repair"]);
+            v["Degats.Reparation"] = damage <= 0 ? "0 s" : repair.HasValue ? repair.Value.ToString("0", Fr) + " s" : "—";
+            v["Degats.ReparationCouleur"] = damage <= 0 ? Green : Red;
+            bool damaged = hit.Count > 0 || wingOff || anyFlat;
+            v["Degats.Alerte"] = damaged;
+            v["Degats.Texte"] = anyFlat ? "CREVAISON" : wingOff ? "AILERON ARRACHÉ" : hit.Count == 1 ? "DÉGÂTS " + hit[0] : hit.Count > 1 ? "DÉGÂTS · " + hit.Count + " ZONES" : "";
+            string stint = D(myInfo["sinceStop"]) is double st ? st.ToString(Fr) : "—";
+            v["PneusBandeau"] = ((S(me["compound"]) ?? "—") + " · " + stint + " tours").ToUpperInvariant();
+            v["RelaisTexte"] = "RELAIS : TOUR " + stint;
 
             // ----- Energy and fuel -----
-            double? ve = D(me["ve"]), fuel = D(me["fuel"]);
+            double? ve = D(me["ve"]), fuel = D(me["fuel"]), capacity = D(me["capacity"]);
             double? ve5 = D(ours["ve5"]), fuel5 = D(ours["fuel5"]);
-            v.EnergyLabel = ve.HasValue ? "ÉNERGIE VIRTUELLE" : "CARBURANT";
-            v.Energy = ve.HasValue ? U(ve, 1, "%") : U(fuel, 1, "L");
-            v.EnergyFill = ve.HasValue ? ve / 100 : fuel.HasValue && D(me["capacity"]) > 0 ? fuel / D(me["capacity"]) : null;
-            v.EnergyLast = ve.HasValue ? U(D(ours["lastVe"]), 2, "%") : U(D(ours["lastFuel"]), 2, "L");
-            v.EnergyAvg5 = ve.HasValue ? U(ve5, 2, "%") : U(fuel5, 2, "L");
-            v.EnergyStint = ve.HasValue ? U(D(ours["stintVe"]), 2, "%") : U(D(ours["stintFuel"]), 2, "L");
-            double? lapsLeft = ve.HasValue && ve5 > 0 ? ve / ve5 : !ve.HasValue && fuel5 > 0 ? fuel / fuel5 : null;
-            v.EnergyLapsLeft = N(lapsLeft, 1);
-            v.EnergyAlert = lapsLeft.HasValue && lapsLeft < 2;
-            v.Fuel = U(fuel, 1, "L"); v.FuelLast = U(D(ours["lastFuel"]), 2, "L"); v.FuelAvg5 = U(fuel5, 2, "L");
-            v.FuelLapsLeft = N(fuel5 > 0 ? fuel / fuel5 : null, 1);
-            v.Ratio = ve5 > 0 && fuel5 > 0 ? N(fuel5 / ve5, 3) : "—";
+            if (ve < 0) ve = null;
+            v["Energie.Valeur"] = U(ve, 1, "%"); v["Energie.Remplissage"] = ve.HasValue ? ve.Value / 100 : 0;
+            v["Energie.DernierTour"] = U(D(ours["lastVe"]), 2, "%"); v["Energie.Moy5"] = U(ve5, 2, "%"); v["Energie.Relais"] = U(D(ours["stintVe"]), 2, "%");
+            double? veLaps = ve.HasValue && ve5 > 0 ? ve / ve5 : null;
+            v["Energie.ToursRestants"] = U(veLaps, 1, "t"); v["Energie.Alerte"] = veLaps < 2;
+            v["Carburant.Valeur"] = U(fuel, 1, "L"); v["Carburant.Remplissage"] = fuel.HasValue && capacity > 0 ? Math.Min(1, fuel.Value / capacity.Value) : 0;
+            v["Carburant.DernierTour"] = U(D(ours["lastFuel"]), 2, "L"); v["Carburant.Moy5"] = U(fuel5, 2, "L"); v["Carburant.Relais"] = U(D(ours["stintFuel"]), 2, "L");
+            double? fuelLaps = fuel.HasValue && fuel5 > 0 ? fuel / fuel5 : null;
+            v["Carburant.ToursRestants"] = U(fuelLaps, 1, "t"); v["Carburant.Alerte"] = fuelLaps < 2;
+            v["Ratio"] = ve5 > 0 && fuel5 > 0 ? N(fuel5 / ve5, 2) : "—";
+            // The stop: where the energy (or the fuel, the one that ends first) runs out at the 5-lap use; the target: what a lap
+            // may use to reach that lap.
+            double? limit = veLaps.HasValue && fuelLaps.HasValue ? Math.Min(veLaps.Value, fuelLaps.Value) : veLaps ?? fuelLaps;
+            int whole = limit.HasValue ? (int)Math.Floor(limit.Value) : 0;
+            v["ArretPrevu"] = limit.HasValue && mine != null ? "T" + (lap + whole) : "—";
+            v["Cible"] = whole >= 1 ? (ve.HasValue ? U(ve / whole, 2, "%") : U(fuel / whole, 2, "L")) : "—";
 
-            // ----- Pace -----
-            v.LastLap = Lap(D(V(mine, "last"))); v.BestLap = Lap(D(V(mine, "best"))); v.Avg5 = Lap(D(ours["avg5"]));
-            double? delta = D(me["delta"]);
-            v.Delta = Signed(delta, 2); v.DeltaColor = delta < 0 ? "#FF00E676" : delta > 0 ? "#FFFF5252" : "#FFFFFFFF";
-            v.Optimal = Lap(D(me["optimal"])); v.Predicted = Lap(D(me["predicted"]));
-            var lastSectors = cars[myId.ToString()]?["lastSectors"] as JArray;
-            var bestSectors = ours["bestSectors"] as JArray;
-            for (int k = 0; k < 3; k++) { v.LastSectors[k] = N(D(lastSectors?[k]), 3); v.BestSectors[k] = N(D(bestSectors?[k]), 3); }
-            v.StintLaps = D(cars[myId.ToString()]?["sinceStop"]) is double st ? st.ToString(Fr) : "—";
-            v.Stops = N(D(V(mine, "stops")), 0);
-            double? lapsToGo = race && mine != null ? LapsLeft(snap, rows, mine, pace) : null;
-            v.LapsLeft = N(lapsToGo, 1);
-
-            // ----- Settings -----
+            // ----- Settings (the advised column waits for the setting profiles) -----
             var control = me["control"] as JObject;
-            v.TC = N(D(control?["tc"]), 0); v.TCCut = N(D(control?["cut"]), 0); v.TCSlip = N(D(control?["slip"]), 0); v.ABS = N(D(control?["abs"]), 0);
-            v.Map = N(D(control?["map"]), 0); v.Migration = N(D(control?["mig"]), 0); v.Bias = N(D(control?["bias"]), 1);
-            v.Battery = D(me["battery"]) is double bat ? U(bat, 0, "%") : "—"; v.Regen = N(D(me["regen"]), 0);
-            v.Compound = S(me["compound"]);
-            v.PlaceShort = myClassPlace > 0 ? "P" + myClassPlace : "—"; v.PlaceNumber = myClassPlace > 0 ? myClassPlace.ToString() : "";
-            v.TyreBand = (v.Compound ?? "—") + " · " + v.StintLaps + " tours"; v.StintText = "Relais : tour " + v.StintLaps;
-            v.Conditions = v.Weather + "  " + v.TrackTemp + " / " + v.AirTemp;
+            v["Reglages.TC"] = N(D(control?["tc"]), 0); v["Reglages.Coupure"] = N(D(control?["cut"]), 0); v["Reglages.ABS"] = N(D(control?["abs"]), 0);
+            v["Reglages.Carto"] = N(D(control?["map"]), 0); v["Reglages.Repartition"] = D(control?["bias"]) is double bias ? bias.ToString("0.0", Fr) + "%" : "—";
+            v["Reglages.Regen"] = N(D(me["regen"]), 0); v["Reglages.Batterie"] = D(me["battery"]) is double bat ? bat.ToString("0", Fr) + "%" : "—";
+            v["Preco.Visible"] = false; v["Preco.Profil"] = ""; v["Preco.Titre"] = ""; v["Preco.Texte"] = "";
+            foreach (var key in new[] { "TC", "Coupure", "ABS", "Repartition", "Carto", "Regen" }) { v["Preco." + key] = ""; v["Preco." + key + "Couleur"] = Muted; }
 
-            // ----- Inputs (the last frame: dist, km/h, throttle, brake, steer, gear) -----
-            var frame = lastFrames?.LastOrDefault() as JArray;
-            if (frame != null && frame.Count >= 6)
+            // ----- Inputs: the last frame (dist, km/h, throttle %, brake %, steer %, gear) and the last ones as a trace -----
+            var list2 = frames?.OfType<JArray>().Where(f => f.Count >= 6).ToList() ?? new List<JArray>();
+            var frame = list2.LastOrDefault();
+            if (frame != null)
             {
-                v.Speed = N(D(frame[1]), 0); v.Throttle = D(frame[2]) ?? 0; v.Brake = D(frame[3]) ?? 0; v.Steer = D(frame[4]) ?? 0;
+                double throttle = D(frame[2]) ?? 0, brakeIn = D(frame[3]) ?? 0, steer = D(frame[4]) ?? 0;
                 int gear = (int)(D(frame[5]) ?? 0);
-                v.Gear = gear < 0 ? "R" : gear == 0 ? "N" : gear.ToString();
-                v.ThrottleText = "GAZ " + N(v.Throttle, 0) + " %"; v.BrakeText = "FREIN " + N(v.Brake, 0) + " %";
+                v["Entrees.Vitesse"] = N(D(frame[1]), 0); v["Entrees.Rapport"] = gear < 0 ? "R" : gear == 0 ? "N" : gear.ToString();
+                v["Entrees.Gaz"] = Math.Max(0, Math.Min(1, throttle / 100)); v["Entrees.Frein"] = Math.Max(0, Math.Min(1, brakeIn / 100));
+                v["Entrees.GazTexte"] = throttle.ToString("0", Fr) + "%"; v["Entrees.FreinTexte"] = brakeIn.ToString("0", Fr) + "%";
+                v["Entrees.Volant"] = Math.Max(0, Math.Min(1, 0.5 + steer / 200));
+                v["Entrees.VolantTexte"] = (steer > 0 ? "+" : "") + steer.ToString("0", Fr) + "%";
+            }
+            for (int k = 0; k < Trace; k++)
+            {
+                var f = k - (Trace - list2.Count) is int j && j >= 0 ? list2[j] : null;
+                v["Entrees.Trace.Gaz." + k] = f != null ? Math.Max(0, Math.Min(1, (D(f[2]) ?? 0) / 100)) : 0;
+                v["Entrees.Trace.Frein." + k] = f != null ? Math.Max(0, Math.Min(1, (D(f[3]) ?? 0) / 100)) : 0;
             }
             return v;
         }
 
-        static string PitText(JArray car, out string color)
+        // A car's four compound letters: the game's per-wheel compounds when sent (« i.t » each), else front / rear names.
+        static string[] Tyres(JArray car, string ownCompound)
         {
-            color = "#FFFFAB00";
-            if ((D(V(car, "pit")) ?? 0) == 2) return "GARAGE";
-            if ((D(V(car, "pit")) ?? 0) == 1) return "AUX STANDS";
-            double? outLaps = D(V(car, "outLaps"));
-            if (outLaps.HasValue && outLaps < 3) { color = "#FF00E5FF"; return "SORTIE " + (outLaps + 1) + "/3"; }
-            color = "#FFFFFFFF";
-            return "";
+            string cmp = S(V(car, "cmp")) ?? ownCompound;
+            if (cmp == null) return new[] { "", "", "", "" };
+            var parts = cmp.Split('/');
+            string front = Letter(parts[0].Trim()), rear = Letter(parts.Length > 1 ? parts[1].Trim() : parts[0].Trim());
+            return new[] { front, front, rear, rear };
         }
 
-        static void FillRelative(WallView.Row row, (JArray row, double gap, int laps) item, List<JArray> rows)
+        static int Place(List<JArray> rows, JArray car)
         {
-            var car = item.row;
             string cls = S(V(car, "cls"));
-            var order = rows.Where(r => S(V(r, "cls")) == cls).OrderBy(r => D(V(r, "place")) ?? 999).ToList();
-            row.Visible = true; row.Num = "#" + S(V(car, "num")); row.Name = S(V(car, "driver")); row.Car = S(V(car, "vehicle"));
-            row.Pos = "P" + (order.IndexOf(car) + 1); row.ClassColor = ClassColor(cls);
-            row.Gap = Signed(item.gap, 1); row.Down = item.laps < 0; row.Up = item.laps > 0;
-            row.Pit = (D(V(car, "pit")) ?? 0) == 1 ? "STANDS" : "";
+            return rows.Where(r => S(V(r, "cls")) == cls).OrderBy(r => D(V(r, "place")) ?? 999).ToList().FindIndex(r => Id(r) == Id(car)) + 1;
+        }
+
+        static void Relative(WallView v, int row, JArray car, int place, string cls, string gap, int laps, bool other)
+        {
+            string at = "Relatif." + row + ".", colour = ClassColor(cls);
+            v[at + "Visible"] = true; v[at + "Pos"] = "P" + place; v[at + "Num"] = "#" + S(V(car, "num"));
+            v[at + "Cat"] = ClassName(cls).ToUpperInvariant(); v[at + "CatCouleur"] = colour; v[at + "CatFond"] = Alpha(colour, 0.12); v[at + "CatBord"] = Alpha(colour, 0.6);
+            v[at + "Pilote"] = S(V(car, "driver")); v[at + "Ecart"] = gap;
+            v[at + "Tours"] = laps == 0 ? "" : (laps > 0 ? "+" : "−") + Math.Abs(laps) + " T";
+            v[at + "TexteCouleur"] = laps < 0 ? Blue : laps > 0 ? Orange : Text;
+            v[at + "Dernier"] = Lap(D(V(car, "last")));
+            v[at + "Stands"] = other && (D(V(car, "pit")) ?? 0) == 1;
         }
 
         // Seconds from the line at a fraction of the lap on our profile, scaled to `lap`.
