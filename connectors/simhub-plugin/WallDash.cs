@@ -49,12 +49,13 @@ namespace EnduranceManager.SimHub
         }
 
         // A small inset box: label on top, figure below.
-        static void Cell(string name, double x, double y, double w, double h, string label, string expr, double size = 34, string color = White, string alert = null)
+        static void Cell(string name, double x, double y, double w, double h, string label, string expr, double size = 34, string color = White, string alert = null,
+            string visible = null)
         {
-            Rect(name, x, y, w, h, Inset, CardEdge, 6);
-            if (alert != null) Rect(name + "Alerte", x, y, w, h, $"if(blink('{name}', 400, {alert}), '#AAFF1744', '#00000000')", null, 6);
-            Text(name + "Nom", x + 12, y + 6, w - 24, 22, 15, Q(label), Grey);
-            Text(name + "Valeur", x + 12, y + 28, w - 24, h - 34, size, expr, color, 0, Digits, "SemiBold");
+            Rect(name, x, y, w, h, Inset, CardEdge, 6, visible);
+            if (alert != null) Rect(name + "Alerte", x, y, w, h, $"if(blink('{name}', 400, {alert}), '#AAFF1744', '#00000000')", null, 6, visible);
+            Text(name + "Nom", x + 12, y + 6, w - 24, 22, 15, Q(label), Grey, 0, Words, "Normal", visible);
+            Text(name + "Valeur", x + 12, y + 28, w - 24, h - 34, size, expr, color, 0, Digits, "SemiBold", visible);
         }
 
         public static JArray Items()
@@ -273,13 +274,15 @@ namespace EnduranceManager.SimHub
             Cell("EnergieMoy5", lx + 241, top + 78, 218, 70, "MOY. 5 TOURS", P("Energie.Moy5"), 28);
             Cell("EnergieRelaisMoy", lx + 14, top + 154, 218, 70, "MOY. DU RELAIS", P("Energie.Relais"), 28);
             Cell("EnergieTours", lx + 241, top + 154, 218, 70, "TOURS RESTANTS", P("Energie.ToursRestants"), 28, White, P("Energie.Alerte"));
-            Rect("CarbuCadre", rx, top, half, 230, Inset, CardEdge, 8);
-            Text("CarbuTitre", rx + 14, top + 10, 260, 30, 20, Q("CARBURANT"), White, 0, Words, "SemiBold");
-            Text("CarbuValeur", rx + 250, top + 4, 210, 46, 40, P("Carburant.Valeur"), Orange, 2, Digits, "Bold");
-            Cell("CarbuDernier", rx + 14, top + 78, 218, 70, "DERNIER TOUR", P("Carburant.DernierTour"), 28);
-            Cell("CarbuMoy5", rx + 241, top + 78, 218, 70, "MOY. 5 TOURS", P("Carburant.Moy5"), 28);
-            Cell("CarbuTours", rx + 14, top + 154, 445, 70, "TOURS RESTANTS", P("Carburant.ToursRestants"), 28);
-            Cell("Ratio", lx, top + 244, 310, 84, "RATIO CARBURANT", P("Ratio"), 32);
+            // A car without virtual energy already has its fuel on the left: the right block and the ratio go.
+            string ve = $"{P("Energie.Titre")} != 'CARBURANT'";
+            Rect("CarbuCadre", rx, top, half, 230, Inset, CardEdge, 8, ve);
+            Text("CarbuTitre", rx + 14, top + 10, 260, 30, 20, Q("CARBURANT"), White, 0, Words, "SemiBold", ve);
+            Text("CarbuValeur", rx + 250, top + 4, 210, 46, 40, P("Carburant.Valeur"), Orange, 2, Digits, "Bold", ve);
+            Cell("CarbuDernier", rx + 14, top + 78, 218, 70, "DERNIER TOUR", P("Carburant.DernierTour"), 28, White, null, ve);
+            Cell("CarbuMoy5", rx + 241, top + 78, 218, 70, "MOY. 5 TOURS", P("Carburant.Moy5"), 28, White, null, ve);
+            Cell("CarbuTours", rx + 14, top + 154, 445, 70, "TOURS RESTANTS", P("Carburant.ToursRestants"), 28, White, null, ve);
+            Cell("Ratio", lx, top + 244, 310, 84, "RATIO CARBURANT", P("Ratio"), 32, White, null, ve);
             Cell("Prevu", lx + 326, top + 244, 310, 84, "TOUR PRÉVU", P("Chrono.Prevu"), 32);
             Cell("Moy5Tour", lx + 652, top + 244, 314, 84, "MOY. 5 TOURS", P("Chrono.Moy5"), 32);
         }

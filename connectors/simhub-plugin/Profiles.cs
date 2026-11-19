@@ -225,7 +225,6 @@ namespace EnduranceManager.SimHub
         // Mapper or not bound in LMU) stops it, said in the message.
         string Reach(Setting setting, double target)
         {
-            var cm = manager()?.GetControlMapperInterface();
             // A pilot's « + » can lower the game's level (TC counted the other way on some cars): seen once, then swapped.
             bool swapped = false;
             for (int presses = 0, still = 0; presses < 40; presses++)
@@ -235,7 +234,7 @@ namespace EnduranceManager.SimHub
                 if (Math.Abs(now - target) < setting.Tolerance) return null;
                 string command = setting.Key + ((target > now) != swapped ? "+" : "-");
                 if (!File.Roles.TryGetValue(command, out string role) || string.IsNullOrEmpty(role)) return setting.Label + " (rôle « " + Command(command) + " » non choisi)";
-                if (cm == null || !cm.StartStopRole(role, 60)) return setting.Label + " (rôle « " + role + " » introuvable)";
+                if (!PressRole(manager(), role)) return setting.Label + " (rôle « " + role + " » introuvable)";
                 // The game takes a moment to show the new level: a few readings at most, then the next press.
                 double? after = now;
                 for (int wait = 0; wait < 6 && after == now; wait++) { Thread.Sleep(60); after = latest() is Sample t ? setting.Read(t) : null; }
@@ -245,6 +244,22 @@ namespace EnduranceManager.SimHub
             }
             return setting.Label + " (pas atteint)";
         }
+
+        // Alone in its method: should SimHub's Control Mapper differ from the facade (reference/), only the profiles' presses
+        // stop, caught by the caller, not the whole plugin (.NET fails the method that calls a missing member).
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal static IControlMapperInterface ControlMapper(PluginManager manager) => manager?.GetControlMapperInterface();
+
+        static bool PressRole(PluginManager manager, string role)
+        {
+            try { return StartStop(manager, role); } catch { return false; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static bool StartStop(PluginManager manager, string role) => ControlMapper(manager)?.StartStopRole(role, 60) == true;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal static List<string> ButtonRoles(PluginManager manager) => ControlMapper(manager)?.GetAvailableButtonRoles();
 
         public static string Command(string command)
         {

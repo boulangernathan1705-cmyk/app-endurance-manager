@@ -287,7 +287,9 @@ namespace EnduranceManager.SimHub.Replay
                         places.Add((r.Car, theirs));
                     }
                     int place = 1;
-                    foreach (var (car, _) in places.OrderByDescending(x => x.run)) car.Place = place++;
+                    // As LMU does: in a race the order on track, in practice and qualifying the best laps (none yet: last).
+                    var order = f.Session >= 10 ? places.OrderByDescending(x => x.run) : places.OrderBy(x => x.car.Best > 0 ? x.car.Best : double.MaxValue).ThenByDescending(x => x.run);
+                    foreach (var (car, _) in order) car.Place = place++;
 
                     // What the game shows at the line belongs to the lap just done (the plugin closes a lap on the first
                     // reading after the line): that reading keeps the finished lap's conditions.

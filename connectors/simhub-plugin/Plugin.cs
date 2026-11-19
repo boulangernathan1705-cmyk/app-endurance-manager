@@ -114,7 +114,8 @@ namespace EnduranceManager.SimHub
             for (int k = 0; k < Profiles.Slots; k++)
             {
                 int slot = k;
-                pluginManager.AddAction("Profil" + (slot + 1), GetType(), (manager, button) => Profiles.Press(slot), (manager, button) => Profiles.Release(slot));
+                // The extension already checked against SimHub (reference/simhub-api.txt): same action, same name.
+                this.AddAction("Profil" + (slot + 1), (manager, button) => Profiles.Press(slot), (manager, button) => Profiles.Release(slot));
                 this.AttachDelegate("Profils." + (slot + 1) + ".Nom", () => Profiles.NameAt(slot));
             }
             this.AttachDelegate("Profils.Actif", () => Settings.Profiles ? Profiles.Active ?? "" : "");

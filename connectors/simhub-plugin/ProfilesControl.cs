@@ -155,7 +155,7 @@ namespace EnduranceManager.SimHub
         {
             roles.Children.Clear();
             List<string> available;
-            try { available = plugin.PluginManager?.GetControlMapperInterface()?.GetAvailableButtonRoles() ?? new List<string>(); } catch { available = new List<string>(); }
+            try { available = Profiles.ButtonRoles(plugin.PluginManager) ?? new List<string>(); } catch { available = new List<string>(); }
             available = available.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList();
             if (available.Count == 0)
                 roles.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 8),
