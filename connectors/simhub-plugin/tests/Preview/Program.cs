@@ -31,9 +31,9 @@ namespace EnduranceManager.SimHub.Preview
                     Idle();
                     then?.Invoke(element);
                     Idle();
-                    var size = new Size(window.ActualWidth, window.ActualHeight);
-                    var bitmap = new RenderTargetBitmap((int)(Width * 1.5), (int)(Height * 1.5), 144, 144, PixelFormats.Pbgra32);
-                    bitmap.Render((Visual)window.Content);
+                    var shown = (FrameworkElement)window.Content;
+                    var bitmap = new RenderTargetBitmap((int)(shown.ActualWidth * 1.5), (int)(shown.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
+                    bitmap.Render(shown);
                     var png = new PngBitmapEncoder();
                     png.Frames.Add(BitmapFrame.Create(bitmap));
                     using (var file = File.Create(Path.Combine(dir, name + ".png"))) png.Save(file);

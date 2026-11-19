@@ -111,6 +111,8 @@ namespace EnduranceManager.SimHub
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 1, 0, 0)));
             style.Setters.Add(new Setter(Control.BorderBrushProperty, Border));
             style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            // The tab's page inherits its text colour from here (WPF's own style would make it black).
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Text));
             return style;
         }
 
@@ -135,6 +137,7 @@ namespace EnduranceManager.SimHub
             style.Setters.Add(new Setter(Control.BackgroundProperty, Clear));
             style.Setters.Add(new Setter(Control.BorderBrushProperty, Clear));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 0, 2)));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Text));
             style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(14, 10, 14, 9)));
             style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
             return style;

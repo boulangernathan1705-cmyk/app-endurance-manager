@@ -278,7 +278,7 @@ namespace EnduranceManager.SimHub
         }
 
         static Ellipse Dot() => new Ellipse { Width = 12, Height = 12, Margin = new Thickness(0, 4, 10, 0), VerticalAlignment = VerticalAlignment.Top };
-        static TextBlock Title() => new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        static TextBlock Title() => new TextBlock { Foreground = Theme.Text, FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
         static TextBlock Detail() => new TextBlock { Foreground = Theme.Muted, Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
 
         static Button Action(string text, bool main) => main ? Theme.Primary(text) : Theme.Secondary(text);
@@ -304,8 +304,8 @@ namespace EnduranceManager.SimHub
         static FrameworkElement Setting(string name, double min, double max, double step, double value, Func<double, string> format, Action<double> save, out Slider slider)
         {
             var line = new DockPanel { Margin = new Thickness(0, 4, 0, 4) };
-            var label = new TextBlock { Text = name, Width = 120, VerticalAlignment = VerticalAlignment.Center };
-            var shown = new TextBlock { Width = 70, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var label = new TextBlock { Text = name, Foreground = Theme.Text, Width = 120, VerticalAlignment = VerticalAlignment.Center };
+            var shown = new TextBlock { Foreground = Theme.Text, Width = 70, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             slider = new Slider { Minimum = min, Maximum = max, SmallChange = step, LargeChange = step * 5, TickFrequency = step, IsSnapToTickEnabled = true,
                 Value = Math.Max(min, Math.Min(max, value)), VerticalAlignment = VerticalAlignment.Center };
             shown.Text = format(slider.Value);
