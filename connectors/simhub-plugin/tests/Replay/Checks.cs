@@ -156,8 +156,13 @@ namespace EnduranceManager.SimHub.Replay
             int errors = 0;
             try
             {
-                foreach (var line in File.ReadLines(room))
+                var lines = File.ReadAllLines(room);
+                int index = 0;
+                foreach (var line in lines)
                 {
+                    // The wall halfway through the session too, car on track (for the picture, dash-render.mjs).
+                    if (index++ == lines.Length / 2)
+                        File.WriteAllText(Path.Combine(outDir, f.File + ".mur-milieu.json"), JsonConvert.SerializeObject(WallProperties.All.ToDictionary(x => x.Name, x => x.Get(wall.View)), Formatting.Indented));
                     var item = JObject.Parse(line);
                     now = (long)item["at"];
                     bool whole = wall.Hear((string)item["message"]);

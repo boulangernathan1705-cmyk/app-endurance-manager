@@ -77,6 +77,8 @@ namespace EnduranceManager.SimHub.Replay
                     bool driving = ok && s.Realtime && frozen < 50;
                     Guard("Recorder.Feed", () => recorder.Feed(s, driving));
                     if (driving) Guard("Computed.Update", () => run.Computed.Update(buffer, s, recorder.Current));
+                    // Our car's last second for the wall's inputs (the plugin reads it thirty times a second, here ten).
+                    if (driving) Guard("LiveShare.Frame", () => live.Frame(s));
                     if (driving && tick % 10 == 0)
                     {
                         Guard("Course.Update", () => run.Course.Update(buffer, s, recorder.Current, service ?? api.Service, menu, game, api.Refuel, null, null));

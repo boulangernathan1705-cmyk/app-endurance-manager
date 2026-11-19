@@ -25,6 +25,13 @@ namespace EnduranceManager.SimHub.Replay
                     Console.WriteLine("Écrit : " + args[2]);
                     return 0;
                 }
+                // The dash « Endurance Manager · Mur » as SimHub's Dash Studio gets it (its items), for the picture (dash-render.mjs).
+                if (args.Length >= 2 && args[0] == "dash-mur")
+                {
+                    File.WriteAllText(args[1], WallDash.Items().ToString(Newtonsoft.Json.Formatting.None));
+                    Console.WriteLine("Écrit : " + args[1]);
+                    return 0;
+                }
                 if (args.Length >= 2 && args[0] == "rejouer")
                 {
                     var run = Replayer.Run(args[1], null, out_);

@@ -21,6 +21,7 @@ function publish(feed) {
 for (const line of readFileSync(input, 'utf8').split('\n').filter(Boolean)) {
   const {at, message} = JSON.parse(line);
   let data = JSON.parse(message);
+  const frames = Array.isArray(data.tm) ? data.tm : [];
   delete data.tm;
   if (data.v === DELTA_VERSION) {
     const merged = mergeSnapshot(base, data);
@@ -34,6 +35,8 @@ for (const line of readFileSync(input, 'utf8').split('\n').filter(Boolean)) {
   const after = publish(feed), before = sent.get(feed.key);
   sent.set(feed.key, after);
   const out = before ? {type:'patch', now:at, key:feed.key, patch:diff(before, after) ?? {}} : {type:'hello', now:at, live:LIVE_FOR, feeds:[after]};
+  // server/live.mjs broadcast(): our car's last second goes along, as it came.
+  if (frames.length) out.tm = frames;
   lines.push(JSON.stringify({at, message:JSON.stringify(out)}));
 }
 writeFileSync(output, lines.join('\n') + '\n');

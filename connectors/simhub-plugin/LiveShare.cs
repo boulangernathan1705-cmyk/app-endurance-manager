@@ -378,7 +378,12 @@ namespace EnduranceManager.SimHub
 
         // The message the plugin would send now for this copy of the game's memory (tests/Replay: the mur des stands
         // without the site, nothing sent).
-        internal string Message(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed) => Encode(Build(b, s, recorder, api, computed), null);
+        internal string Message(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed)
+        {
+            List<object[]> moments;
+            lock (gate) { moments = frames; frames = new List<object[]>(); }
+            return Encode(Build(b, s, recorder, api, computed), moments);
+        }
 
         // What the site says: {type:'mode', watch, map} or {type:'full'}.
         void Heard(string text)
