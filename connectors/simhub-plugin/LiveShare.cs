@@ -393,7 +393,7 @@ namespace EnduranceManager.SimHub
         }
 
         // Seconds from the line at each percent of the lap, from the best lap's points (time and distance).
-        static double[] Profile(LapTrace trace, double length)
+        internal static double[] Profile(LapTrace trace, double length)
         {
             if (trace.Dist.Count < 50 || trace.Time <= 0) return null;
             var times = new double[101];
@@ -415,7 +415,7 @@ namespace EnduranceManager.SimHub
 
         // What the lane costs on top of the same stretch at racing speed (the stretch from our best lap), without the
         // time stopped: the part of a stop that does not depend on the service.
-        static double? Drive(LiveStop stop, double[] profile, double length)
+        internal static double? Drive(LiveStop stop, double[] profile, double length)
         {
             if (profile == null || length <= 100) return null;
             double At(double dist) { double x = Math.Max(0, Math.Min(0.99999, dist / length)) * 100; int k = (int)x; return profile[k] + (profile[k + 1] - profile[k]) * (x - k); }

@@ -104,6 +104,10 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   la séance), le tour prévu (meilleur tour du jeu + delta du jeu), les chocs du relais et les blocages de roue du
   dernier tour (`Voiture.TourOptimal`, `TourPrevu`, `ChocsRelais`, `BlocagesDernierTour` ; `optimal`, `predicted`,
   `impacts`, `lockups` dans `me`).
+  Aussi : place prévue dans la catégorie hors course (`Voiture.PlacePrevue`), sortie des stands si on s'arrêtait
+  maintenant (`Voiture.Sortie.*` : temps perdu mesuré au dernier arrêt, place, écarts et voitures devant et derrière,
+  d'après le profil de notre meilleur tour) et dix micro-secteurs (`Voiture.MicroSecteurs.Ecart1..10` contre le meilleur
+  de la séance, `.Optimal`).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 

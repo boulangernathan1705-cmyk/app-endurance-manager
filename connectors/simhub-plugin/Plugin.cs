@@ -133,6 +133,15 @@ namespace EnduranceManager.SimHub
             this.AttachDelegate("Voiture.TourPrevu", () => Computed.Predicted);
             this.AttachDelegate("Voiture.ChocsRelais", () => Computed.Impacts);
             this.AttachDelegate("Voiture.BlocagesDernierTour", () => Computed.LockupsLastLap);
+            this.AttachDelegate("Voiture.PlacePrevue", () => Computed.PredictedPlace);
+            this.AttachDelegate("Voiture.Sortie.TempsPerdu", () => Computed.RejoinLoss);
+            this.AttachDelegate("Voiture.Sortie.Place", () => Computed.RejoinPlace);
+            this.AttachDelegate("Voiture.Sortie.EcartDevant", () => Computed.RejoinAhead);
+            this.AttachDelegate("Voiture.Sortie.VoitureDevant", () => Computed.RejoinAheadCar);
+            this.AttachDelegate("Voiture.Sortie.EcartDerriere", () => Computed.RejoinBehind);
+            this.AttachDelegate("Voiture.Sortie.VoitureDerriere", () => Computed.RejoinBehindCar);
+            this.AttachDelegate("Voiture.MicroSecteurs.Optimal", () => Computed.MicroOptimal);
+            for (int k = 0; k < Computed.Micro; k++) { int part = k; this.AttachDelegate("Voiture.MicroSecteurs.Ecart" + (part + 1), () => Computed.MicroDelta[part]); }
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
