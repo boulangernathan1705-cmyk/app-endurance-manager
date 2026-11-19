@@ -1,0 +1,35 @@
+# API de SimHub dont le plugin se sert, telle que le compilateur l'a écrite dans une DLL compilée avec le vrai SimHub
+# (2.2.0, PC de Nathan, SimHub 9.x). ApiCheck signale toute ligne nouvelle : à confirmer avec une compilation sur le PC,
+# puis « dotnet run --project reference/ApiCheck -c Release -- <cette DLL> --ecrire ».
+impl EnduranceManager.SimHub.EnduranceManagerPlugin : [SimHub.Plugins]SimHub.Plugins.IDataPlugin
+impl EnduranceManager.SimHub.EnduranceManagerPlugin : [SimHub.Plugins]SimHub.Plugins.IPlugin
+impl EnduranceManager.SimHub.EnduranceManagerPlugin : [SimHub.Plugins]SimHub.Plugins.IWPFSettings
+impl EnduranceManager.SimHub.EnduranceManagerPlugin : [SimHub.Plugins]SimHub.Plugins.IWPFSettingsV2
+memberref [SimHub.Plugins]SimHub.Plugins.IPluginExtensions::AddAction`1 Void(!!0, String, [mscorlib]System.Action`2<[SimHub.Plugins]SimHub.Plugins.PluginManager,String>, [mscorlib]System.Action`2<[SimHub.Plugins]SimHub.Plugins.PluginManager,String>)
+memberref [SimHub.Plugins]SimHub.Plugins.IPluginExtensions::AttachDelegate`2 Void(!!0, String, [mscorlib]System.Func`1<!!1>)
+memberref [SimHub.Plugins]SimHub.Plugins.IPluginExtensions::ReadCommonSettings`1 !!0([SimHub.Plugins]SimHub.Plugins.IPlugin, String, [mscorlib]System.Func`1<!!0>)
+memberref [SimHub.Plugins]SimHub.Plugins.IPluginExtensions::SaveCommonSettings`1 Void([SimHub.Plugins]SimHub.Plugins.IPlugin, String, !!0)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginAuthorAttribute::.ctor`0 Void(String)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginDescriptionAttribute::.ctor`0 Void(String)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginManager/InputToActionTriggeredDelegate::.ctor`0 Void(Object, IntPtr)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginManager::GetPropertyValue`0 Object(String)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginManager::add_InputToActionTriggered`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager/InputToActionTriggeredDelegate)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginManager::remove_InputToActionTriggered`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager/InputToActionTriggeredDelegate)
+memberref [SimHub.Plugins]SimHub.Plugins.PluginNameAttribute::.ctor`0 Void(String)
+method EnduranceManager.SimHub.EnduranceManagerPlugin::DataUpdate`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager, ref [GameReaderCommon]GameReaderCommon.GameData) virtual=True
+method EnduranceManager.SimHub.EnduranceManagerPlugin::End`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager) virtual=True
+method EnduranceManager.SimHub.EnduranceManagerPlugin::GetWPFSettingsControl`0 [PresentationFramework]System.Windows.Controls.Control([SimHub.Plugins]SimHub.Plugins.PluginManager) virtual=True
+method EnduranceManager.SimHub.EnduranceManagerPlugin::Init`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager) virtual=True
+method EnduranceManager.SimHub.EnduranceManagerPlugin::get_PluginManager`0 [SimHub.Plugins]SimHub.Plugins.PluginManager() virtual=False
+method EnduranceManager.SimHub.EnduranceManagerPlugin::set_PluginManager`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager) virtual=True
+typeref [GameReaderCommon]GameReaderCommon.GameData
+typeref [SimHub.Plugins]SimHub.Plugins.IDataPlugin
+typeref [SimHub.Plugins]SimHub.Plugins.IPlugin
+typeref [SimHub.Plugins]SimHub.Plugins.IPluginExtensions
+typeref [SimHub.Plugins]SimHub.Plugins.IWPFSettings
+typeref [SimHub.Plugins]SimHub.Plugins.IWPFSettingsV2
+typeref [SimHub.Plugins]SimHub.Plugins.PluginAuthorAttribute
+typeref [SimHub.Plugins]SimHub.Plugins.PluginDescriptionAttribute
+typeref [SimHub.Plugins]SimHub.Plugins.PluginManager
+typeref [SimHub.Plugins]SimHub.Plugins.PluginManager/InputToActionTriggeredDelegate
+typeref [SimHub.Plugins]SimHub.Plugins.PluginNameAttribute

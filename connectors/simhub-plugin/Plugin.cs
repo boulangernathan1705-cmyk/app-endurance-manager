@@ -192,6 +192,7 @@ namespace EnduranceManager.SimHub
             standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
+            Tape.Stop();
             // SimHub closes: the session being driven is written to disk before the process goes.
             reader?.Join(3000);
         }
@@ -214,6 +215,13 @@ namespace EnduranceManager.SimHub
         {
             change(Settings);
             this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
+        // The recorder's switch (Tape.cs): never saved, a new SimHub run starts without recording.
+        public void SetRecording(bool on)
+        {
+            if (on) Tape.Start(GetType().Assembly.GetName().Version.ToString(3));
+            else Tape.Stop();
         }
 
         // The mur in SimHub switch: on, the plugin follows the team's room (Wall.cs).
@@ -294,6 +302,8 @@ namespace EnduranceManager.SimHub
                         for (int misses = 0, frozen = 0, tick = 0; running && Reading && misses < 600; tick++)
                         {
                             Copy(view, buffer);
+                            // The session recorder for the tests (Tape.cs), while its switch is on.
+                            Tape.Frame(buffer);
                             bool ok = LmuMemory.Read(buffer, out var sample);
                             // The game's clock stopped (paused, crashed or closed while on track): not driving. After a
                             // minute the memory is let go and the session written, so nothing is lost on a crash.

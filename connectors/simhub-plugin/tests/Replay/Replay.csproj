@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Rejoue des séances LMU dans le code du plugin, sans le jeu ni SimHub : `dotnet run -c Release` (voir README.md).
+       Le code du plugin est compilé ici tel quel, sauf ce qui dépend de SimHub ou de WPF (l'écran, les dashs, les profils). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Sur Windows aussi en .NET Framework 4.8, le moteur de SimHub. -->
+    <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net8.0;net48</TargetFrameworks>
+    <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>EnduranceManager.SimHub.Replay</RootNamespace>
+    <AssemblyName>Replay</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\*.cs" Exclude="..\..\Plugin.cs;..\..\SettingsControl.cs;..\..\ProfilesControl.cs;..\..\Profiles.cs" LinkBase="Plugin" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- .NET Framework 4.8 sans son Developer Pack (n'agit que sur net48). -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -175,6 +175,30 @@ dotnet build -c Release
 Si SimHub n'est pas dans `C:\Program Files (x86)\SimHub`, ajouter `-p:SimHubDir="D:\chemin\SimHub"`.
 La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
 
+## Compiler et tester sans le PC
+
+Sans SimHub (GitHub, cloud, Linux), `dotnet build -c Release` prend la façade de `reference/` : les types et membres
+de SimHub dont le plugin se sert, mêmes signatures, sans code (jamais copiée chez les pilotes). Une DLL 2.2.0
+compilée ainsi a la même forme que celle compilée sur le PC avec le vrai SimHub (métadonnées comparées).
+`reference/ApiCheck` liste ce que la DLL attend de SimHub et signale ce qui n'a jamais été vérifié avec le vrai SimHub
+(`reference/simhub-api.txt`) : à confirmer une fois par une compilation sur le PC, puis
+`dotnet run --project reference/ApiCheck -c Release -- <cette DLL> --ecrire`.
+
+La CI « Plugin SimHub » (`.github/workflows/simhub-plugin.yml`, Windows) compile à chaque PR qui touche le plugin,
+lance ApiCheck, rejoue les séances de test et joint la DLL (Artifacts de l'exécution).
+
+`tests/Replay` rejoue des séances dans le code du plugin, sans le jeu : `dotnet run --project tests/Replay -c Release`.
+Pour chaque séance de `tests/Replay/fixtures` (séances réelles des fiches combo), la mémoire de LMU est refaite dix
+fois par seconde, passe par l'enregistreur des tours, les calculs, les chiffres de course et le message du mur, puis
+par le salon du site (`tests/room-bridge.mjs`, le code de `shared/live.mjs`) jusqu'au mur dans SimHub. Le résultat est
+comparé à ce que le plugin avait vraiment envoyé. Les chiffres du dash et du mur sont écrits dans `out/`
+(`*.dash.json`, `*.mur.json`).
+
+Enregistrer une vraie séance : sur l'écran du plugin (onglet Général), « Enregistrer ma séance pour les tests ».
+Tout ce que le plugin lit (mémoire de LMU, réponses de son API locale, messages du salon) va dans
+`Documents\Endurance Manager\Enregistrements\*.emrec` (rien n'est envoyé ; coupé à chaque démarrage de SimHub,
+1 h 30 ou 1,5 Go au plus). `dotnet run --project tests/Replay -c Release -- rejouer <fichier.emrec>` le rejoue.
+
 ## Installer et tester
 
 1. Double-cliquer sur `Installer le plugin.cmd`, posé à côté de la DLL dans `bin\Release` : il ferme SimHub, copie

@@ -257,7 +257,7 @@ namespace EnduranceManager.SimHub
         {
             try
             {
-                var lines = JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult());
+                var lines = JArray.Parse(Tape.Get(client, MenuUrl));
                 var texts = new Dictionary<string, string>();
                 foreach (var line in lines.OfType<JObject>())
                 {
@@ -275,7 +275,7 @@ namespace EnduranceManager.SimHub
         {
             try
             {
-                var lines = JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult());
+                var lines = JArray.Parse(Tape.Get(client, MenuUrl));
                 var wanted = new Dictionary<string, int>();
                 var missing = new List<string>();
                 foreach (var line in lines.OfType<JObject>())
@@ -295,7 +295,7 @@ namespace EnduranceManager.SimHub
                     for (int check = 0; check < 4 && wanted.Count > 0; check++)
                     {
                         Thread.Sleep(250);
-                        foreach (var line in JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult()).OfType<JObject>())
+                        foreach (var line in JArray.Parse(Tape.Get(client, MenuUrl)).OfType<JObject>())
                             if (wanted.TryGetValue(Name(line), out int index) && ((int?)line["currentSetting"] ?? -1) == index) wanted.Remove(Name(line));
                     }
                 }

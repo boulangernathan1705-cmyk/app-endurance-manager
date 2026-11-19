@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Façade de SimHub.Plugins.dll pour compiler le plugin sans SimHub (GitHub Actions) : seulement les types et les
+       membres que le plugin utilise, avec les mêmes signatures, sans code. La DLL produite n'est jamais copiée chez les
+       pilotes : SimHub charge la sienne. Les signatures se vérifient dans reference/simhub-api.txt. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF Condition="'$(OS)' == 'Windows_NT'">true</UseWPF>
+    <AssemblyName>SimHub.Plugins</AssemblyName>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GameReaderCommon\GameReaderCommon.csproj" />
+  </ItemGroup>
+  <!-- Hors Windows (compilation dans le cloud), WPF par ses DLL de référence : le plugin n'a pas de XAML. -->
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+  </ItemGroup>
+</Project>

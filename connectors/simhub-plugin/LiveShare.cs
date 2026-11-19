@@ -306,7 +306,7 @@ namespace EnduranceManager.SimHub
         string Encode(Snapshot snap, List<object[]> moments)
         {
             bool withFrames = moments != null && moments.Count > 0;
-            var now = DateTime.Now;
+            var now = Tape.Now;
             if (needFull || sentRows == null || now - sentFullAt > TimeSpan.FromMinutes(5))
             {
                 needFull = false;
@@ -376,6 +376,10 @@ namespace EnduranceManager.SimHub
             return JsonConvert.SerializeObject(message);
         }
 
+        // The message the plugin would send now for this copy of the game's memory (tests/Replay: the mur des stands
+        // without the site, nothing sent).
+        internal string Message(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed) => Encode(Build(b, s, recorder, api, computed), null);
+
         // What the site says: {type:'mode', watch, map} or {type:'full'}.
         void Heard(string text)
         {
@@ -436,7 +440,7 @@ namespace EnduranceManager.SimHub
 
         static JToken Get(HttpClient client, string path)
         {
-            try { return JToken.Parse(client.GetStringAsync(Api + path).GetAwaiter().GetResult()); }
+            try { return JToken.Parse(Tape.Get(client, Api + path)); }
             catch { return null; }
         }
 

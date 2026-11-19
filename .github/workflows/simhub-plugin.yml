@@ -1,0 +1,81 @@
+name: Plugin SimHub
+
+# Compile le plugin SimHub sur une machine Windows de GitHub, sans SimHub : la façade de son API
+# (connectors/simhub-plugin/reference) remplace ses DLL, avec les mêmes signatures (vérifiées par ApiCheck). Puis rejoue
+# les séances de tests/Replay/fixtures dans le code du plugin, du jeu jusqu'au mur des stands dans SimHub. La DLL
+# compilée est jointe à chaque exécution (Artifacts), prête à essayer.
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev, main]
+    paths: ['connectors/simhub-plugin/**', 'shared/live.mjs', '.github/workflows/simhub-plugin.yml']
+  pull_request:
+    paths: ['connectors/simhub-plugin/**', 'shared/live.mjs', '.github/workflows/simhub-plugin.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simhub-plugin-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plugin:
+    name: compilation et rejeu
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: connectors/simhub-plugin
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      REPLAY_OUT: ${{ github.workspace }}\replay-out
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Compiler le plugin (façade SimHub)
+        run: dotnet build EnduranceManager.SimHub.csproj -c Release -p:UseSimHubFacade=true
+
+      - name: Vérifier l'API SimHub utilisée
+        run: dotnet run --project reference/ApiCheck -c Release -- bin/Release/EnduranceManager.SimHub.dll
+
+      - name: Rejouer les séances (moteur .NET Framework 4.8, celui de SimHub)
+        run: dotnet run --project tests/Replay -c Release -f net48
+
+      - name: Résumé
+        if: always()
+        run: |
+          $version = ([xml](Get-Content EnduranceManager.SimHub.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "### Plugin $version" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "DLL compilée sans SimHub : fichier « plugin-simhub-$version » dans Artifacts, plus bas sur cette page." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Joindre la DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-simhub-${{ env.VERSION }}-${{ github.sha }}
+          path: |
+            connectors/simhub-plugin/bin/Release/EnduranceManager.SimHub.dll
+            connectors/simhub-plugin/bin/Release/Installer le plugin.cmd
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Joindre les chiffres rejoués (dash, mur, séances)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rejeu-${{ github.sha }}
+          path: |
+            replay-out/*.mur.json
+            replay-out/*.dash.json
+            replay-out/*.sessions.json
+          if-no-files-found: ignore
+          retention-days: 14

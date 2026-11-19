@@ -92,7 +92,8 @@ namespace EnduranceManager.SimHub
     {
         public const string Name = "LMU_Data";
         public const int Size = 324820;
-        const int ScoringInfo = 1632, VehScoring = 2192, VehSize = 584, TelemetryOff = 128464, TelemInfo = 128468, TelemSize = 1888, MaxVehicles = 104;
+        // The layout's offsets, also used by the tests to write a synthetic copy (tests/Replay).
+        public const int ScoringInfo = 1632, VehScoring = 2192, VehSize = 584, TelemetryOff = 128464, TelemInfo = 128468, TelemSize = 1888, MaxVehicles = 104;
 
         static double F64(byte[] b, int at) => BitConverter.ToDouble(b, at);
         static double F32(byte[] b, int at) => BitConverter.ToSingle(b, at);

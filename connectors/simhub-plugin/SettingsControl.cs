@@ -47,6 +47,9 @@ namespace EnduranceManager.SimHub
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
             page.Children.Add(new TextBlock { Text = "Seul le module Profils change quelque chose dans le jeu, quand tu appuies sur un de ses boutons.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
+            // The recorder for the tests (Tape.cs): off at each start of SimHub.
+            page.Children.Add(Switch("Enregistrer ma séance pour les tests (fichier sur ce PC, rien n'est envoyé)", Tape.Recording, on => plugin.SetRecording(on)));
+            page.Children.Add(recordText);
 
             // One tab per module, its switch at the top.
             var combos = Page("Fiches combo", "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.");
@@ -88,7 +91,7 @@ namespace EnduranceManager.SimHub
 
         // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
         // by itself every two seconds (automatic): the pilot only clicks « Créer mon code » on the site.
-        readonly TextBlock sessionText = Detail(), wallText = Detail();
+        readonly TextBlock sessionText = Detail(), wallText = Detail(), recordText = Detail();
 
         static StackPanel Page(string title, string intro)
         {
@@ -182,6 +185,7 @@ namespace EnduranceManager.SimHub
             sessionText.Text = !plugin.Settings.Enabled ? "Module coupé : aucune séance enregistrée. Celles déjà enregistrées attendent sur le PC."
                 : plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.";
             if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
+            recordText.Text = Tape.Status;
             wallText.Text = (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
                 + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""))
                 + (plugin.Settings.Wall ? "\nMur dans SimHub : " + plugin.Wall.Status : "");

@@ -95,6 +95,9 @@ namespace EnduranceManager.SimHub
 
         public void Stop() => running = false;
 
+        // The last error making the dash's view (shown by the tests; in SimHub the previous view stays).
+        internal Exception LastError;
+
         // ---------- Connection ----------
 
         void Loop()
@@ -179,8 +182,16 @@ namespace EnduranceManager.SimHub
         // hello: every feed; feed: one complete; patch: what changed in one; fast: our car's last frames.
         void Heard(string text, ClientWebSocket socket)
         {
+            Tape.RoomMessage(text);
+            if (!Hear(text)) Send(socket, "{\"type\":\"view\",\"watch\":true,\"map\":false,\"again\":true}");
+        }
+
+        // One message from the room applied to the feeds held and the dash's view; false when everything is needed again
+        // (a patch for a feed not held). Also what the tests feed (tests/Replay).
+        internal bool Hear(string text)
+        {
             JObject message;
-            try { message = JObject.Parse(text); } catch { return; }
+            try { message = JObject.Parse(text); } catch { return true; }
             string type = (string)message["type"];
             if (type == "hello")
             {
@@ -192,12 +203,13 @@ namespace EnduranceManager.SimHub
             {
                 string key = (string)message["key"];
                 // A patch for a feed not held: everything again.
-                if (key == null || !feeds.TryGetValue(key, out var before)) { Send(socket, "{\"type\":\"view\",\"watch\":true,\"map\":false,\"again\":true}"); return; }
+                if (key == null || !feeds.TryGetValue(key, out var before)) return false;
                 feeds[key] = Patch(before, message["patch"]);
             }
-            else if (type != "fast") return;
+            else if (type != "fast") return true;
             if (message["tm"] is JArray frames && frames.Count > 0) lastFrames = frames.ToList();
-            try { View = Make(feeds.Values, lastFrames); } catch { }
+            try { View = Make(feeds.Values, lastFrames); LastError = null; } catch (Exception e) { LastError = e; }
+            return true;
         }
 
         const string Size = "\u0001n", Gone = "\u0001d", Whole = "\u0001w";
@@ -277,7 +289,7 @@ namespace EnduranceManager.SimHub
             var me = snap?["me"] as JObject;
             var rows = (snap?["field"] as JArray)?.OfType<JArray>().ToList();
             if (snap == null || me == null || rows == null) return v;
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long now = Tape.NowMs;
             v.Live = now - (D(feed["updated"]) ?? 0) < 20000;
             v.Status = v.Live ? "" : "Plus de données depuis " + Clock((now - (D(feed["updated"]) ?? now)) / 1000.0);
             int myId = (int)(D(me["id"]) ?? -1);
