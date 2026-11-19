@@ -35,6 +35,10 @@ namespace EnduranceManager.SimHub
         public bool Profiles { get; set; } = false;
         // The mur in SimHub (Wall.cs): follow the team's room for the dash « Endurance Manager · Mur ». Off by default.
         public bool Wall { get; set; } = false;
+        // FMT companion, whole, run by this plugin (Companion.cs). Not chosen yet: on when the installer put its DLL in
+        // our folder (it was installed alone before). Takes effect at SimHub's next start.
+        public bool? Companion { get; set; }
+        [Newtonsoft.Json.JsonIgnore] public bool CompanionOn => Companion ?? System.IO.File.Exists(EnduranceManager.SimHub.Companion.Kept);
     }
 
     [PluginDescription("Overlays, chiffres de course, profils de réglages et mur des stands pour Le Mans Ultimate. Le site Endurance Manager est un module à part.")]
@@ -81,6 +85,8 @@ namespace EnduranceManager.SimHub
         public GameApi Game { get; } = new GameApi();
         // The pilot's setting profiles, car by car, and the wheel buttons that apply or memorise them (Profiles.cs).
         public Profiles Profiles { get; private set; }
+        // FMT companion 0.5 as it is, its DLL run from here when its module is on (Companion.cs).
+        public Companion Companion { get; } = new Companion();
         // Our own calculations after LMU Drive's ideas (Computed.cs): pit timing and out-laps per car, optimal and predicted lap.
         public Computed Computed { get; } = new Computed();
         // The game's live standings (penalties by kind, finish status) and Lovely's track and car files.
@@ -185,6 +191,7 @@ namespace EnduranceManager.SimHub
             sender.Start();
             // The overlays « Endurance Manager · Bandeau » and « · Colonne » in Dash Studio's templates.
             ThreadPool.QueueUserWorkItem(_ => Dashes.Install(home));
+            if (Settings.CompanionOn) Companion.Start(pluginManager);
         }
 
         public void End(PluginManager pluginManager)
@@ -194,6 +201,7 @@ namespace EnduranceManager.SimHub
             wall?.Stop();
             standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
+            Companion.End(pluginManager);
             this.SaveCommonSettings("GeneralSettings", Settings);
             Tape.Stop();
             // SimHub closes: the session being driven is written to disk before the process goes.
@@ -202,7 +210,7 @@ namespace EnduranceManager.SimHub
 
         // SimHub calls this sixty times a second; the plugin reads the game on its own thread, ten times a second (our car
         // thirty times while a teammate watches the wall).
-        public void DataUpdate(PluginManager pluginManager, ref GameData data) { }
+        public void DataUpdate(PluginManager pluginManager, ref GameData data) => Companion.DataUpdate(pluginManager, ref data);
 
         public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsControl(this);
 

@@ -33,3 +33,8 @@ typeref [SimHub.Plugins]SimHub.Plugins.PluginDescriptionAttribute
 typeref [SimHub.Plugins]SimHub.Plugins.PluginManager
 typeref [SimHub.Plugins]SimHub.Plugins.PluginManager/InputToActionTriggeredDelegate
 typeref [SimHub.Plugins]SimHub.Plugins.PluginNameAttribute
+memberref [SimHub.Plugins]SimHub.Plugins.IDataPlugin::DataUpdate`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager, ref [GameReaderCommon]GameReaderCommon.GameData)
+memberref [SimHub.Plugins]SimHub.Plugins.IPlugin::End`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager)
+memberref [SimHub.Plugins]SimHub.Plugins.IPlugin::Init`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager)
+memberref [SimHub.Plugins]SimHub.Plugins.IPlugin::set_PluginManager`0 Void([SimHub.Plugins]SimHub.Plugins.PluginManager)
+memberref [SimHub.Plugins]SimHub.Plugins.IWPFSettings::GetWPFSettingsControl`0 [PresentationFramework]System.Windows.Controls.Control([SimHub.Plugins]SimHub.Plugins.PluginManager)

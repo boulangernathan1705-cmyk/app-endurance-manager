@@ -67,12 +67,21 @@ namespace EnduranceManager.SimHub
             overlays.Children.Add(BannerBox());
             var course = Page("Chiffres de course", "Énergie, carburant, écarts, menu des stands… en propriétés pour tes dashs, sous les noms de NeoRed.");
             course.Children.Add(Switch("Activer ce module", plugin.Settings.Course, on => plugin.SetModule(x => x.Course = on)));
+            // FMT companion, whole: its own screen below the switch when it runs.
+            var companion = Page("FMT companion", "FMT companion tel quel, dans ce plugin : menu des stands, commandes de la voiture, Préparer LMU… Activé ou coupé, il démarre au prochain lancement de SimHub.");
+            companion.Children.Add(Switch("Activer ce module", plugin.Settings.CompanionOn, on => plugin.SetModule(x => x.Companion = on)));
+            companion.Children.Add(companionText);
+            var screen = plugin.Companion.Running ? plugin.Companion.Screen(plugin.PluginManager) : null;
+            if (screen != null) companion.Children.Add(screen);
             var tabs = new TabControl { Margin = new Thickness(8) };
             tabs.Items.Add(Tab("Général", page));
             // SimHub alone first; then the site and the two modules that go through it.
             tabs.Items.Add(Tab("Overlays", overlays));
             tabs.Items.Add(Tab("Chiffres de course", course));
             tabs.Items.Add(new TabItem { Header = "Profils", Content = new ProfilesControl(plugin) });
+            // Its own screen is wide: no fixed-width page around it.
+            companion.Width = double.NaN;
+            tabs.Items.Add(Tab("FMT companion", companion));
             tabs.Items.Add(Tab("Site", site));
             tabs.Items.Add(Tab("Fiches combo", combos));
             tabs.Items.Add(Tab("Mur des stands", wall));
@@ -95,7 +104,7 @@ namespace EnduranceManager.SimHub
 
         // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
         // by itself every two seconds (automatic): the pilot only clicks « Créer mon code » on the site.
-        readonly TextBlock sessionText = Detail(), wallText = Detail(), recordText = Detail();
+        readonly TextBlock sessionText = Detail(), wallText = Detail(), recordText = Detail(), companionText = Detail();
 
         static StackPanel Page(string title, string intro)
         {
@@ -194,6 +203,9 @@ namespace EnduranceManager.SimHub
             if (plugin.Settings.Enabled && !siteOn) sessionText.Text += "\nModule Site coupé : les séances restent sur ce PC, elles partiront s'il est réactivé.";
             if (uploader?.LastRefusal is string refusal) sessionText.Text += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
             recordText.Text = Tape.Status;
+            companionText.Text = plugin.Settings.CompanionOn == plugin.Companion.Running ? plugin.Companion.Status
+                : plugin.Settings.CompanionOn ? "Activé : FMT companion démarre au prochain lancement de SimHub." + (plugin.Companion.Status.StartsWith("Module") ? "" : "\n" + plugin.Companion.Status)
+                : "Coupé : FMT companion s'arrête au prochain lancement de SimHub.";
             wallText.Text = !siteOn ? "Le mur des stands passe par le site : active le module Site." : (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
                 + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""))
                 + (plugin.Settings.Wall ? "\nMur dans SimHub : " + plugin.Wall.Status : "");
