@@ -25,6 +25,8 @@ namespace EnduranceManager.SimHub
         public bool Share { get; set; } = true;
         // The overlays' stint length in laps (Practice.cs): it sets the energy per lap aimed at.
         public int StintLaps { get; set; } = 12;
+        // The mur in SimHub (Wall.cs): follow the team's room for the dash « Endurance Manager · Mur ». Off by default.
+        public bool Wall { get; set; } = false;
     }
 
     [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
@@ -62,6 +64,8 @@ namespace EnduranceManager.SimHub
         public Updater Updater => updater;
         public LmuApi Api => api;
         public LiveShare Live => live;
+        public Wall Wall => wall;
+        Wall wall;
         public Practice Practice { get; } = new Practice();
         // The race figures a dashboard reads (Course.cs), and the game's pit menu they come with.
         public Course Course { get; } = new Course();
@@ -89,6 +93,8 @@ namespace EnduranceManager.SimHub
             uploader = new Uploader(home);
             updater = new Updater(home);
             live = new LiveShare(() => LinkCode.Parse(Settings.Code));
+            wall = new Wall(() => LinkCode.Parse(Settings.Code), () => Settings.Wall);
+            foreach (var (name, get) in WallProperties.All) this.AttachDelegate(name, () => get(wall.View));
             lovely = new Lovely(home);
             standings = new Standings(() => Settings.Enabled && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
             standings.Start();
@@ -156,6 +162,7 @@ namespace EnduranceManager.SimHub
         {
             running = false;
             live?.Stop();
+            wall?.Stop();
             standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
@@ -174,6 +181,13 @@ namespace EnduranceManager.SimHub
             Settings.Code = code?.Trim() ?? "";
             this.SaveCommonSettings("GeneralSettings", Settings);
             uploader.Reset();
+        }
+
+        // The mur in SimHub switch: on, the plugin follows the team's room (Wall.cs).
+        public void SetWall(bool on)
+        {
+            Settings.Wall = on;
+            this.SaveCommonSettings("GeneralSettings", Settings);
         }
 
         // The live sharing switch (mur des stands): off, nothing more leaves for the team's pit wall.

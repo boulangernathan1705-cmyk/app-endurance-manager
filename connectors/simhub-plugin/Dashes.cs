@@ -26,10 +26,10 @@ namespace EnduranceManager.SimHub
 
         static string P(string name) => "[EnduranceManagerPlugin.Essais." + name + "]";
 
-        static JObject Bind(string target, string expression) =>
+        internal static JObject Bind(string target, string expression) =>
             new JObject { ["Formula"] = new JObject { ["Expression"] = expression }, ["Mode"] = 2, ["TargetPropertyName"] = target };
 
-        static JObject Label(string name, double left, double top, double width, double height, string font, double size, string weight,
+        internal static JObject Label(string name, double left, double top, double width, double height, string font, double size, string weight,
             string text, string color = null, int align = 0, string visible = null, bool italic = false)
         {
             var bindings = new JObject { ["Text"] = Bind("Text", text) };
@@ -46,7 +46,7 @@ namespace EnduranceManager.SimHub
             return item;
         }
 
-        static JObject Box(string name, double x, double y, double width, double height, string color, string border, int radius) =>
+        internal static JObject Box(string name, double x, double y, double width, double height, string color, string border, int radius) =>
             new JObject
             {
                 ["$type"] = Rectangle, ["IsRectangleItem"] = true, ["Name"] = name,
@@ -114,6 +114,39 @@ namespace EnduranceManager.SimHub
             return (dash, metadata);
         }
 
+        static (JObject dash, JObject metadata) MakeWall()
+        {
+            int width = WallDash.Width, height = WallDash.Height;
+            var layer = new JObject
+            {
+                ["$type"] = Layer, ["Group"] = true, ["Repetitions"] = 0, ["Visible"] = true, ["Name"] = "Mur", ["RenderingSkip"] = 0,
+                ["MinimumRefreshIntervalMS"] = 0.0, ["Top"] = 0, ["Left"] = 0, ["Height"] = height, ["Width"] = width, ["BackgroundColor"] = "#00FFFFFF",
+                ["Childrens"] = WallDash.Items()
+            };
+            var metadata = new JObject
+            {
+                ["Category"] = "Endurance Manager", ["Title"] = "Endurance Manager · Mur", ["Author"] = "Endurance Manager",
+                ["Description"] = "Le mur des stands de l'équipe sur l'écran du PC (2560 × 1440). Plugin « Fiches combo » requis, case « Mur dans SimHub » cochée.",
+                ["ScreenCount"] = 1.0, ["InGameScreensIndexs"] = new JArray(0), ["IdleScreensIndexs"] = new JArray(0), ["MainPreviewIndex"] = 0, ["IsOverlay"] = false,
+                ["Width"] = (double)width, ["Height"] = (double)height, ["OverlaySizeWarning"] = false, ["MetadataVersion"] = 2.0, ["EnableOnDashboardMessaging"] = true,
+                ["PitScreensIndexs"] = new JArray()
+            };
+            var dash = new JObject
+            {
+                ["DashboardDebugManager"] = new JObject { ["Maximized"] = false }, ["Version"] = 2, ["Id"] = "0b5c6c9e-4f0a-4d39-9d3e-6a1d2b7c1a05", ["BaseHeight"] = height, ["BaseWidth"] = width,
+                ["BackgroundColor"] = "#FF0A0C10",
+                ["Screens"] = new JArray(new JObject
+                {
+                    ["Name"] = "Mur", ["InGameScreen"] = true, ["IdleScreen"] = true, ["PitScreen"] = false, ["ScreenId"] = "0b5c6c9e-4f0a-4d39-9d3e-6a1d2b7c1a06", ["IsForegroundLayer"] = false,
+                    ["IsBackgroundLayer"] = false, ["BackgroundColor"] = "#FF0A0C10", ["Items"] = new JArray(layer)
+                }),
+                ["SnapToGrid"] = false, ["HideLabels"] = true, ["ShowForeground"] = true, ["ForegroundOpacity"] = 100.0, ["ShowBackground"] = true, ["BackgroundOpacity"] = 100.0,
+                ["ShowBoundingRectangles"] = false, ["GridSize"] = 2, ["Images"] = new JArray(), ["Metadata"] = metadata, ["ShowOnScreenControls"] = false,
+                ["IsOverlay"] = false, ["EnableClickThroughOverlay"] = false, ["EnableOnDashboardMessaging"] = true
+            };
+            return (dash, metadata);
+        }
+
         public static IEnumerable<(string name, string dash, string metadata)> All()
         {
             foreach (var (title, id, screen, column) in new[]
@@ -125,6 +158,9 @@ namespace EnduranceManager.SimHub
                 var (dash, metadata) = Make(title, id, screen, column);
                 yield return (title, dash.ToString(Formatting.None), metadata.ToString(Formatting.Indented));
             }
+            // The mur (plugin 2.5): a full screen, 2560 × 1440, for the PC (WallDash.cs).
+            var (wall, wallMeta) = MakeWall();
+            yield return ("Endurance Manager · Mur", wall.ToString(Formatting.None), wallMeta.ToString(Formatting.Indented));
         }
 
         static string Hash(string text) { using (var sha = SHA256.Create()) return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(text))); }

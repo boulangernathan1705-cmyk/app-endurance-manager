@@ -108,6 +108,12 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   maintenant (`Voiture.Sortie.*` : temps perdu mesuré au dernier arrêt, place, écarts et voitures devant et derrière,
   d'après le profil de notre meilleur tour) et dix micro-secteurs (`Voiture.MicroSecteurs.Ecart1..10` contre le meilleur
   de la séance, `.Optimal`).
+- affiche, depuis la 2.5.0, le mur des stands dans SimHub : case « Mur dans SimHub » (coupée par défaut) → le plugin suit
+  le salon de l'équipe comme une page du site (`Wall.cs`, `GET /api/combos/plugin/live/watch`, viewer) et publie chaque
+  case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
+  (2560 × 1440, `WallDash.cs`, installé avec les overlays) les affiche : classement de notre catégorie, pneus et dégâts,
+  réglages, bande du rythme, piste à plat centrée sur notre voiture, relatif, énergie et carburant, entrées. Une alerte
+  fait clignoter le cadre concerné, rien ne masque le reste.
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
