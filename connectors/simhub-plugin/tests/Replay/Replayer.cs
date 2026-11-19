@@ -23,6 +23,9 @@ namespace EnduranceManager.SimHub.Replay
         // What the plugin would have sent to the team's room, with the recording's clock (ms).
         public List<(long At, string Message)> Messages = new List<(long, string)>();
         public List<(long At, string Message)> Room = new List<(long, string)>();
+        // The mur des stands made on the PC alone (module « Mur des stands », LocalRoom), at the end and halfway.
+        public Wall Solo = new Wall();
+        public WallView SoloHalf;
         // The dash's figures once a minute: property name → value, for reading in out/ (and in the CI's files).
         public List<Dictionary<string, object>> Dash = new List<Dictionary<string, object>>();
         public string DashFile;
@@ -86,6 +89,12 @@ namespace EnduranceManager.SimHub.Replay
                         {
                             string message = live.Message(buffer, s, recorder, api, run.Computed);
                             if (message != null) run.Messages.Add((Tape.NowMs, message));
+                        });
+                        Guard("Mur solo", () =>
+                        {
+                            var snap = live.Local(buffer, s, recorder, api, run.Computed, false);
+                            if (snap != null) run.Solo.Local(snap, new object[] { Math.Round(s.LapDist), Math.Round(s.Speed, 1), Math.Round(s.Throttle * 100), Math.Round(s.BrakePedal * 100), Math.Round(s.Steer * 100), s.Gear });
+                            if (run.Solo.LastError != null) throw run.Solo.LastError;
                         });
                         Guard("Telemetry", () => { foreach (var (_, get) in Telemetry.Properties) get(s); });
                         Guard("Course.Properties", () => { foreach (var (_, get) in Course.Properties) get(run.Course.View); });

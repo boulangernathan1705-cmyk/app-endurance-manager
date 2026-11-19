@@ -27,7 +27,7 @@ namespace EnduranceManager.SimHub
         {
             this.plugin = plugin;
             var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
-            page.Children.Add(new TextBlock { Text = "Profils de réglages", FontSize = 22, FontWeight = FontWeights.SemiBold });
+            page.Children.Add(new TextBlock { Text = "Réglages voiture en course", FontSize = 22, FontWeight = FontWeights.SemiBold });
             page.Children.Add(new TextBlock { Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap,
                 Text = "Un bouton du volant par profil : appui court, la voiture passe dans ce profil ; appui de 2 s, il mémorise ses réglages actuels. "
                     + "Relie « Profil1 », « Profil2 »… à tes boutons dans SimHub › Contrôles et événements (plugin EnduranceManagerPlugin)." });

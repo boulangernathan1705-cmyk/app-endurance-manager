@@ -136,6 +136,8 @@ namespace EnduranceManager.SimHub.Replay
         }
 
         // The mur: the plugin's messages through the room (the site's code), then into the dash in SimHub.
+        static readonly string[] Inputs = { "Mur.Entrees." };
+
         static void Wall(Fixture f, Run run, string outDir, Report r)
         {
             r.Is(run.Messages.Count > 0, "Aucun message pour le mur");
@@ -150,7 +152,7 @@ namespace EnduranceManager.SimHub.Replay
             r.Is(p.ExitCode == 0, "Salon (room-bridge.mjs) : " + err.Trim());
             if (p.ExitCode != 0) return;
 
-            var wall = new Wall(() => null, () => false);
+            var wall = new Wall();
             long now = 0;
             Tape.Clock = () => DateTimeOffset.FromUnixTimeMilliseconds(now).LocalDateTime;
             int errors = 0;
@@ -179,8 +181,15 @@ namespace EnduranceManager.SimHub.Replay
                 r.Is(v.LastLap == lap, $"Mur : dernier tour « {v.LastLap} » au lieu de « {lap} »");
                 r.Is(v.Standing.Count(x => x.Visible) == 4, $"Mur : {v.Standing.Count(x => x.Visible)} lignes au classement de la catégorie au lieu de 4");
                 r.Is(v.Standing.Count(x => x.Visible && x.Us) == 1, "Mur : notre voiture absente du classement");
+                // The mur des stands on the PC alone (LocalRoom) shows the same as through the site's room, inputs aside
+                // (the room passes our car's frames ten times a second, the PC its reading of the moment).
+                var viaSite = WallProperties.All.ToDictionary(x => x.Name, x => JsonConvert.SerializeObject(x.Get(v)));
+                var solo = WallProperties.All.ToDictionary(x => x.Name, x => JsonConvert.SerializeObject(x.Get(run.Solo.View)));
+                File.WriteAllText(Path.Combine(outDir, f.File + ".mur-solo.json"), JsonConvert.SerializeObject(WallProperties.All.ToDictionary(x => x.Name, x => x.Get(run.Solo.View)), Formatting.Indented));
+                var differ = viaSite.Keys.Where(k => viaSite[k] != solo[k] && !Inputs.Any(k.Contains)).ToList();
+                r.Is(differ.Count == 0, "Mur solo différent du mur par le site : " + string.Join(", ", differ.Take(8).Select(k => $"{k} {solo[k]} au lieu de {viaSite[k]}")));
             }
-            finally { Tape.Clock = null; wall.Stop(); }
+            finally { Tape.Clock = null; }
         }
     }
 }

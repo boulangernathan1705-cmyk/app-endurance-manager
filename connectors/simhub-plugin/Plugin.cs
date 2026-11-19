@@ -21,7 +21,7 @@ namespace EnduranceManager.SimHub
     public class Settings
     {
         public string Code { get; set; } = "";
-        // The site module: off, the plugin works alone on this PC (no link, nothing sent or fetched, no update check).
+        // Was the Site module's switch: kept so old settings still read, no longer used (the team modules use the site, Plugin.TeamOn).
         public bool Site { get; set; } = true;
         // Off: nothing is read from the game and nothing is sent; the sessions waiting stay on the disk.
         public bool Enabled { get; set; } = true;
@@ -29,22 +29,24 @@ namespace EnduranceManager.SimHub
         public bool Share { get; set; } = true;
         // The overlays' stint length in laps (Practice.cs): it sets the energy per lap aimed at.
         public int StintLaps { get; set; } = 12;
-        // The other modules: the practice overlays (Practice.cs), the race figures for the dashs (Course.cs) and the
-        // setting profiles (Profiles.cs, off until the pilot turns it on: it presses buttons in the game).
+        // The other modules: the overlay relais (Practice.cs) and the setting profiles (Profiles.cs, off until the pilot turns it on: it presses buttons in the game).
         public bool Overlays { get; set; } = true;
+        // Was the « Chiffres de course » switch: kept so old settings still read, no longer used (Plugin.CourseOn).
         public bool Course { get; set; } = true;
         public bool Profiles { get; set; } = false;
-        // The mur in SimHub (Wall.cs): follow the team's room for the dash « Endurance Manager · Mur ». Off by default.
+        // Mur des stands (Wall.cs): our car on the dash « Endurance Manager · Mur », from this PC alone. Off by default.
         public bool Wall { get; set; } = false;
         // FMT companion, whole, run by this plugin (Companion.cs). Not chosen yet: on when the installer put its DLL in
         // our folder (it was installed alone before). Takes effect at SimHub's next start.
         public bool? Companion { get; set; }
-        // « Retours de test » (Report.cs): a journal of what the plugin does, for the development. Off by default.
+        // « Aide au développement » (Report.cs): a journal of what the plugin does, for the development. Off by default.
         public bool Report { get; set; } = false;
+        // The guided path (Guide.cs) was gone through or skipped: the plugin's screen opens on its modules.
+        public bool GuideDone { get; set; } = false;
         [Newtonsoft.Json.JsonIgnore] public bool CompanionOn => Companion ?? System.IO.File.Exists(EnduranceManager.SimHub.Companion.Kept);
     }
 
-    [PluginDescription("Overlays, chiffres de course, profils de réglages et mur des stands pour Le Mans Ultimate. Le site Endurance Manager est un module à part.")]
+    [PluginDescription("Overlay relais, réglages voiture en course, black box sur boutons et mur des stands pour Le Mans Ultimate. Le partage avec l'équipe passe par le site, en option.")]
     [PluginAuthor("Endurance Manager")]
     [PluginName("Endurance Manager")]
     public class EnduranceManagerPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
@@ -104,7 +106,9 @@ namespace EnduranceManager.SimHub
         volatile object latest;
         public string Status => !Settings.Enabled ? "En pause" : uploader?.Status ?? "";
         // The game is read while one module at least needs it.
-        bool Reading => Settings.Enabled || Settings.Share || Settings.Overlays || Settings.Course || Settings.Profiles;
+        bool Reading => Settings.Enabled || Settings.Share || Settings.Overlays || Settings.Wall || Settings.Profiles;
+        // The race figures for the dashs (Course.cs): no switch of their own, they run for the overlay and the mur des stands.
+        public bool CourseOn => Settings.Overlays || Settings.Wall;
 
         public void Init(PluginManager pluginManager)
         {
@@ -117,7 +121,7 @@ namespace EnduranceManager.SimHub
             uploader = new Uploader(home);
             updater = new Updater(home);
             live = new LiveShare(() => Link);
-            wall = new Wall(() => Link, () => Settings.Wall);
+            wall = new Wall();
             foreach (var (name, get) in WallProperties.All) this.AttachDelegate(name, () => get(wall.View));
             lovely = new Lovely(home);
             standings = new Standings(() => Reading && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
@@ -205,7 +209,6 @@ namespace EnduranceManager.SimHub
         {
             running = false;
             live?.Stop();
-            wall?.Stop();
             standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
             Companion.End(pluginManager);
@@ -220,10 +223,12 @@ namespace EnduranceManager.SimHub
         // thirty times while a teammate watches the wall).
         public void DataUpdate(PluginManager pluginManager, ref GameData data) => Companion.DataUpdate(pluginManager, ref data);
 
-        public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsControl(this);
+        public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new Shell(this);
 
-        // The team's site, when its module is on and a code is saved: everything that talks to the site goes through it.
-        public LinkCode Link => Settings.Site ? LinkCode.Parse(Settings.Code) : null;
+        // A module « Avec mon équipe » is on: the site is used (no switch of its own any more).
+        public bool TeamOn => Settings.Enabled || Settings.Share || Settings.Report;
+        // The team's site, when a team module is on and a code is saved: everything that talks to the site goes through it.
+        public LinkCode Link => TeamOn ? LinkCode.Parse(Settings.Code) : null;
 
         public void SaveCode(string code)
         {
@@ -244,11 +249,11 @@ namespace EnduranceManager.SimHub
         // Which modules are on, for the test reports.
         public object Modules() => new
         {
-            site = Settings.Site, lie = Link != null, fiches = Settings.Enabled, partage = Settings.Share, mur = Settings.Wall, overlays = Settings.Overlays,
-            course = Settings.Course, profils = Settings.Profiles, fmt = Settings.CompanionOn, retours = Settings.Report,
+            equipe = TeamOn, lie = Link != null, fiches = Settings.Enabled, partage = Settings.Share, mur = Settings.Wall, overlays = Settings.Overlays,
+            course = CourseOn, profils = Settings.Profiles, fmt = Settings.CompanionOn, retours = Settings.Report,
         };
 
-        // « Signaler un problème » on the Retours de test tab.
+        // « Signaler un problème » on the Aide au développement tab.
         public void Signal(string note) => EnduranceManager.SimHub.Report.Signal(note, Modules());
 
         // The recorder's switch (Tape.cs): never saved, a new SimHub run starts without recording.
@@ -258,10 +263,11 @@ namespace EnduranceManager.SimHub
             else Tape.Stop();
         }
 
-        // The mur in SimHub switch: on, the plugin follows the team's room (Wall.cs).
+        // The mur des stands switch (solo, Wall.cs): off, the dash is emptied.
         public void SetWall(bool on)
         {
             Settings.Wall = on;
+            if (!on) wall.Clear();
             this.SaveCommonSettings("GeneralSettings", Settings);
         }
 
@@ -302,7 +308,7 @@ namespace EnduranceManager.SimHub
                 // The game's service times and forecast for this car, read while the pilot drove.
                 session.Service = api.Service;
                 session.Game = api.Game;
-                // Fiches combo off: the session is not kept (the other modules still read the game).
+                // Télémétrie Mémo off: the session is not kept (the other modules still read the game).
                 if (Settings.Enabled) try { uploader.Save(session); } catch { }
             }, () => api.Setup, api.CurrentLight);
             var buffer = new byte[LmuMemory.Size];
@@ -356,8 +362,13 @@ namespace EnduranceManager.SimHub
                             // Between two, nine quick messages a second: our car's frames and the cars on the map.
                             else if (driving && Settings.Share) live.Fast(buffer);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
-                            if (driving && Settings.Course && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch (Exception e) { EnduranceManager.SimHub.Report.Error("Course", e); }
-                            if (driving && Settings.Course && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
+                            // Once a second, the mur des stands on this PC (solo, Wall.cs): our own snapshot, nothing sent.
+                            if (driving && Settings.Wall && tick % 10 == 0)
+                                try { var snap = live.Local(buffer, sample, recorder, api, Computed); if (snap != null) wall.Local(snap, new object[] { Math.Round(sample.LapDist), Math.Round(sample.Speed, 1), Math.Round(sample.Throttle * 100), Math.Round(sample.BrakePedal * 100), Math.Round(sample.Steer * 100), sample.Gear }); }
+                                catch (Exception e) { EnduranceManager.SimHub.Report.Error("Mur", e); }
+                            else if (!driving && Settings.Wall && tick % 10 == 0) wall.Pause();
+                            if (driving && CourseOn && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch (Exception e) { EnduranceManager.SimHub.Report.Error("Course", e); }
+                            if (driving && CourseOn && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
                             // The game's state, its estimate of the stop and the car's condition, what is due each second.
                             if (driving && tick % 10 == 7 && !Game.Busy)
                             {
@@ -431,7 +442,7 @@ namespace EnduranceManager.SimHub
                 try
                 {
                     var values = new List<KeyValuePair<string, object>>();
-                    if (Settings.Course) foreach (var (name, get) in Course.Properties) values.Add(new KeyValuePair<string, object>(name, get(Course.View)));
+                    if (CourseOn) foreach (var (name, get) in Course.Properties) values.Add(new KeyValuePair<string, object>(name, get(Course.View)));
                     if (Settings.Wall) foreach (var p in WallProperties.All) values.Add(new KeyValuePair<string, object>(p.Name, p.Get(wall.View)));
                     EnduranceManager.SimHub.Report.Figures(values);
                 }

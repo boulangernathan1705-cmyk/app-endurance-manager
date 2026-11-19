@@ -1,4 +1,4 @@
-// Module « Retours de test » : ce que fait le plugin chez un pilote qui l'essaie, pour continuer le développement.
+// Module « Aide au développement » (ex « Retours de test ») : ce que fait le plugin chez un pilote qui l'essaie, pour continuer le développement.
 // Un journal léger (erreurs du plugin, appuis sur les boutons de profil et leur résultat, états des modules quand ils
 // changent, chiffres du dash toutes les 5 minutes), écrit à la fin de chaque séance, et « Signaler un problème » : une
 // phrase du pilote avec le journal du moment. Les fichiers vont dans Documents\Endurance Manager\Retours ; avec le module

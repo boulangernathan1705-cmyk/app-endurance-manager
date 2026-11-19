@@ -401,7 +401,7 @@ export async function combosPlugin(path, request, env) {
     if (path.endsWith('/pass')) return relayPass(env, community.id, who);
     return openLive(request, env, community.id, who);
   }
-  // Module « Retours de test » (Report.cs): a session's journal or a problem the pilot reports, kept REPORT_DAYS days.
+  // Module « Aide au développement » (Report.cs): a session's journal or a problem the pilot reports, kept REPORT_DAYS days.
   if (path === '/api/combos/plugin/report') {
     if (method !== 'POST') fail(405, 'Méthode non prise en charge.');
     const {community, user} = await pluginAccess(request, env);

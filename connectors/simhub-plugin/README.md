@@ -108,16 +108,22 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   maintenant (`Voiture.Sortie.*` : temps perdu mesuré au dernier arrêt, place, écarts et voitures devant et derrière,
   d'après le profil de notre meilleur tour) et dix micro-secteurs (`Voiture.MicroSecteurs.Ecart1..10` contre le meilleur
   de la séance, `.Optimal`).
-- affiche, depuis la 2.5.0, le mur des stands dans SimHub : case « Mur dans SimHub » (coupée par défaut) → le plugin suit
-  le salon de l'équipe comme une page du site (`Wall.cs`, `GET /api/combos/plugin/live/watch`, viewer) et publie chaque
-  case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
+- affiche le mur des stands dans SimHub, en solo depuis la 2.6.0 : module « Mur des stands » (coupé par défaut) → une fois
+  par seconde, la photo du jeu que le site recevrait (`LiveShare.Local`) passe par le salon refait sur le PC
+  (`LocalRoom.cs`, les règles de `shared/live.mjs`), sans le site ; le rejeu vérifie que ce mur est case pour case celui
+  qu'on obtient par le salon du site (sauf les entrées). Il publie chaque case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
   (2560 × 1440, `WallDash.cs`, installé avec les overlays) les affiche : classement de notre catégorie, pneus et dégâts,
   réglages, bande du rythme, piste à plat centrée sur notre voiture, relatif, énergie et carburant, entrées. Une alerte
   fait clignoter le cadre concerné, rien ne masque le reste.
 
-- est organisé, depuis la 2.6.0, en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin :
-  Général (liaison, état du jeu, mise à jour), Fiches combo (`Enabled`), Mur des stands (`Share`), Overlays (`Overlays`),
-  Chiffres de course (`Course`), Profils (`Profiles`, coupé par défaut). Le jeu n'est lu que si un module au moins est actif.
+- est organisé, depuis la 2.6.0, en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin
+  (noms choisis par Nathan le 19/11/2026). Pour moi, SimHub seul : Overlay relais (`Overlays`), Réglages voiture en course
+  (`Profiles`, coupé par défaut), Black box sur boutons (FMT companion, `Companion`), Mur des stands (`Wall`). Avec mon
+  équipe, par le site : Relier au site (le code), Télémétrie Mémo (`Enabled`), Mur des stands équipages (`Share`), Aide au
+  développement (`Report`). Le site n'est utilisé que si un module d'équipe est coché (`TeamOn`). Les chiffres de course
+  (`Course.cs`) n'ont plus d'interrupteur : ils tournent avec l'Overlay relais ou le Mur des stands. Au premier lancement,
+  un parcours guidé (`Guide.cs`) fait choisir les modules puis régler chacun ; « Relancer le guide » dans Général.
+  Le jeu n'est lu que si un module au moins est actif.
 - garde, depuis la 2.6.0, les profils de réglages du pilote, voiture par voiture (`Profiles.cs`, `ProfilesControl.cs`,
   fichier `%LOCALAPPDATA%\EnduranceManager\profils.json`) : Sec, Inter et Pluie au départ (plages d'humidité 0-5, 5-12,
   12-100 %), renommables, supprimables, six au plus. Une action par profil (`Profil1` … `Profil6`, Contrôles et
