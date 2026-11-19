@@ -54,10 +54,10 @@ namespace EnduranceManager.SimHub
             buttons.Children.Add(paste);
             buttons.Children.Add(open);
             site.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
-            var combos = Page("Fiches combo", "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.");
+            var combos = Page("Fiches combo", "Avec le module Site : tes séances arrivent toutes seules dans les fiches combo de ton équipe.");
             combos.Children.Add(Switch("Activer ce module : enregistrer et envoyer mes séances", plugin.Settings.Enabled, on => plugin.SetEnabled(on)));
             combos.Children.Add(sessionText);
-            var wall = Page("Mur des stands", "Tes coéquipiers suivent ta voiture en direct sur le mur des stands.");
+            var wall = Page("Mur des stands", "Avec le module Site : tes coéquipiers suivent ta voiture en direct, et toi la leur.");
             wall.Children.Add(Switch("Activer ce module : partager ma voiture en direct", plugin.Settings.Share, on => plugin.SetShare(on)));
             // The mur in SimHub: off by default, on it follows the team's room like a page of the site.
             wall.Children.Add(Switch("Mur dans SimHub : suivre la voiture de l'équipe en piste (dash « Endurance Manager · Mur »)", plugin.Settings.Wall, on => plugin.SetWall(on)));
@@ -69,12 +69,13 @@ namespace EnduranceManager.SimHub
             course.Children.Add(Switch("Activer ce module", plugin.Settings.Course, on => plugin.SetModule(x => x.Course = on)));
             var tabs = new TabControl { Margin = new Thickness(8) };
             tabs.Items.Add(Tab("Général", page));
-            tabs.Items.Add(Tab("Site", site));
-            tabs.Items.Add(Tab("Fiches combo", combos));
-            tabs.Items.Add(Tab("Mur des stands", wall));
+            // SimHub alone first; then the site and the two modules that go through it.
             tabs.Items.Add(Tab("Overlays", overlays));
             tabs.Items.Add(Tab("Chiffres de course", course));
             tabs.Items.Add(new TabItem { Header = "Profils", Content = new ProfilesControl(plugin) });
+            tabs.Items.Add(Tab("Site", site));
+            tabs.Items.Add(Tab("Fiches combo", combos));
+            tabs.Items.Add(Tab("Mur des stands", wall));
 
             paste.Click += (sender, args) => PasteCode(false);
             update.Click += (sender, args) => StartUpdate();

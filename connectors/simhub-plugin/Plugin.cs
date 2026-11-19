@@ -37,9 +37,9 @@ namespace EnduranceManager.SimHub
         public bool Wall { get; set; } = false;
     }
 
-    [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
+    [PluginDescription("Overlays, chiffres de course, profils de réglages et mur des stands pour Le Mans Ultimate. Le site Endurance Manager est un module à part.")]
     [PluginAuthor("Endurance Manager")]
-    [PluginName("Endurance Manager · Fiches combo")]
+    [PluginName("Endurance Manager")]
     public class EnduranceManagerPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
     {
         public Settings Settings;
@@ -58,7 +58,7 @@ namespace EnduranceManager.SimHub
             image.Freeze();
             return image;
         }
-        public string LeftMenuTitle => "Fiches combo";
+        public string LeftMenuTitle => "Endurance Manager";
 
         Uploader uploader;
         Updater updater;
