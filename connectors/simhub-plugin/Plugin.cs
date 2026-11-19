@@ -4,7 +4,8 @@
 // énergie, carburant, vitesse, pluie, secteurs, arrêts aux stands) et l'API locale du jeu (temps de service de la
 // voiture, nom du réglage chargé),
 // puis envoie chaque séance aux fiches combo de son équipe avec sa clé de pilote. Il se met à jour depuis le même site.
-// Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub.
+// Organisé en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin. Seul le module Profils
+// change quelque chose dans le jeu, quand le pilote appuie sur un de ses boutons.
 using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -25,6 +26,11 @@ namespace EnduranceManager.SimHub
         public bool Share { get; set; } = true;
         // The overlays' stint length in laps (Practice.cs): it sets the energy per lap aimed at.
         public int StintLaps { get; set; } = 12;
+        // The other modules: the practice overlays (Practice.cs), the race figures for the dashs (Course.cs) and the
+        // setting profiles (Profiles.cs, off until the pilot turns it on: it presses buttons in the game).
+        public bool Overlays { get; set; } = true;
+        public bool Course { get; set; } = true;
+        public bool Profiles { get; set; } = false;
         // The mur in SimHub (Wall.cs): follow the team's room for the dash « Endurance Manager · Mur ». Off by default.
         public bool Wall { get; set; } = false;
     }
@@ -71,6 +77,8 @@ namespace EnduranceManager.SimHub
         public Course Course { get; } = new Course();
         public PitMenu Menu { get; } = new PitMenu();
         public GameApi Game { get; } = new GameApi();
+        // The pilot's setting profiles, car by car, and the wheel buttons that apply or memorise them (Profiles.cs).
+        public Profiles Profiles { get; private set; }
         // Our own calculations after LMU Drive's ideas (Computed.cs): pit timing and out-laps per car, optimal and predicted lap.
         public Computed Computed { get; } = new Computed();
         // The game's live standings (penalties by kind, finish status) and Lovely's track and car files.
@@ -84,6 +92,8 @@ namespace EnduranceManager.SimHub
         // The last reading while driving (boxed: the dashboards read it on SimHub's thread), null otherwise.
         volatile object latest;
         public string Status => !Settings.Enabled ? "En pause" : uploader?.Status ?? "";
+        // The game is read while one module at least needs it.
+        bool Reading => Settings.Enabled || Settings.Share || Settings.Overlays || Settings.Course || Settings.Profiles;
 
         public void Init(PluginManager pluginManager)
         {
@@ -96,8 +106,24 @@ namespace EnduranceManager.SimHub
             wall = new Wall(() => LinkCode.Parse(Settings.Code), () => Settings.Wall);
             foreach (var name in WallDash.Properties()) { string key = name; this.AttachDelegate("Mur." + key, () => wall.View[key]); }
             lovely = new Lovely(home);
-            standings = new Standings(() => Settings.Enabled && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
+            standings = new Standings(() => Reading && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
             standings.Start();
+            Profiles = new Profiles(Path.GetDirectoryName(home), () => latest is Sample s ? s : (Sample?)null, () => PluginManager ?? pluginManager, () => Settings.Profiles);
+            // One action per profile place, to map to a wheel button in SimHub (Contrôles et événements): a short press
+            // applies the profile, a press held 2 s memorises the car's state in it.
+            for (int k = 0; k < Profiles.Slots; k++)
+            {
+                int slot = k;
+                pluginManager.AddAction("Profil" + (slot + 1), GetType(), (manager, button) => Profiles.Press(slot), (manager, button) => Profiles.Release(slot));
+                this.AttachDelegate("Profils." + (slot + 1) + ".Nom", () => Profiles.NameAt(slot));
+            }
+            this.AttachDelegate("Profils.Actif", () => Settings.Profiles ? Profiles.Active ?? "" : "");
+            this.AttachDelegate("Profils.Applique", () => Settings.Profiles ? Profiles.Applied ?? "" : "");
+            this.AttachDelegate("Profils.NonActif", () => Settings.Profiles && Profiles.NotActive);
+            this.AttachDelegate("Profils.Meteo", () => Settings.Profiles ? Profiles.ForWeather ?? "" : "");
+            this.AttachDelegate("Profils.AChanger", () => Settings.Profiles && Profiles.ToChange);
+            this.AttachDelegate("Profils.Humidite", () => Profiles.Wetness);
+            this.AttachDelegate("Profils.Message", () => Settings.Profiles ? Profiles.Message : "");
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             this.AttachDelegate("Enabled", () => Settings.Enabled);
@@ -183,6 +209,13 @@ namespace EnduranceManager.SimHub
             uploader.Reset();
         }
 
+        // A module's switch on its tab.
+        public void SetModule(Action<Settings> change)
+        {
+            change(Settings);
+            this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
         // The mur in SimHub switch: on, the plugin follows the team's room (Wall.cs).
         public void SetWall(bool on)
         {
@@ -227,12 +260,13 @@ namespace EnduranceManager.SimHub
                 // The game's service times and forecast for this car, read while the pilot drove.
                 session.Service = api.Service;
                 session.Game = api.Game;
-                try { uploader.Save(session); } catch { }
+                // Fiches combo off: the session is not kept (the other modules still read the game).
+                if (Settings.Enabled) try { uploader.Save(session); } catch { }
             }, () => api.Setup, api.CurrentLight);
             var buffer = new byte[LmuMemory.Size];
             while (running)
             {
-                if (!Settings.Enabled)
+                if (!Reading)
                 {
                     GameState = "paused";
                     Practice.Hide();
@@ -257,7 +291,7 @@ namespace EnduranceManager.SimHub
                     using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
                     {
                         double lastEt = -1;
-                        for (int misses = 0, frozen = 0, tick = 0; running && Settings.Enabled && misses < 600; tick++)
+                        for (int misses = 0, frozen = 0, tick = 0; running && Reading && misses < 600; tick++)
                         {
                             Copy(view, buffer);
                             bool ok = LmuMemory.Read(buffer, out var sample);
@@ -268,6 +302,7 @@ namespace EnduranceManager.SimHub
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
                             latest = driving ? (object)sample : null;
+                            if (ok && Settings.Profiles) Profiles.Seen(sample);
                             // Each car's pit lane and our optimal and predicted lap (Computed.cs), ten times a second.
                             if (driving) try { Computed.Update(buffer, sample, recorder.Current); } catch { }
                             GameState = driving ? "track" : "menu";
@@ -277,8 +312,8 @@ namespace EnduranceManager.SimHub
                             // Between two, nine quick messages a second: our car's frames and the cars on the map.
                             else if (driving && Settings.Share) live.Fast(buffer);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
-                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch { }
-                            if (driving && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
+                            if (driving && Settings.Course && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch { }
+                            if (driving && Settings.Course && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
                             // The game's state, its estimate of the stop and the car's condition, what is due each second.
                             if (driving && tick % 10 == 7 && !Game.Busy)
                             {
@@ -297,7 +332,7 @@ namespace EnduranceManager.SimHub
                             // Once a second, the overlays' figures, in every session.
                             if (tick % 10 == 0)
                             {
-                                if (driving) try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
+                                if (driving && Settings.Overlays) try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
                                 else Practice.Hide();
                             }
                             misses = driving ? 0 : misses + 1;
