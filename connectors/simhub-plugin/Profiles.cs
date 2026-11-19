@@ -38,7 +38,7 @@ namespace EnduranceManager.SimHub
     {
         // Car model → its profiles, in button order (button 1 = the first).
         public Dictionary<string, List<Profile>> Cars = new Dictionary<string, List<Profile>>();
-        // Command (Setting key + "+" or "-") → the Control Mapper role that presses it in LMU.
+        // Command (Setting key + "+" or "-") → a role kept from older versions (chosen by hand). Roles are found by themselves now.
         public Dictionary<string, string> Roles = new Dictionary<string, string>();
     }
 
@@ -55,15 +55,15 @@ namespace EnduranceManager.SimHub
         public static readonly Setting[] All =
         {
             new Setting { Key = "TC", Label = "TC", Words = new[] { "tc" }, Read = s => s.TCMax > 0 ? s.TC : (double?)null },
-            new Setting { Key = "TCCut", Label = "Coupure TC", Words = new[] { "tc cut", "coupure", "tc2" }, Read = s => s.TCCutMax > 0 ? s.TCCut : (double?)null },
-            new Setting { Key = "TCSlip", Label = "TC slip", Words = new[] { "tc angle", "tc slip", "slip" }, Read = s => s.TCSlipMax > 0 ? s.TCSlip : (double?)null },
+            new Setting { Key = "TCCut", Label = "Coupure TC", Words = new[] { "tc cut", "tc2", "coupure" }, Read = s => s.TCCutMax > 0 ? s.TCCut : (double?)null },
+            new Setting { Key = "TCSlip", Label = "TC slip", Words = new[] { "tc angle", "tc slip", "tcslip", "slip" }, Read = s => s.TCSlipMax > 0 ? s.TCSlip : (double?)null },
             new Setting { Key = "ABS", Label = "ABS", Words = new[] { "abs" }, Read = s => s.ABSMax > 0 ? s.ABS : (double?)null },
             new Setting { Key = "Bias", Label = "Répartition", Words = new[] { "bb", "bias", "répartition", "repartition" }, Tolerance = 0.05,
                 Read = s => s.RearBrakeBias > 0 && s.RearBrakeBias < 1 ? Math.Round((1 - s.RearBrakeBias) * 100, 1) : (double?)null },
             new Setting { Key = "Migration", Label = "Migration", Words = new[] { "migration" }, Read = s => s.MigrationMax > 0 ? s.Migration : (double?)null },
-            new Setting { Key = "MotorMap", Label = "Carto moteur", Words = new[] { "carto", "motor map", "map" }, Read = s => s.MotorMapMax > 0 ? s.MotorMap : (double?)null },
-            new Setting { Key = "ArbFront", Label = "Barre avant", Words = new[] { "arb av", "arb front", "barre av" }, Read = s => s.AntiSwayFrontMax > 0 ? s.AntiSwayFront : (double?)null },
-            new Setting { Key = "ArbRear", Label = "Barre arrière", Words = new[] { "arb arr", "arb rear", "barre arr" }, Read = s => s.AntiSwayRearMax > 0 ? s.AntiSwayRear : (double?)null },
+            new Setting { Key = "MotorMap", Label = "Carto moteur", Words = new[] { "carto", "motor map", "motormap", "map" }, Read = s => s.MotorMapMax > 0 ? s.MotorMap : (double?)null },
+            new Setting { Key = "ArbFront", Label = "Barre avant", Words = new[] { "arb av", "arb front", "front arb", "frontarb", "barre av" }, Read = s => s.AntiSwayFrontMax > 0 ? s.AntiSwayFront : (double?)null },
+            new Setting { Key = "ArbRear", Label = "Barre arrière", Words = new[] { "arb arr", "arb rear", "rear arb", "reararb", "barre arr" }, Read = s => s.AntiSwayRearMax > 0 ? s.AntiSwayRear : (double?)null },
         };
     }
 
@@ -152,6 +152,7 @@ namespace EnduranceManager.SimHub
         public void Press(int slot)
         {
             if (!enabled() || slot < 0 || slot >= Slots) return;
+            Report.Log("bouton", "Profil" + (slot + 1) + " appuyé");
             pressedAt[slot] = DateTime.UtcNow;
             holds[slot]?.Dispose();
             holds[slot] = new Timer(_ => { pressedAt[slot] = DateTime.MinValue; Memorise(slot); }, null, HoldMs, Timeout.Infinite);
@@ -162,8 +163,9 @@ namespace EnduranceManager.SimHub
             if (!enabled() || slot < 0 || slot >= Slots) return;
             holds[slot]?.Dispose();
             holds[slot] = null;
-            if (pressedAt[slot] == DateTime.MinValue) return;
+            if (pressedAt[slot] == DateTime.MinValue) { Report.Log("bouton", "Profil" + (slot + 1) + " relâché après 2 s : mémorisé"); return; }
             pressedAt[slot] = DateTime.MinValue;
+            Report.Log("bouton", "Profil" + (slot + 1) + " relâché : appliqué");
             Apply(slot);
         }
 
@@ -225,7 +227,6 @@ namespace EnduranceManager.SimHub
         // Mapper or not bound in LMU) stops it, said in the message.
         string Reach(Setting setting, double target)
         {
-            var cm = manager()?.GetControlMapperInterface();
             // A pilot's « + » can lower the game's level (TC counted the other way on some cars): seen once, then swapped.
             bool swapped = false;
             for (int presses = 0, still = 0; presses < 40; presses++)
@@ -234,8 +235,9 @@ namespace EnduranceManager.SimHub
                 if (!(setting.Read(s) is double now)) return null;
                 if (Math.Abs(now - target) < setting.Tolerance) return null;
                 string command = setting.Key + ((target > now) != swapped ? "+" : "-");
-                if (!File.Roles.TryGetValue(command, out string role) || string.IsNullOrEmpty(role)) return setting.Label + " (rôle « " + Command(command) + " » non choisi)";
-                if (cm == null || !cm.StartStopRole(role, 60)) return setting.Label + " (rôle « " + role + " » introuvable)";
+                string role = Role(command);
+                if (string.IsNullOrEmpty(role)) return setting.Label + " (bouton « " + Command(command) + " » introuvable : clique « Préparer LMU » dans FMT companion)";
+                if (!PressRole(manager(), role)) return setting.Label + " (rôle « " + role + " » introuvable)";
                 // The game takes a moment to show the new level: a few readings at most, then the next press.
                 double? after = now;
                 for (int wait = 0; wait < 6 && after == now; wait++) { Thread.Sleep(60); after = latest() is Sample t ? setting.Read(t) : null; }
@@ -244,6 +246,69 @@ namespace EnduranceManager.SimHub
                 if (still >= 2) return setting.Label + " (rien ne bouge avec « " + role + " »)";
             }
             return setting.Label + " (pas atteint)";
+        }
+
+        // Alone in its method: should SimHub's Control Mapper differ from the facade (reference/), only the profiles' presses
+        // stop, caught by the caller, not the whole plugin (.NET fails the method that calls a missing member).
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal static IControlMapperInterface ControlMapper(PluginManager manager) => manager?.GetControlMapperInterface();
+
+        static bool PressRole(PluginManager manager, string role)
+        {
+            try { return StartStop(manager, role); } catch { return false; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static bool StartStop(PluginManager manager, string role) => ControlMapper(manager)?.StartStopRole(role, 60) == true;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        internal static List<string> ButtonRoles(PluginManager manager) => ControlMapper(manager)?.GetAvailableButtonRoles();
+
+        // The Control Mapper role that presses a command in LMU, found by itself: FMT companion's first (« FMT - … », made by
+        // its « Préparer LMU »), else one the pilot named (« TC + »), else one chosen by hand in an older version.
+        public string Role(string command)
+        {
+            var setting = Setting.All.FirstOrDefault(x => command.StartsWith(x.Key) && command.Length == x.Key.Length + 1);
+            if (setting == null) return null;
+            return Find(setting, command.EndsWith("+") ? "+" : "-", Available())
+                ?? (File.Roles.TryGetValue(command, out string kept) && !string.IsNullOrEmpty(kept) ? kept : null);
+        }
+
+        public bool AnyRole => Available().Count > 0;
+
+        List<string> available = new List<string>();
+        DateTime availableAt;
+        // The Control Mapper's button roles, read again every 5 s at most.
+        List<string> Available()
+        {
+            if (DateTime.UtcNow - availableAt < TimeSpan.FromSeconds(5)) return available;
+            availableAt = DateTime.UtcNow;
+            try { available = (ButtonRoles(manager()) ?? new List<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList(); }
+            catch { available = new List<string>(); }
+            return available;
+        }
+
+        static readonly string[] Up = { "+", "plus", "next", "suivant", "increase", "up" }, Down = { "-", "−", "moins", "previous", "prev", "précédent", "decrease", "down" };
+
+        // The role for a setting and a sign: its last part (« FMT - Voiture - TC Next » → « tc next »), the sign at the end,
+        // what is left is the setting's name. « TC + » is TC, not « TC cut + »: short names must be the whole name.
+        internal static string Find(Setting setting, string sign, List<string> roles)
+        {
+            var ordered = roles.OrderBy(x => x.TrimStart().StartsWith("FMT", StringComparison.OrdinalIgnoreCase) ? 0 : 1);
+            foreach (string word in setting.Words)
+                foreach (string role in ordered)
+                {
+                    string text = role.ToLowerInvariant().Trim();
+                    int cut = text.LastIndexOf(" - ", StringComparison.Ordinal);
+                    if (cut >= 0 && text.StartsWith("fmt")) text = text.Substring(cut + 3).Trim();
+                    string stem = null;
+                    foreach (string end in sign == "+" ? Up : Down)
+                        if (text.EndsWith(end) && (end.Length == 1 || text.Length == end.Length || !char.IsLetter(text[text.Length - end.Length - 1])))
+                        { stem = text.Substring(0, text.Length - end.Length).Trim(' ', '-', '_'); break; }
+                    if (stem == null) continue;
+                    if (stem == word || (word.Length > 3 && stem.Contains(word))) return role;
+                }
+            return null;
         }
 
         public static string Command(string command)
@@ -257,7 +322,7 @@ namespace EnduranceManager.SimHub
         {
             try
             {
-                var lines = JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult());
+                var lines = JArray.Parse(Tape.Get(client, MenuUrl));
                 var texts = new Dictionary<string, string>();
                 foreach (var line in lines.OfType<JObject>())
                 {
@@ -275,7 +340,7 @@ namespace EnduranceManager.SimHub
         {
             try
             {
-                var lines = JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult());
+                var lines = JArray.Parse(Tape.Get(client, MenuUrl));
                 var wanted = new Dictionary<string, int>();
                 var missing = new List<string>();
                 foreach (var line in lines.OfType<JObject>())
@@ -295,7 +360,7 @@ namespace EnduranceManager.SimHub
                     for (int check = 0; check < 4 && wanted.Count > 0; check++)
                     {
                         Thread.Sleep(250);
-                        foreach (var line in JArray.Parse(client.GetStringAsync(MenuUrl).GetAwaiter().GetResult()).OfType<JObject>())
+                        foreach (var line in JArray.Parse(Tape.Get(client, MenuUrl)).OfType<JObject>())
                             if (wanted.TryGetValue(Name(line), out int index) && ((int?)line["currentSetting"] ?? -1) == index) wanted.Remove(Name(line));
                     }
                 }

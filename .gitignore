@@ -11,4 +11,7 @@ public/
 npm-debug.log*
 connectors/simhub-plugin/obj/
 connectors/simhub-plugin/bin/
+connectors/simhub-plugin/**/bin/
+connectors/simhub-plugin/**/obj/
+*.emrec
 playwright-visual-report/

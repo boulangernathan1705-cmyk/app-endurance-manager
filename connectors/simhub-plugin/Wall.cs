@@ -1,20 +1,18 @@
-// Le mur des stands dans SimHub (plugin 2.5) : le plugin suit le salon de l'équipe comme une page du site (même salon,
-// mêmes données, GET /api/combos/plugin/live/watch avec la clé du pilote) et en tire les chiffres du dash « Endurance
-// Manager · Mur » (Dashes.cs) : classement de notre catégorie, piste à plat centrée sur notre voiture, relatif, pneus et
-// dégâts, énergie et carburant, chrono, réglages, entrées. Le pilote au volant et ses coéquipiers lisent le même mur.
-// Rien n'est inventé : chaque case est une valeur du salon ou un calcul simple dessus, vide quand elle manque.
+// Le mur des stands dans SimHub, en solo (plugin 2.6) : le dash « Endurance Manager · Mur » (Dashes.cs) montre notre
+// voiture avec ce que le plugin lit sur ce PC, sans le site. Une fois par seconde en piste, la photo du jeu que le site
+// recevrait (LiveShare.Local) passe par le salon refait ici (LocalRoom.cs, les règles de shared/live.mjs), et le dash en
+// tire ses chiffres : classement de notre catégorie, piste à plat centrée sur notre voiture, relatif, pneus et dégâts,
+// énergie et carburant, chrono, réglages, entrées. Rien n'est inventé : chaque case est une valeur du jeu ou un calcul
+// simple dessus, vide quand elle manque.
 //
-// Activé par l'interrupteur « Mur dans SimHub » de l'écran du plugin (coupé par défaut) : tant qu'il est coupé, aucune
-// connexion. Le salon envoie le flux complet une fois, puis seulement ce qui change (patch, shared/live.mjs diff).
+// Module « Mur des stands » de l'écran du plugin (coupé par défaut). Partager sa voiture avec l'équipe, c'est le module
+// « Mur des stands équipages » (LiveShare.cs) : les coéquipiers suivent sur le site.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net.Http;
-using System.Net.WebSockets;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using Newtonsoft.Json.Linq;
 
 namespace EnduranceManager.SimHub
@@ -75,112 +73,47 @@ namespace EnduranceManager.SimHub
 
     public class Wall
     {
-        readonly Func<LinkCode> code;
-        readonly Func<bool> enabled;
-        readonly HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         readonly Dictionary<string, JToken> feeds = new Dictionary<string, JToken>();
-        readonly Thread thread;
-        volatile bool running = true;
+        readonly LocalRoom room = new LocalRoom();
         List<JToken> lastFrames;
         public volatile WallView View = new WallView();
         public string Status { get; private set; } = "Coupé";
 
-        public Wall(Func<LinkCode> code, Func<bool> enabled)
-        {
-            this.code = code;
-            this.enabled = enabled;
-            thread = new Thread(Loop) { IsBackground = true, Name = "EnduranceManager.Wall", Priority = ThreadPriority.Lowest };
-            thread.Start();
-        }
+        // The last error making the dash's view (shown by the tests; in SimHub the previous view stays).
+        internal Exception LastError;
 
-        public void Stop() => running = false;
-
-        // ---------- Connection ----------
-
-        void Loop()
-        {
-            int backoff = 5;
-            while (running)
-            {
-                var link = code();
-                if (!enabled() || link == null)
-                {
-                    Status = link == null ? "Colle ton code de liaison" : "Coupé";
-                    View = new WallView();
-                    Thread.Sleep(2000);
-                    continue;
-                }
-                try
-                {
-                    using (var socket = new ClientWebSocket())
-                    {
-                        socket.Options.SetRequestHeader("Authorization", "Bearer " + link.Token);
-                        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-                        var uri = new Uri(Pass(link) ?? Regex.Replace(link.Origin, "^https://", "wss://") + "/api/combos/plugin/live/watch");
-                        if (!socket.ConnectAsync(uri, CancellationToken.None).Wait(10000) || socket.State != WebSocketState.Open) throw new TimeoutException();
-                        Status = "Connecté au mur de l'équipe";
-                        backoff = 5;
-                        feeds.Clear();
-                        Send(socket, "{\"type\":\"view\",\"watch\":true,\"map\":false}");
-                        var buffer = new byte[65536];
-                        while (running && enabled() && socket.State == WebSocketState.Open)
-                        {
-                            using (var text = new System.IO.MemoryStream())
-                            {
-                                WebSocketReceiveResult part;
-                                do
-                                {
-                                    var task = socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                                    // Nothing for 30 s: the room went quiet, the connection is opened again.
-                                    if (!task.Wait(30000)) throw new TimeoutException();
-                                    part = task.Result;
-                                    if (part.MessageType == WebSocketMessageType.Close) throw new WebSocketException();
-                                    text.Write(buffer, 0, part.Count);
-                                } while (!part.EndOfMessage && text.Length < 4_000_000);
-                                Heard(Encoding.UTF8.GetString(text.ToArray()), socket);
-                            }
-                        }
-                        try { socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).Wait(2000); } catch { }
-                    }
-                }
-                catch
-                {
-                    Status = "Coupé, nouvel essai dans " + backoff + " s";
-                    var view = View; view.Live = false;
-                    Thread.Sleep(backoff * 1000);
-                    backoff = Math.Min(backoff * 2, 60);
-                }
-            }
-        }
-
-        static void Send(ClientWebSocket socket, string text)
-        {
-            var bytes = Encoding.UTF8.GetBytes(text);
-            socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None).Wait(5000);
-        }
-
-        // The relay's address with a pass from the site, null when the site has no relay.
-        string Pass(LinkCode link)
+        // Once a second while driving: our own snapshot (LiveShare.Local) through the room made on this PC, and our car
+        // now for the inputs ([metres, km/h, throttle %, brake %, steering %, gear]).
+        public void Local(JObject snap, object[] frame)
         {
             try
             {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, link.Origin + "/api/combos/plugin/live/watch/pass"))
-                {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", link.Token);
-                    var response = client.SendAsync(request).GetAwaiter().GetResult();
-                    if (!response.IsSuccessStatusCode) return null;
-                    string url = (string)JObject.Parse(response.Content.ReadAsStringAsync().GetAwaiter().GetResult())["url"];
-                    return url != null && url.StartsWith("wss://") ? url : null;
-                }
+                var feed = room.Add(snap, Tape.NowMs);
+                View = Make(new[] { feed }, frame == null ? null : new List<JToken> { JArray.FromObject(frame) });
+                Status = "En piste";
+                LastError = null;
             }
-            catch { return null; }
+            catch (Exception e) { LastError = e; Status = "Erreur : " + e.Message; }
         }
 
-        // hello: every feed; feed: one complete; patch: what changed in one; fast: our car's last frames.
-        void Heard(string text, ClientWebSocket socket)
+        // Off the track: the dash says it is no longer live.
+        public void Pause()
+        {
+            if (View.Live) { var view = View; view.Live = false; view.Status = "Pas en piste"; }
+            Status = "Pas en piste";
+        }
+
+        public void Clear() { View = new WallView(); Status = "Coupé"; }
+
+        // hello: every feed; feed: one complete; patch: what changed in one; fast: our car's last frames. The room's
+        // messages as the site sends them to a page: kept for the tests (tests/Replay), which check the same wall made
+        // both ways.
+        // One message from the room applied to the feeds held and the dash's view; false when everything is needed again
+        // (a patch for a feed not held). Also what the tests feed (tests/Replay).
+        internal bool Hear(string text)
         {
             JObject message;
-            try { message = JObject.Parse(text); } catch { return; }
+            try { message = JObject.Parse(text); } catch { return true; }
             string type = (string)message["type"];
             if (type == "hello")
             {
@@ -192,12 +125,13 @@ namespace EnduranceManager.SimHub
             {
                 string key = (string)message["key"];
                 // A patch for a feed not held: everything again.
-                if (key == null || !feeds.TryGetValue(key, out var before)) { Send(socket, "{\"type\":\"view\",\"watch\":true,\"map\":false,\"again\":true}"); return; }
+                if (key == null || !feeds.TryGetValue(key, out var before)) return false;
                 feeds[key] = Patch(before, message["patch"]);
             }
-            else if (type != "fast") return;
+            else if (type != "fast") return true;
             if (message["tm"] is JArray frames && frames.Count > 0) lastFrames = frames.ToList();
-            try { View = Make(feeds.Values, lastFrames); } catch { }
+            try { View = Make(feeds.Values, lastFrames); LastError = null; } catch (Exception e) { LastError = e; }
+            return true;
         }
 
         const string Size = "\u0001n", Gone = "\u0001d", Whole = "\u0001w";
@@ -261,7 +195,7 @@ namespace EnduranceManager.SimHub
             return n.Contains("wet") || n.Contains("rain") ? "W" : n.Contains("soft") ? "S" : n.Contains("hard") ? "H" : n.Contains("med") ? "M" : name.Substring(0, 1).ToUpperInvariant();
         }
 
-        static readonly string[] Field = { "id", "place", "cls", "driver", "vehicle", "num", "laps", "dist", "pit", "stops", "pen", "last", "best",
+        internal static readonly string[] Field = { "id", "place", "cls", "driver", "vehicle", "num", "laps", "dist", "pit", "stops", "pen", "last", "best",
             "ls1", "ls2", "bs1", "bs2", "cs1", "cs2", "behind", "lapsBehind", "next", "lapsNext", "finish", "x", "z", "tank", "cmp", "dmg", "veLap",
             "wcmp", "pst", "flag", "yellow", "outLaps", "lane", "box" };
         static int F(string name) => Array.IndexOf(Field, name);
@@ -277,7 +211,7 @@ namespace EnduranceManager.SimHub
             var me = snap?["me"] as JObject;
             var rows = (snap?["field"] as JArray)?.OfType<JArray>().ToList();
             if (snap == null || me == null || rows == null) return v;
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long now = Tape.NowMs;
             v.Live = now - (D(feed["updated"]) ?? 0) < 20000;
             v.Status = v.Live ? "" : "Plus de données depuis " + Clock((now - (D(feed["updated"]) ?? now)) / 1000.0);
             int myId = (int)(D(me["id"]) ?? -1);

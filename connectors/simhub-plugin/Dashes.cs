@@ -126,7 +126,7 @@ namespace EnduranceManager.SimHub
             var metadata = new JObject
             {
                 ["Category"] = "Endurance Manager", ["Title"] = "Endurance Manager · Mur", ["Author"] = "Endurance Manager",
-                ["Description"] = "Le mur des stands de l'équipe sur l'écran du PC (2560 × 1440). Plugin « Fiches combo » requis, case « Mur dans SimHub » cochée.",
+                ["Description"] = "Le mur des stands de ta voiture sur l'écran du PC (2560 × 1440). Plugin Endurance Manager requis, module « Mur des stands » activé.",
                 ["ScreenCount"] = 1.0, ["InGameScreensIndexs"] = new JArray(0), ["IdleScreensIndexs"] = new JArray(0), ["MainPreviewIndex"] = 0, ["IsOverlay"] = false,
                 ["Width"] = (double)width, ["Height"] = (double)height, ["OverlaySizeWarning"] = false, ["MetadataVersion"] = 2.0, ["EnableOnDashboardMessaging"] = true,
                 ["PitScreensIndexs"] = new JArray()

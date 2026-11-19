@@ -162,6 +162,27 @@ namespace EnduranceManager.SimHub
             try { message = Build(b, s, recorder, api, computed); } catch { return; }
             lock (gate) { pending = message; offeredAt = DateTime.Now; }
             wake.Set();
+            Numbers(s);
+        }
+
+        // The snapshot the site would get, for the mur des stands on this PC (Wall.Local, solo): nothing is sent, and what
+        // the site connection keeps (the track's map, what was sent) is left alone. Null when nobody drives our car.
+        // read: the game's API for the cars' numbers too (not in the replay tests, whose answers come from the recording).
+        public JObject Local(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed = null, bool read = true)
+        {
+            if (s.Control < 0 || s.Control > 1) return null;
+            var snap = Build(b, s, recorder, api, computed, false);
+            if (read) Numbers(s);
+            var all = JObject.FromObject(snap.Top);
+            all["v"] = 2;
+            all["me"] = JObject.FromObject(snap.Me);
+            all["field"] = JArray.FromObject(snap.Field);
+            return all;
+        }
+
+        // The game's API every 20 s for the cars' numbers (and once per track for its map).
+        void Numbers(Sample s)
+        {
             if (DateTime.Now - numbersAt > TimeSpan.FromSeconds(20) && Interlocked.Exchange(ref reading, 1) == 0)
             {
                 numbersAt = DateTime.Now;
@@ -172,11 +193,12 @@ namespace EnduranceManager.SimHub
             }
         }
 
-        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed)
+        // site: for the site (positions only when a page shows the map, the track's map once); else for this PC.
+        Snapshot Build(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed, bool site = true)
         {
             int count = Math.Min(I32(b, ScoringInfo + 104), MaxVehicles);
             double length = F64(b, ScoringInfo + 88);
-            bool positions = mapShown;
+            bool positions = site && mapShown;
             var field = new List<object[]>(count);
             // Each car's telemetry slot, by id: the compound it runs and its body damage (8 zones, 0 to 2 each), as the
             // game shows them on track. To check online: whether LMU fills them for the other drivers' cars.
@@ -288,7 +310,7 @@ namespace EnduranceManager.SimHub
                 ["optimal"] = computed?.Optimal, ["predicted"] = computed?.Predicted, ["impacts"] = computed?.Impacts, ["lockups"] = computed?.LockupsLastLap
             };
             // The outline once per connection (the room keeps it).
-            if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }
+            if (site && needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }
             return new Snapshot { Top = top, Me = me, Field = field };
         }
 
@@ -306,7 +328,7 @@ namespace EnduranceManager.SimHub
         string Encode(Snapshot snap, List<object[]> moments)
         {
             bool withFrames = moments != null && moments.Count > 0;
-            var now = DateTime.Now;
+            var now = Tape.Now;
             if (needFull || sentRows == null || now - sentFullAt > TimeSpan.FromMinutes(5))
             {
                 needFull = false;
@@ -376,6 +398,15 @@ namespace EnduranceManager.SimHub
             return JsonConvert.SerializeObject(message);
         }
 
+        // The message the plugin would send now for this copy of the game's memory (tests/Replay: the mur des stands
+        // without the site, nothing sent).
+        internal string Message(byte[] b, Sample s, Recorder recorder, LmuApi api, Computed computed)
+        {
+            List<object[]> moments;
+            lock (gate) { moments = frames; frames = new List<object[]>(); }
+            return Encode(Build(b, s, recorder, api, computed), moments);
+        }
+
         // What the site says: {type:'mode', watch, map} or {type:'full'}.
         void Heard(string text)
         {
@@ -436,7 +467,7 @@ namespace EnduranceManager.SimHub
 
         static JToken Get(HttpClient client, string path)
         {
-            try { return JToken.Parse(client.GetStringAsync(Api + path).GetAwaiter().GetResult()); }
+            try { return JToken.Parse(Tape.Get(client, Api + path)); }
             catch { return null; }
         }
 

@@ -45,9 +45,17 @@ if (-not (Test-Path $dll)) { Done "Le fichier EnduranceManager.SimHub.dll doit Ã
 if (-not (Test-Path (Join-Path $simhub 'SimHubWPF.exe'))) { Done "SimHub est introuvable ($simhub). Installe SimHub, lance-le une fois, puis relance cet installeur."; return }
 
 # The copy alone, run again as administrator when the SimHub folder needs it.
+# FMT companion goes in our folder, run by the plugin's module of the same name (never twice: no more alone in SimHub's).
 function Copy-Plugin {
     Copy-Item $dll $simhub -Force -ErrorAction Stop
     Unblock-File (Join-Path $simhub 'EnduranceManager.SimHub.dll')
+    $kept = Join-Path $simhub 'EnduranceManager'
+    $alone = Join-Path $simhub 'FMTCompanion.dll'
+    $shipped = Join-Path (Split-Path $env:EM_SELF) 'FMTCompanion.dll'
+    if ((Test-Path $alone) -or (Test-Path $shipped)) { New-Item -ItemType Directory -Force $kept | Out-Null }
+    if (Test-Path $alone) { Move-Item $alone (Join-Path $kept 'FMTCompanion.dll') -Force -ErrorAction Stop }
+    if (Test-Path $shipped) { Copy-Item $shipped $kept -Force -ErrorAction Stop }
+    if (Test-Path (Join-Path $kept 'FMTCompanion.dll')) { Unblock-File (Join-Path $kept 'FMTCompanion.dll') }
 }
 if ($copyOnly) { Copy-Plugin; return }
 

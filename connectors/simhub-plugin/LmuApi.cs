@@ -68,7 +68,7 @@ namespace EnduranceManager.SimHub
 
         JObject Get(string path)
         {
-            try { return JObject.Parse(client.GetStringAsync(Root + path).GetAwaiter().GetResult()); }
+            try { return JObject.Parse(Tape.Get(client, Root + path)); }
             catch { return null; }
         }
 
@@ -104,12 +104,12 @@ namespace EnduranceManager.SimHub
             double? light = Number(answer?.SelectToken("$..lightLevel"));
             if (light == null || light < 0 || light > 1) return false;
             Light = light;
-            LightAt = DateTime.Now;
+            LightAt = Tape.Now;
             return true;
         }
 
         // The daylight for a lap ending now: the last reading, when it is recent enough to tell day from night.
-        public double? CurrentLight() => Light.HasValue && DateTime.Now - LightAt < TimeSpan.FromMinutes(3) ? Light : null;
+        public double? CurrentLight() => Light.HasValue && Tape.Now - LightAt < TimeSpan.FromMinutes(3) ? Light : null;
 
         void ReadSetup()
         {
@@ -137,7 +137,7 @@ namespace EnduranceManager.SimHub
                     DriverAlong = Number(times["DriverConcurrent"]), RepairAlong = Number(times["FixTimeConcurrent"]), FuelRandom = Number(times["FuelRandomDelay"]),
                     TyresRandom = Number(times["RandomTireDelay"]), DriverRandom = Number(times["DriverRandom"]), RepairRandom = Number(times["FixRandomDelay"])
                 };
-                ReadAt = DateTime.Now;
+                ReadAt = Tape.Now;
             }
             var tyres = Get("garage/UIScreen/TireManagement");
             var usage = tyres?["expectedUsage"];

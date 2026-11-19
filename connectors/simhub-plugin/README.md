@@ -108,22 +108,28 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   maintenant (`Voiture.Sortie.*` : temps perdu mesuré au dernier arrêt, place, écarts et voitures devant et derrière,
   d'après le profil de notre meilleur tour) et dix micro-secteurs (`Voiture.MicroSecteurs.Ecart1..10` contre le meilleur
   de la séance, `.Optimal`).
-- affiche, depuis la 2.5.0, le mur des stands dans SimHub : case « Mur dans SimHub » (coupée par défaut) → le plugin suit
-  le salon de l'équipe comme une page du site (`Wall.cs`, `GET /api/combos/plugin/live/watch`, viewer) et publie chaque
-  case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
+- affiche le mur des stands dans SimHub, en solo depuis la 2.6.0 : module « Mur des stands » (coupé par défaut) → une fois
+  par seconde, la photo du jeu que le site recevrait (`LiveShare.Local`) passe par le salon refait sur le PC
+  (`LocalRoom.cs`, les règles de `shared/live.mjs`), sans le site ; le rejeu vérifie que ce mur est case pour case celui
+  qu'on obtient par le salon du site (sauf les entrées). Il publie chaque case du mur en propriétés `EnduranceManagerPlugin.Mur.*` (`WallProperties.cs`). Le dash « Endurance Manager · Mur »
   (2560 × 1440, `WallDash.cs`, installé avec les overlays) les affiche : classement de notre catégorie, pneus et dégâts,
   réglages, bande du rythme, piste à plat centrée sur notre voiture, relatif, énergie et carburant, entrées. Une alerte
   fait clignoter le cadre concerné, rien ne masque le reste.
 
-- est organisé, depuis la 2.6.0, en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin :
-  Général (liaison, état du jeu, mise à jour), Fiches combo (`Enabled`), Mur des stands (`Share`), Overlays (`Overlays`),
-  Chiffres de course (`Course`), Profils (`Profiles`, coupé par défaut). Le jeu n'est lu que si un module au moins est actif.
+- est organisé, depuis la 2.6.0, en modules que chaque pilote active ou non, un onglet chacun sur l'écran du plugin
+  (noms choisis par Nathan le 19/11/2026). Pour moi, SimHub seul : Overlay relais (`Overlays`), Réglages voiture en course
+  (`Profiles`, coupé par défaut), Black box sur boutons (FMT companion, `Companion`), Mur des stands (`Wall`). Avec mon
+  équipe, par le site : Relier au site (le code), Télémétrie Mémo (`Enabled`), Mur des stands équipages (`Share`), Aide au
+  développement (`Report`). Le site n'est utilisé que si un module d'équipe est coché (`TeamOn`). Les chiffres de course
+  (`Course.cs`) n'ont plus d'interrupteur : ils tournent avec l'Overlay relais ou le Mur des stands. Au premier lancement,
+  un parcours guidé (`Guide.cs`) fait choisir les modules puis régler chacun ; « Relancer le guide » dans Général.
+  Le jeu n'est lu que si un module au moins est actif.
 - garde, depuis la 2.6.0, les profils de réglages du pilote, voiture par voiture (`Profiles.cs`, `ProfilesControl.cs`,
   fichier `%LOCALAPPDATA%\EnduranceManager\profils.json`) : Sec, Inter et Pluie au départ (plages d'humidité 0-5, 5-12,
-  12-100 %), renommables, supprimables, six au plus. Une action par profil (`Profil1` … `Profil6`, Contrôles et
+  12-100 %), renommables. Une action par profil (`Profil1` … `Profil6`, Contrôles et
   événements) : appui court = appliquer, appui de 2 s = mémoriser l'état actuel. En roulant (TC, coupure, slip, ABS,
-  répartition, migration, carto, barres) le plugin appuie sur les rôles du Control Mapper choisis pour « + » et « − »
-  (`GetControlMapperInterface().StartStopRole`, sortie vJoy ou bridge USB) et relit la mémoire du jeu après chaque appui ;
+  répartition, migration, carto, barres) le plugin appuie sur les rôles du Control Mapper trouvés tout seuls
+  (ceux de FMT companion « FMT - … » d'abord, sinon « TC + »… du pilote ; `Profiles.Find`, `StartStopRole`, sortie vJoy ou bridge USB) et relit la mémoire du jeu après chaque appui ;
   le menu des stands est écrit par l'API du jeu (`garage/PitMenu/loadPitMenu`, menu entier renvoyé puis relu), lignes
   dégâts et pilote non appliquées par défaut. Rien d'automatique : propriétés `Profils.Actif`, `Applique`, `NonActif`,
   `Meteo`, `AChanger`, `Humidite`, `Message`, `Profils.1.Nom` … `6.Nom` pour les dashs. La régén ne se lit pas en
@@ -174,6 +180,30 @@ dotnet build -c Release
 
 Si SimHub n'est pas dans `C:\Program Files (x86)\SimHub`, ajouter `-p:SimHubDir="D:\chemin\SimHub"`.
 La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
+
+## Compiler et tester sans le PC
+
+Sans SimHub (GitHub, cloud, Linux), `dotnet build -c Release` prend la façade de `reference/` : les types et membres
+de SimHub dont le plugin se sert, mêmes signatures, sans code (jamais copiée chez les pilotes). Une DLL 2.2.0
+compilée ainsi a la même forme que celle compilée sur le PC avec le vrai SimHub (métadonnées comparées).
+`reference/ApiCheck` liste ce que la DLL attend de SimHub et signale ce qui n'a jamais été vérifié avec le vrai SimHub
+(`reference/simhub-api.txt`) : à confirmer une fois par une compilation sur le PC, puis
+`dotnet run --project reference/ApiCheck -c Release -- <cette DLL> --ecrire`.
+
+La CI « Plugin SimHub » (`.github/workflows/simhub-plugin.yml`, Windows) compile à chaque PR qui touche le plugin,
+lance ApiCheck, rejoue les séances de test et joint la DLL (Artifacts de l'exécution).
+
+`tests/Replay` rejoue des séances dans le code du plugin, sans le jeu : `dotnet run --project tests/Replay -c Release`.
+Pour chaque séance de `tests/Replay/fixtures` (séances réelles des fiches combo), la mémoire de LMU est refaite dix
+fois par seconde, passe par l'enregistreur des tours, les calculs, les chiffres de course et le message du mur, puis
+par le salon du site (`tests/room-bridge.mjs`, le code de `shared/live.mjs`) jusqu'au mur dans SimHub. Le résultat est
+comparé à ce que le plugin avait vraiment envoyé. Les chiffres du dash et du mur sont écrits dans `out/`
+(`*.dash.json`, `*.mur.json`).
+
+Enregistrer une vraie séance : sur l'écran du plugin (onglet Général), « Enregistrer ma séance pour les tests ».
+Tout ce que le plugin lit (mémoire de LMU, réponses de son API locale, messages du salon) va dans
+`Documents\Endurance Manager\Enregistrements\*.emrec` (rien n'est envoyé ; coupé à chaque démarrage de SimHub,
+1 h 30 ou 1,5 Go au plus). `dotnet run --project tests/Replay -c Release -- rejouer <fichier.emrec>` le rejoue.
 
 ## Installer et tester
 

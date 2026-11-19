@@ -30,7 +30,7 @@ namespace EnduranceManager.SimHub
 
         JObject Get(string path)
         {
-            try { return JObject.Parse(client.GetStringAsync(Root + path).GetAwaiter().GetResult()); }
+            try { return JObject.Parse(Tape.Get(client, Root + path)); }
             catch { return null; }
         }
 

@@ -227,7 +227,8 @@ namespace EnduranceManager.SimHub
                     block.DeltaColor = val > tt ? Amber : Blue;
                 }
                 block.Me = "Moi " + (myAvg is double m ? format(m) : "—");
-                block.Team = "Équipe " + (crew is double cr ? format(cr) : "—");
+                // Without the site (module off or not linked) there is no team: the line stays empty.
+                block.Team = sheet == null ? "" : "Équipe " + (crew is double cr ? format(cr) : "—");
                 var best = others.Where(mate => pickMate(mate) > 0).OrderBy(mate => pickMate(mate)).FirstOrDefault();
                 bool meBest = myAvg != null && (best == null || myAvg <= pickMate(best));
                 block.MeColor = meBest ? Violet : Argb(myColor);

@@ -39,7 +39,7 @@ namespace EnduranceManager.SimHub
             if (System.Threading.Interlocked.Exchange(ref busy, 1) == 1) return;
             try
             {
-                var lines = JArray.Parse(client.GetStringAsync(Url).GetAwaiter().GetResult());
+                var lines = JArray.Parse(Tape.Get(client, Url));
                 var items = new List<MenuItem>();
                 foreach (var line in lines.OfType<JObject>())
                 {
