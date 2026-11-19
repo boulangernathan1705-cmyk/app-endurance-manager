@@ -8,6 +8,8 @@
     <AssemblyName>EnduranceManager.SimHub</AssemblyName>
     <!-- The plugin's version: raised for each new build given to the pilots (release/plugin.json, README.md). -->
     <Version>2.6.0</Version>
+    <!-- The commit in the build's identity (2.6.0+sha, shown « 2.6.0 (abc1234) » on the plugin's screen). -->
+    <SourceRevisionId Condition="'$(GITHUB_SHA)' != ''">$(GITHUB_SHA)</SourceRevisionId>
     <RootNamespace>EnduranceManager.SimHub</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
@@ -53,4 +55,9 @@
     <Reference Include="WindowsBase" />
     <Reference Include="System.Xaml" />
   </ItemGroup>
+  <Target Name="EmCommit" BeforeTargets="InitializeSourceControlInformation;GetAssemblyVersion;GenerateAssemblyInfo" Condition="'$(SourceRevisionId)' == ''">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="SourceRevisionId" />
+    </Exec>
+  </Target>
 </Project>

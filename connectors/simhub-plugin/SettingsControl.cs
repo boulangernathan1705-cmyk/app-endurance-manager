@@ -30,7 +30,7 @@ namespace EnduranceManager.SimHub
         public SettingsControl(EnduranceManagerPlugin plugin)
         {
             this.plugin = plugin;
-            var page = Page("Endurance Manager", "Un seul plugin. Chaque onglet est un module : active seulement ceux que tu utilises. Sans le module Site, tout reste sur ce PC.");
+            var page = Page("Endurance Manager", "Un seul plugin, en modules que tu actives ou coupes. Perso : avec SimHub seul. Équipage : avec le site de ton équipe.");
 
             // A newer version on the site: one button, the installer does the rest.
             var updatePanel = new StackPanel();
@@ -95,19 +95,23 @@ namespace EnduranceManager.SimHub
             // The recorder for the replay tests (Tape.cs): off at each start of SimHub, heavy, kept on the PC.
             report.Children.Add(Switch("Enregistrer ma séance complète pour les tests (gros fichier, reste sur ce PC)", Tape.Recording, on => plugin.SetRecording(on)));
             report.Children.Add(recordText);
-            var tabs = new TabControl { Margin = new Thickness(8) };
-            tabs.Items.Add(Tab("Général", page));
-            // SimHub alone first; then the site and the two modules that go through it.
-            tabs.Items.Add(Tab("Overlays", overlays));
-            tabs.Items.Add(Tab("Chiffres de course", course));
-            tabs.Items.Add(new TabItem { Header = "Profils", Content = new ProfilesControl(plugin) });
+            // Two groups of modules: Perso works with SimHub alone, Équipage goes through the team's site.
+            var perso = new TabControl { Margin = new Thickness(0, 8, 0, 0) };
+            perso.Items.Add(Tab("Overlays", overlays));
+            perso.Items.Add(Tab("Chiffres de course", course));
+            perso.Items.Add(new TabItem { Header = "Profils", Content = new ProfilesControl(plugin) });
             // Its own screen is wide: no fixed-width page around it.
             companion.Width = double.NaN;
-            tabs.Items.Add(Tab("FMT companion", companion));
-            tabs.Items.Add(Tab("Site", site));
-            tabs.Items.Add(Tab("Fiches combo", combos));
-            tabs.Items.Add(Tab("Mur des stands", wall));
-            tabs.Items.Add(Tab("Retours de test", report));
+            perso.Items.Add(Tab("FMT companion", companion));
+            var crew = new TabControl { Margin = new Thickness(0, 8, 0, 0) };
+            crew.Items.Add(Tab("Site", site));
+            crew.Items.Add(Tab("Fiches combo", combos));
+            crew.Items.Add(Tab("Mur des stands", wall));
+            crew.Items.Add(Tab("Retours de test", report));
+            var tabs = new TabControl { Margin = new Thickness(8) };
+            tabs.Items.Add(Tab("Général", page));
+            tabs.Items.Add(new TabItem { Header = "Perso", Content = Group("Avec SimHub seul, rien ne sort de ton PC.", perso) });
+            tabs.Items.Add(new TabItem { Header = "Équipage", Content = Group("Avec le site de ton équipe : partage avec tes coéquipiers. Commence par l'onglet Site.", crew) });
 
             paste.Click += (sender, args) => PasteCode(false);
             update.Click += (sender, args) => StartUpdate();
@@ -137,6 +141,17 @@ namespace EnduranceManager.SimHub
             page.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold });
             page.Children.Add(new TextBlock { Text = intro, Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap });
             return page;
+        }
+
+        // A group of modules: one line saying what they have in common, then their tabs.
+        static UIElement Group(string intro, TabControl modules)
+        {
+            var panel = new DockPanel { Margin = new Thickness(12, 10, 12, 0) };
+            var text = new TextBlock { Text = intro, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+            DockPanel.SetDock(text, Dock.Top);
+            panel.Children.Add(text);
+            panel.Children.Add(modules);
+            return panel;
         }
 
         static TabItem Tab(string header, UIElement page) => new TabItem { Header = header, Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
@@ -171,7 +186,6 @@ namespace EnduranceManager.SimHub
         void StartUpdate()
         {
             var code = plugin.Link;
-            if (code == null) return;
             if (plugin.GameState == "track") { updateText.Text = "Termine d'abord ta séance : la mise à jour ferme et relance SimHub."; return; }
             update.IsEnabled = false;
             updateText.Text = "Téléchargement de l'installeur…";
@@ -181,7 +195,7 @@ namespace EnduranceManager.SimHub
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     update.IsEnabled = true;
-                    updateText.Text = error ?? "SimHub se ferme : l'installeur met la nouvelle version et le relance. Ta liaison est gardée.";
+                    updateText.Text = error ?? "SimHub se ferme : l'installeur met la nouvelle version et le relance. Tes réglages sont gardés.";
                     // SimHub closes itself, as from its own menu (settings saved), so the installer has nothing to wait for.
                     if (error == null) Dispatcher.BeginInvoke(new Action(() => Application.Current?.Shutdown()), System.Windows.Threading.DispatcherPriority.Background);
                 }));
@@ -211,9 +225,9 @@ namespace EnduranceManager.SimHub
             else Show(linkDot, Grey, linkTitle, "Relié à " + host, linkDetail, "Premier envoi dans la minute.");
 
             var available = plugin.Updater.Available;
-            version.Text = "Version " + Updater.Current.ToString(3);
+            version.Text = "Version " + Updater.Build;
             plugin.Updater.Check(code);
-            if (available != null && code != null)
+            if (available != null)
             {
                 if (updateBox.Visibility != Visibility.Visible) updateText.Text = "Une nouvelle version du plugin est prête (" + available.ToString(3) + ", tu as la " + Updater.Current.ToString(3) + ").";
                 updateBox.Visibility = Visibility.Visible;
