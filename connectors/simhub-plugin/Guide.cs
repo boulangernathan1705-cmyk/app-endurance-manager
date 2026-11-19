@@ -17,16 +17,20 @@ namespace EnduranceManager.SimHub
     public class Shell : ContentControl
     {
         readonly EnduranceManagerPlugin plugin;
+        // The site's background under the page (a ContentControl draws none of its own).
+        readonly System.Windows.Controls.Border host = new System.Windows.Controls.Border { Background = Theme.Bg };
 
         public Shell(EnduranceManagerPlugin plugin)
         {
             this.plugin = plugin;
             Theme.Apply(this);
+            Content = host;
             if (plugin.Settings.GuideDone) ShowModules(); else ShowGuide();
         }
 
-        public void ShowGuide() => Content = new Guide(plugin, ShowModules);
-        public void ShowModules() => Content = new SettingsControl(plugin, ShowGuide);
+        public UIElement Page => host.Child;
+        public void ShowGuide() => host.Child = new Guide(plugin, ShowModules);
+        public void ShowModules() => host.Child = new SettingsControl(plugin, ShowGuide);
     }
 
     public class Guide : UserControl
@@ -155,7 +159,7 @@ namespace EnduranceManager.SimHub
             var state = new TextBlock { FontSize = 14, Margin = new Thickness(0, 6, 0, 12), TextWrapping = TextWrapping.Wrap };
             body.Children.Add(state);
             body.Children.Add(Steps("Ouvre la page Fiches combo du site de ton équipe.", "Clique « Créer mon code ». Le code est copié.", "Reviens ici : le plugin le trouve tout seul."));
-            var open = Link("Ouvrir le site");
+            var open = Theme.Secondary("Ouvrir le site");
             open.Margin = new Thickness(0, 4, 0, 12);
             open.HorizontalAlignment = HorizontalAlignment.Left;
             open.Click += (sender, args) => { try { Process.Start(new ProcessStartInfo((plugin.Link?.Origin ?? Updater.PublicSite) + "/fiches-combo.html") { UseShellExecute = true }); } catch { } };
@@ -293,10 +297,11 @@ namespace EnduranceManager.SimHub
             if (back)
             {
                 var b = Theme.Secondary("Retour");
+                b.HorizontalAlignment = HorizontalAlignment.Left;
                 b.Click += (sender, args) => Back();
                 buttons.Children.Add(b);
             }
-            else if (left != null) buttons.Children.Add(left);
+            else if (left != null) { left.HorizontalAlignment = HorizontalAlignment.Left; buttons.Children.Add(left); }
             var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
             if (step == 1)
             {

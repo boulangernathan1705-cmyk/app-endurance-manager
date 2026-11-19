@@ -46,7 +46,7 @@ namespace EnduranceManager.SimHub.Preview
 
             // A pilot who has just installed it: overlay, team telemetry and sharing on (the defaults), the mur too.
             EnduranceManagerPlugin Plugin(bool guideDone) { var p = new EnduranceManagerPlugin(); p.Preview(new Settings { GuideDone = guideDone, Wall = true }); return p; }
-            Guide GuideOf(FrameworkElement e) => (Guide)((Shell)e).Content;
+            Guide GuideOf(FrameworkElement e) => (Guide)((Shell)e).Page;
 
             Shot("guide-1-modules", () => new Shell(Plugin(false)));
             Shot("guide-2-relier-au-site", () => new Shell(Plugin(false)), e => GuideOf(e).Jump(1, 0));

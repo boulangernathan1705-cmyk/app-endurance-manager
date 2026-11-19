@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -113,26 +114,29 @@ namespace EnduranceManager.SimHub
             return style;
         }
 
-        // A tab: its name in grey, the open one in white over a cyan line, as the site's sub-menus.
+        // A tab: its name in grey, the open one in white over a cyan line, as the site's sub-menus. The look is set on the
+        // name only: the tab's page keeps its own font and colours.
         static Style TabStyle()
         {
-            var border = Chrome(out _, true);
+            var border = Chrome(out var name, true);
+            name.Name = "name";
+            name.SetValue(TextElement.ForegroundProperty, Muted);
+            name.SetValue(TextElement.FontWeightProperty, FontWeights.Bold);
+            var template = Template<TabItem>(border);
+            var open = new Trigger { Property = TabItem.IsSelectedProperty, Value = true };
+            open.Setters.Add(new Setter(TextElement.ForegroundProperty, Text, "name"));
+            open.Setters.Add(new Setter(System.Windows.Controls.Border.BorderBrushProperty, Accent, "chrome"));
+            template.Triggers.Add(open);
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(TextElement.ForegroundProperty, Text, "name"));
+            template.Triggers.Add(hover);
             var style = new Style(typeof(TabItem));
-            style.Setters.Add(new Setter(Control.TemplateProperty, Template<TabItem>(border)));
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Clear));
             style.Setters.Add(new Setter(Control.BorderBrushProperty, Clear));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 0, 2)));
-            style.Setters.Add(new Setter(Control.ForegroundProperty, Muted));
-            style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Bold));
             style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(14, 10, 14, 9)));
             style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
-            var open = new Trigger { Property = TabItem.IsSelectedProperty, Value = true };
-            open.Setters.Add(new Setter(Control.ForegroundProperty, Text));
-            open.Setters.Add(new Setter(Control.BorderBrushProperty, Accent));
-            style.Triggers.Add(open);
-            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-            hover.Setters.Add(new Setter(Control.ForegroundProperty, Text));
-            style.Triggers.Add(hover);
             return style;
         }
 
