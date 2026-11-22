@@ -142,6 +142,14 @@ test('the plugin sends sessions with the pilot’s key, once each, and stops whe
   assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', {track:TRACK})).status, 400);
   assert.ok((await req('/api/combos/link', 'GET', null, NATHAN)).data.lastSeen);
 
+  // Module « Retours de test »: a journal and a reported problem are kept; anything else is refused.
+  const report = await plugin('/api/combos/plugin/report', key, 'POST', {kind:'signal', version:'2.6.0', note:'Le profil Pluie ne s’applique pas', data:{log:[{at:1, what:'Profil1', text:'TC introuvable'}]}});
+  assert.equal(report.status, 201);
+  const kept = DB.db.prepare('SELECT kind, version, note, body FROM plugin_reports WHERE id=?').get(report.data.id);
+  assert.deepEqual({...kept, body:JSON.parse(kept.body)}, {kind:'signal', version:'2.6.0', note:'Le profil Pluie ne s’applique pas', body:{log:[{at:1, what:'Profil1', text:'TC introuvable'}]}});
+  assert.equal((await plugin('/api/combos/plugin/report', key, 'POST', {kind:'autre'})).status, 400);
+  assert.equal((await plugin('/api/combos/plugin/report', 'nope', 'POST', {kind:'journal'})).status, 401);
+
   // Lost the team role on Discord: the key is refused, the data stays.
   setMember(DB.db, NATHAN, []);
   assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_100_000}))).status, 403);

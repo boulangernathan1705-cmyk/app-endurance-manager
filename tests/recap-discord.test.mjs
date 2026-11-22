@@ -1099,17 +1099,32 @@ test('a race\'s thread archived by Discord (nobody wrote for a week) is opened a
   thread.thread_metadata={archived:false};
   calls.length=0;await addThreadMembers(env,NOW+7200002,12);
   assert.deepEqual(calls.map(call=>call.method),['GET']);
-  // Six days without a message (Discord archives on the 7th, and the thread then leaves its members' list): its next
-  // starts, without a ping.
+  // Six days without a message (Discord archives on the 7th, and the thread then leaves its members' list): the race's
+  // card sent again at the bottom by the next pass, without a ping, then the old one deleted. Never a bare line.
   thread.last_message_id=snowflake(NOW-6*DAY);
+  const before=DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id;
   calls.length=0;await addThreadMembers(env,NOW+4*3600000,12);
-  const post=calls.find(call=>call.method==='POST');
-  assert.equal(post.path,`/channels/${thread.id}/messages`);
-  assert.match(post.body.content,/^📅 \*\*.+\*\* · \d+h/);
-  assert.equal(post.body.flags,4096);assert.deepEqual(post.body.allowed_mentions,{parse:[]});
+  assert.ok(!calls.some(call=>call.method==='POST'),'no bare line');
+  calls.length=0;await syncBotRecaps(env,NOW+4*3600000+1000,COMMUNITY);
+  const post=sends(calls).find(call=>call.path===`/channels/${thread.id}/messages`);
+  assert.ok(post?.body.embeds?.length,'the whole card');assert.equal(post.body.flags,4096);
+  const after=DB.db.prepare("SELECT message_id,content_hash FROM discord_recap_publications WHERE event_id='race-a'").get();
+  assert.notEqual(after.message_id,before);assert.notEqual(after.content_hash,'repost');
+  assert.ok(calls.some(call=>call.method==='DELETE'&&call.path===`/channels/${thread.id}/messages/${before}`),'the old card deleted');
+  calls.length=0;await syncBotRecaps(env,NOW+4*3600000+2000,COMMUNITY);
+  assert.ok(!sends(calls).length,'once');
   // Its race over: nothing more.
   calls.length=0;await addThreadMembers(env,NOW+2*DAY,12);
   assert.ok(!calls.some(call=>call.method==='POST'));
+  // Its last race ends before Discord archives the thread (the 22 Nov. case: opened Monday 16 at 0h04, last start Sunday
+  // 22 at 19h): the thread lasts until then, no message.
+  const later=NOW+3*DAY;
+  DB.db.prepare("UPDATE events SET departures=? WHERE id='race-a'").run(JSON.stringify([{id:'start-a',startsAt:later+3600000}]));
+  thread.last_message_id=snowflake(later-6*DAY-3600000);
+  calls.length=0;await addThreadMembers(env,later,12);
+  assert.ok(calls.some(call=>call.method==='GET'),'looked at');
+  assert.notEqual(DB.db.prepare("SELECT content_hash FROM discord_recap_publications WHERE event_id='race-a'").get().content_hash,'repost');
+  assert.ok(!calls.some(call=>call.method==='POST'),'the thread lasts until the end of the race');
 });
 
 test('a pass with nothing to change makes one request; a changed race only its edit more',async t=>{
