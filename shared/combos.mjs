@@ -96,7 +96,7 @@ function sectors(lap) {
   return {s1, s2, s3};
 }
 
-// One session as the plugin sends it (connectors/simhub-plugin/Live.cs): bounded numbers, short texts, nothing else.
+// One session as the plugin sends it (Live.cs of the plugin, repo endurance-manager-plugin): bounded numbers, short texts, nothing else.
 export function cleanSession(input) {
   if (!input || typeof input !== 'object' || !Array.isArray(input.laps) || !Array.isArray(input.stops)) throw Error('Séance illisible.');
   const at = finite(input.at, 1_500_000_000_000, 4_000_000_000_000);

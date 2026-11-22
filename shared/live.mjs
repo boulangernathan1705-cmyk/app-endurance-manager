@@ -8,7 +8,7 @@
 export const LIVE_VERSION = 1;
 // Plugin 1.6 and later (version 2): a complete snapshot when the connection opens, then only what changed (mergeSnapshot).
 export const DELTA_VERSION = 2;
-// One row per car of the field (connectors/simhub-plugin/LiveShare.cs writes them in this order).
+// One row per car of the field (LiveShare.cs of the plugin, repo endurance-manager-plugin, writes them in this order).
 // dist: metres into the lap; pit: 0 on track, 1 in the pit lane, 2 in the garage; ls1/ls2, bs1/bs2, cs1/cs2: the game's
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
 // lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above;
