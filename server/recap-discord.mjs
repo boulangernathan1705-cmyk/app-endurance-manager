@@ -703,6 +703,16 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
   if (!repair && row.message_id && row.content_hash === hash) return;
+  // A race's thread quiet for 6 days (addThreadMembers): its card sent again at the bottom, then the old one deleted. The
+  // thread gets a message, so Discord does not archive it, and keeps one clean card.
+  if (threaded && row.message_id && row.content_hash === REPOST) {
+    const old = row.message_id, message = await discord(env,'POST',`/channels/${channel}/messages`,{...payload,flags:4096},budget);
+    row.message_id = message.id;
+    await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
+      .bind(row.message_id,hash,community.id,row.event_id).run();
+    await discord(env,'DELETE',`/channels/${channel}/messages/${old}`,null,budget).catch(error => { if (error.status !== 404) throw error; });
+    return;
+  }
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
     const edit = () => discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget);
@@ -1026,9 +1036,9 @@ export async function removeBotDiscord(env,timestamp,community) {
 }
 
 
-// A thread quiet for 6 days gets the race's next starts (Discord archives it on the 7th), only when a start would end
-// after that archiving: a thread that lasts until the end of the race needs no message.
-const QUIET_THREAD_MS = 6 * 86400000, ARCHIVE_THREAD_MS = 7 * 86400000;
+// A thread quiet for 6 days gets its race's card again (Discord archives it on the 7th), only when a start would end
+// after that archiving: a thread that lasts until the end of the race needs nothing.
+const QUIET_THREAD_MS = 6 * 86400000, ARCHIVE_THREAD_MS = 7 * 86400000, REPOST = 'repost';
 const lastFinish = (departures, minutes) => {
   let list = []; try { list = JSON.parse(departures || '[]'); } catch {}
   return Math.max(0, ...(Array.isArray(list) ? list : []).map(item => raceFinishAt(Number(item?.startsAt) || 0, minutes)));
@@ -1057,15 +1067,19 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
     if (!pilots.length) {
       // Discord archives a thread nobody wrote in for a week and takes it out of its members' list, for good: opening it
       // again does not put it back (a race over two weekends, its thread opened on the first Monday). Before the 7th day
-      // without a message, the bot writes its next starts there, without a ping: the thread stays in everyone's list.
+      // without a message, the bot sends the race's card again there, without a ping: the thread stays in everyone's list.
       if (thread.members_checked_at) try {
         const channel = await discord(env,'GET',`/channels/${thread.channel_id}`,null,budget);
         if (channel?.thread_metadata?.archived) await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
         const lastMessage = Math.max(snowflakeTime(channel?.last_message_id), snowflakeTime(thread.channel_id));
         const minutes = eventMinutes({durationMinutes:thread.duration_minutes, durationHours:thread.duration_hours});
         const quiet = lastMessage < timestamp - QUIET_THREAD_MS && lastFinish(thread.departures, minutes) > lastMessage + ARCHIVE_THREAD_MS;
-        const starts = quiet ? nextStartsRecap(thread.departures, timestamp) : '';
-        if (starts) await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:starts,flags:4096,allowed_mentions:{parse:[]}},budget);
+        // The card is sent again by the next pass of the community (publish), the race first in its queue.
+        if (quiet && nextStartsRecap(thread.departures, timestamp)) await env.DB.batch([
+          env.DB.prepare('UPDATE discord_recap_publications SET content_hash=? WHERE community_id=? AND event_id=?').bind(REPOST,thread.community_id,thread.event_id),
+          env.DB.prepare('INSERT INTO discord_pending_races(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id,event_id) DO UPDATE SET queued_at=excluded.queued_at')
+            .bind(thread.community_id,thread.event_id,timestamp),
+          env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(thread.community_id)]);
       } catch (error) {
         if (error.budget || error.status === 429) return added;
       }
