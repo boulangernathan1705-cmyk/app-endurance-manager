@@ -1109,7 +1109,14 @@ test('a race\'s thread archived by Discord (nobody wrote for a week) is opened a
   assert.equal(post.body.flags,4096);assert.deepEqual(post.body.allowed_mentions,{parse:[]});
   // Its race over: nothing more.
   calls.length=0;await addThreadMembers(env,NOW+2*DAY,12);
-  assert.ok(!calls.some(call=>call.method==='POST'));
+  assert.ok(!calls.some(call=>call.method==='POST'));  // Its last race ends before Discord archives the thread (the 22 Nov. case: opened Monday 16 at 0h04, last start Sunday
+  // 22 at 19h): the thread lasts until then, no message.
+  const later=NOW+3*DAY;
+  DB.db.prepare("UPDATE events SET departures=? WHERE id='race-a'").run(JSON.stringify([{id:'start-a',startsAt:later+3600000}]));
+  thread.last_message_id=snowflake(later-6*DAY-3600000);
+  calls.length=0;await addThreadMembers(env,later,12);
+  assert.ok(calls.some(call=>call.method==='GET'),'looked at');
+  assert.ok(!calls.some(call=>call.method==='POST'),'the thread lasts until the end of the race');
 });
 
 test('a pass with nothing to change makes one request; a changed race only its edit more',async t=>{

@@ -8,6 +8,7 @@ import {communityAdmins} from './access.mjs';
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
 import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES, nextStartsRecap} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
+import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
@@ -1025,15 +1026,20 @@ export async function removeBotDiscord(env,timestamp,community) {
 }
 
 
-// A thread quiet for 6 days gets the race's next starts (Discord archives it on the 7th).
-const QUIET_THREAD_MS = 6 * 86400000;
+// A thread quiet for 6 days gets the race's next starts (Discord archives it on the 7th), only when a start would end
+// after that archiving: a thread that lasts until the end of the race needs no message.
+const QUIET_THREAD_MS = 6 * 86400000, ARCHIVE_THREAD_MS = 7 * 86400000;
+const lastFinish = (departures, minutes) => {
+  let list = []; try { list = JSON.parse(departures || '[]'); } catch {}
+  return Math.max(0, ...(Array.isArray(list) ? list : []).map(item => raceFinishAt(Number(item?.startsAt) || 0, minutes)));
+};
 const snowflakeTime = id => { try { return id ? Number(BigInt(id) >> 22n) + 1420070400000 : 0; } catch { return 0; } };
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
 // Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile, or archived by Discord).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id,p.members_checked_at,e.departures FROM discord_recap_publications p
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id,p.members_checked_at,e.departures,e.duration_minutes,e.duration_hours FROM discord_recap_publications p
     JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
     LEFT JOIN events e ON e.id=p.event_id
     WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.message_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
@@ -1056,7 +1062,9 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
         const channel = await discord(env,'GET',`/channels/${thread.channel_id}`,null,budget);
         if (channel?.thread_metadata?.archived) await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
         const lastMessage = Math.max(snowflakeTime(channel?.last_message_id), snowflakeTime(thread.channel_id));
-        const starts = lastMessage < timestamp - QUIET_THREAD_MS ? nextStartsRecap(thread.departures, timestamp) : '';
+        const minutes = eventMinutes({durationMinutes:thread.duration_minutes, durationHours:thread.duration_hours});
+        const quiet = lastMessage < timestamp - QUIET_THREAD_MS && lastFinish(thread.departures, minutes) > lastMessage + ARCHIVE_THREAD_MS;
+        const starts = quiet ? nextStartsRecap(thread.departures, timestamp) : '';
         if (starts) await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:starts,flags:4096,allowed_mentions:{parse:[]}},budget);
       } catch (error) {
         if (error.budget || error.status === 429) return added;
