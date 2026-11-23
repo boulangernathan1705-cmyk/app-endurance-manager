@@ -14,6 +14,7 @@ import {allCommunities, currentCommunity, communityById, communitySlug, appearan
 import {isDevelopment,devRobots,markDevelopmentResponse,withoutProductionCookies} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
 import {cleanCrewRequestCards} from './crew-request-discord.mjs';
+import {retryGridfestPasswords} from './gridfest-discord.mjs';
 // The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
 export {LiveRoom} from './live.mjs';
 
@@ -214,6 +215,8 @@ export default {
     // About every 5 minutes: crew vocals and race reminders.
     if (job === 'crews') {
       run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:8}));
+      // Gridfest MPs refused for a reason that may pass: sent again by the bot (2 pilots, at most 12 requests).
+      if (!isDevelopment(env)) run('Gridfest MP retry failed', () => retryGridfestPasswords(env, Math.floor(at.getTime() / 1000)));
       return;
     }
     // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the day's announcement, the changes on the
