@@ -1,10 +1,13 @@
 import {assignStreamerWaitlist, streamersOf, eventDetails, gridfestPasswordValid} from '../shared/grindfest.mjs';
-import {fail, hash, id, now} from './core.mjs';
+import {HttpError, fail, hash, id, now} from './core.mjs';
 import {discordFetch, pause} from './discord-api.mjs';
+import {eventById} from './api-shared.mjs';
+import {communityById} from './community.mjs';
 
 const BATCH_SIZE = 6; // At most 18 Discord calls, 36 with one retry each: within the Worker's subrequest budget.
 const LEASE_SECONDS = 120;
 const RETRY_MS = 2000;
+const RETRY_AFTER = 240, RETRY_MAX = 3, RETRY_WINDOW = 6 * 3600; // seconds: again after 4 min, 3 times, for 6 h
 // Refusals that pass: Discord down for a moment, or « you are opening direct messages too fast » (40003).
 const passing = answer => answer.status >= 500 || answer.code === 40003;
 
@@ -17,14 +20,16 @@ async function discord(env, method, path, data) {
     if (!attempt) await pause(RETRY_MS);
   }
   if (!answer.ok) {
-    if (!answer.status) throw Error('Discord ne répond pas. Réessaie plus tard.');
-    if (answer.status === 429) fail(429, 'Discord limite les envois. Attends un peu avant de réessayer.');
+    // A refusal that may pass later is marked: the bot sends that MP again by itself (retryGridfestPasswords).
+    const later = message => Object.assign(Error(message), {retry:true});
+    if (!answer.status) throw later('Discord ne répond pas. Nouvel essai automatique.');
+    if (answer.status === 429) throw Object.assign(new HttpError(429, 'Discord limite les envois. Nouvel essai automatique.'), {retry:true});
     if (answer.code === 50007) throw Error('MP bloqués : le pilote doit autoriser les messages privés du serveur.');
     if (answer.status === 404 && answer.code === 10007) throw Error('Ce pilote n’est plus membre du Discord de la communauté.');
     if (answer.code === 10013) throw Error('Ce compte Discord n’existe plus.');
-    if (answer.code === 40003) throw Error('Discord limite les MP pour l’instant. Renvoie dans quelques minutes.');
-    // Keep Discord's own code: without it, a refusal cannot be explained afterwards.
-    throw Error(`Envoi refusé par Discord (${answer.code || answer.status}). Renvoie, puis vérifie les MP du pilote.`);
+    if (answer.code === 40003 || passing(answer)) throw later(`Discord limite les MP (${answer.code || answer.status}). Nouvel essai automatique.`);
+    // Keep Discord's own code: without it, a refusal cannot be explained afterwards. Unknown: tried again too.
+    throw later(`Envoi refusé par Discord (${answer.code || answer.status}). Nouvel essai automatique.`);
   }
   return answer.data;
 }
@@ -63,7 +68,7 @@ export async function gridfestPasswordStatus(env, community, event) {
 
 // Called only by the module's admin route. Never post the secret in a channel, a recap or a notification.
 // Batches can resume after a browser/network interruption; successful deliveries of this password are skipped.
-export async function sendGridfestPasswords(env, community, event, cursor = '') {
+export async function sendGridfestPasswords(env, community, event, cursor = '', {only = null, limit = BATCH_SIZE} = {}) {
   if (typeof cursor !== 'string' || (cursor && !/^\d{15,22}$/.test(cursor))) fail(400, 'Reprise d’envoi invalide.');
   const password = eventDetails(event).password || '';
   if (!gridfestPasswordValid(password)) fail(400, 'Enregistre un mot de passe Gridfest dans « Modifier l’événement ».');
@@ -71,16 +76,17 @@ export async function sendGridfestPasswords(env, community, event, cursor = '') 
   const digest = await hash(password);
   const current = await entries(env, community, event);
   const byUser = new Map(current.confirmed.filter(row => /^\d{15,22}$/.test(row.user_id || '') && row.game_name?.trim()).map(row => [row.user_id, row]));
-  const candidates = [...byUser.values()].sort((a,b) => a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0).filter(row => row.user_id > cursor);
-  const batch = candidates.slice(0, BATCH_SIZE), results = [];
+  const candidates = [...byUser.values()].sort((a,b) => a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0).filter(row => row.user_id > cursor && (!only || only.has(row.user_id)));
+  const batch = candidates.slice(0, limit), results = [];
   for (const pilot of batch) {
     const attempt = id(), at = now();
     const claimed = await env.DB.prepare(`INSERT INTO gridfest_password_deliveries(event_id,user_id,password_hash,status,attempt_token,attempted_at)
       VALUES(?,?,?,'sending',?,?) ON CONFLICT(event_id,user_id,password_hash) DO UPDATE SET
-      status='sending',attempt_token=excluded.attempt_token,attempted_at=excluded.attempted_at,error=''
+      status='sending',attempt_token=excluded.attempt_token,attempted_at=excluded.attempted_at,error='',
+      retries=CASE WHEN ? THEN gridfest_password_deliveries.retries+1 ELSE 0 END
       WHERE gridfest_password_deliveries.status='failed' OR
       (gridfest_password_deliveries.status='sending' AND gridfest_password_deliveries.attempted_at<?)`)
-      .bind(event.id, pilot.user_id, digest, attempt, at, at - LEASE_SECONDS).run();
+      .bind(event.id, pilot.user_id, digest, attempt, at, only ? 1 : 0, at - LEASE_SECONDS).run();
     if (!claimed.meta.changes) { results.push({name:pilot.name, status:'skipped'}); continue; }
     try {
       // Check membership live: a cached site session must not invite someone who left TDZ.
@@ -105,11 +111,44 @@ export async function sendGridfestPasswords(env, community, event, cursor = '') 
       results.push({name:pilot.name, status:'sent'});
     } catch (error) {
       const message = error.message || 'Envoi impossible.';
-      await env.DB.prepare("UPDATE gridfest_password_deliveries SET status='failed',error=? WHERE event_id=? AND user_id=? AND password_hash=? AND attempt_token=?")
-        .bind(message, event.id, pilot.user_id, digest, attempt).run();
+      await env.DB.prepare("UPDATE gridfest_password_deliveries SET status='failed',error=?,retryable=? WHERE event_id=? AND user_id=? AND password_hash=? AND attempt_token=?")
+        .bind(message, error.retry ? 1 : 0, event.id, pilot.user_id, digest, attempt).run();
       if (error.status === 429 || error.status === 409) throw error;
       results.push({name:pilot.name, status:'failed', error:message});
     }
   }
   return {results, nextCursor:candidates.length > batch.length ? batch.at(-1).user_id : null, ...await gridfestPasswordStatus(env, community, event)};
+}
+
+// Every few minutes (scheduled crews job): the MPs refused for a reason that may pass are sent again, at most
+// RETRY_MAX times, only for the password they were refused with. Only an admin click starts a first send.
+export async function retryGridfestPasswords(env, at = now(), limit = 2) {
+  if (!env.DISCORD_BOT_TOKEN) return 0;
+  const rows = (await env.DB.prepare(`SELECT d.event_id,d.user_id,d.password_hash,e.community_id FROM gridfest_password_deliveries d
+    JOIN events e ON e.id=d.event_id WHERE d.status='failed' AND d.retryable=1 AND d.retries<? AND d.attempted_at<? AND d.attempted_at>?
+    ORDER BY d.attempted_at LIMIT ?`).bind(RETRY_MAX, at - RETRY_AFTER, at - RETRY_WINDOW, limit).all()).results || [];
+  let sent = 0;
+  for (const row of rows) {
+    try {
+      const community = await communityById(env, row.community_id);
+      const event = community && await eventById(env, row.event_id, community);
+      const password = eventDetails(event || {}).password || '';
+      // The password changed since: that refusal is out of date, an admin sends the new one.
+      if (!event || !gridfestPasswordValid(password) || await hash(password) !== row.password_hash) {
+        await env.DB.prepare("UPDATE gridfest_password_deliveries SET retryable=0 WHERE event_id=? AND user_id=? AND password_hash=?")
+          .bind(row.event_id, row.user_id, row.password_hash).run();
+        continue;
+      }
+      const result = await sendGridfestPasswords(env, community, event, '', {only:new Set([row.user_id]), limit:1});
+      sent += result.results.filter(item => item.status === 'sent').length;
+      // Not a confirmed pilot any more (withdrawn, on the waiting list): nothing to send again.
+      if (!result.results.length) await env.DB.prepare("UPDATE gridfest_password_deliveries SET retryable=0 WHERE event_id=? AND user_id=? AND password_hash=?")
+        .bind(row.event_id, row.user_id, row.password_hash).run();
+    } catch (error) {
+      if (error.status === 429) break;
+      if (error.status === 404) await env.DB.prepare("UPDATE gridfest_password_deliveries SET retryable=0 WHERE event_id=? AND user_id=? AND password_hash=?")
+        .bind(row.event_id, row.user_id, row.password_hash).run();
+    }
+  }
+  return sent;
 }
