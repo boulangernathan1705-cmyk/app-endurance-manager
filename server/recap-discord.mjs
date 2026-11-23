@@ -200,6 +200,11 @@ export async function validateDiscordLayout(env, community, input) {
     const before = parseLayout((await botRecapSettings(env, community))?.layout);
     layout.announceAt = before?.announce === layout.announce && before.announceAt ? before.announceAt : Date.now();
   }
+  if (layout.calendarPing) {
+    // Turned on (or changed) now: the first ping at its next time, never one already past.
+    const before = parseLayout((await botRecapSettings(env, community))?.layout)?.calendarPing;
+    layout.calendarPing.from = before?.day === layout.calendarPing.day && before.time === layout.calendarPing.time && before.from ? before.from : Date.now();
+  }
   if (layout.requests) {
     const place = destinations.find(item => item.id === layout.requests && [0,5].includes(item.type));
     if (!place) throw Object.assign(new Error('Choisis un salon qui existe sur le serveur Discord de cette communauté pour les demandes d’équipage.'), {status:400});
