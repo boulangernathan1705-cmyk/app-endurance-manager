@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.15 — 23 novembre 2026
+
+### ✨ Améliorations
+
+- **Plugin SimHub 0.1.4** : black box du jeu sur l'écran VoCore, et tout FMT companion dans la page « Black box sur boutons ». Les plugins installés proposent la mise à jour dans SimHub.
+
 ## v2.13.14 — 23 novembre 2026
 
 ### 🐛 Corrections
