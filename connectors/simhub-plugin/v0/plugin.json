@@ -1,0 +1,12 @@
+{
+  "version": "0.1.1",
+  "size": 1823744,
+  "sha256": "821192E5399785C903FE516EE52FB8C576CFB52B186C5D211F2E750CE7B632BF",
+  "changes": [
+    {
+      "type": "nouveau",
+      "text": "FMT companion livré avec le plugin : rien à installer à part",
+      "page": "bb"
+    }
+  ]
+}

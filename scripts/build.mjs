@@ -171,6 +171,22 @@ if (await access(pluginRelease + 'release/EnduranceManager.SimHub.dll').then(() 
   await writeFile(new URL('downloads/simhub/plugin.json', out), JSON.stringify({version, size:dll.length, sha256:createHash('sha256').update(dll).digest('hex')}) + '\n');
 }
 
+// Versions 0.x use their own channel. Keep the release manifest unchanged, including its change notes,
+// and refuse a partial or mismatched delivery rather than publishing an unusable update.
+const pluginV0 = pluginRelease + 'v0/';
+const manifestV0 = await readFile(pluginV0 + 'plugin.json');
+const infoV0 = JSON.parse(manifestV0.toString('utf8').replace(/^\uFEFF/, ''));
+const dllV0 = await readFile(pluginV0 + 'EnduranceManager.SimHub.dll');
+if (!/^0\.\d+\.\d+$/.test(infoV0.version || '') || infoV0.size !== dllV0.length ||
+    String(infoV0.sha256 || '').toLowerCase() !== createHash('sha256').update(dllV0).digest('hex')) {
+  throw new Error('Livraison SimHub v0 incohérente : utiliser la DLL et le plugin.json de la même Release.');
+}
+const installerV0 = await readFile(pluginV0 + 'Installer le plugin.cmd');
+await mkdir(new URL('downloads/simhub/v0/', out), {recursive: true});
+await writeFile(new URL('downloads/simhub/v0/EnduranceManager.SimHub.dll', out), dllV0);
+await writeFile(new URL('downloads/simhub/v0/plugin.json', out), manifestV0);
+await writeFile(new URL('downloads/simhub/v0/installer.cmd', out), installerV0);
+
 // Module preloads: each page lists every module its scripts import (and their own imports), so the browser
 // fetches them all at once instead of discovering them one level at a time.
 const staticImportPattern = /(?:^|[;\n])\s*(?:import|export)\s*(?:[\w*{}\s,$]+\s*from\s*)?['"]([^'"]+)['"]/g;
