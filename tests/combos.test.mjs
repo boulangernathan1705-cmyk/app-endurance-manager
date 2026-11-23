@@ -398,7 +398,7 @@ test('a stint of fewer than 3 timed laps keeps only the pilot\'s best lap', asyn
 });
 
 test('the plugin installer is handed out with the site written in and Windows line endings', async () => {
-  const script = readFileSync(new URL('../connectors/simhub-plugin/Installer le plugin.cmd', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../connectors/simhub-plugin/v0/installer.cmd', import.meta.url), 'utf8');
   assert.equal(script.split('@@SITE@@').length, 2, 'one place for the site');
   const out = installerFor(script, 'https://dev.endurance-manager.app');
   assert.ok(out.includes("$site = 'https://dev.endurance-manager.app'"));

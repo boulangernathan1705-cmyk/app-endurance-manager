@@ -76,7 +76,7 @@ async function start() {
   if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
     // The plugin build this site hands out, when there is one (scripts/build.mjs).
-    const plugin = fetch('/downloads/simhub/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
+    const plugin = fetch('/downloads/simhub/v0/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
     view.combos = list.combos; view.link = link; view.plugin = await plugin;
   } catch (error) { renderError(error); return; }
@@ -622,7 +622,7 @@ const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).sp
 // The installer with this site written in: it fetches the latest plugin from here when double-clicked.
 async function downloadPlugin() {
   await act(async () => {
-    const response = await fetch('/downloads/simhub/installer.cmd', {cache:'no-store'});
+    const response = await fetch('/downloads/simhub/v0/installer.cmd', {cache:'no-store'});
     if (!response.ok) throw Error('Installeur indisponible pour l’instant.');
     const url = URL.createObjectURL(new Blob([installerFor(await response.text(), location.origin)], {type:'application/octet-stream'}));
     const link = Object.assign(document.createElement('a'), {href:url, download:'Installer le plugin Fiches combo.cmd'});

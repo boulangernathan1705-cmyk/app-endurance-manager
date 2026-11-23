@@ -1,0 +1,22 @@
+{
+  "version": "0.1.2",
+  "size": 1825280,
+  "sha256": "22014C53D00BD9D1F74D65FE5ED01426FACA376519B44EE9EEE6356CD3D08E47",
+  "changes": [
+    {
+      "type": "corrige",
+      "text": "Prochain arrêt : cases et libellés alignés dans les profils",
+      "page": "profils"
+    },
+    {
+      "type": "corrige",
+      "text": "Black box : un démarrage bloqué affiche sa cause au lieu de demander un redémarrage",
+      "page": "bb"
+    },
+    {
+      "type": "corrige",
+      "text": "Mises à jour : une vérification impossible ne dit plus « À jour »",
+      "page": "maj"
+    }
+  ]
+}

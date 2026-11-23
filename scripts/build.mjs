@@ -155,20 +155,27 @@ await cp(root + 'front', new URL('front/', out), {recursive: true});
 await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 
-// The SimHub plugin for the fiches combo, when a build sits in connectors/simhub-plugin/release: the DLL, the installer
-// (the page and the plugin write the site's address into it) and plugin.json, which the installer checks the download
-// against and the plugin reads to offer an update.
-const pluginRelease = root + 'connectors/simhub-plugin/';
-if (await access(pluginRelease + 'release/EnduranceManager.SimHub.dll').then(() => true, () => false)) {
-  const {version} = JSON.parse(await readFile(pluginRelease + 'release/plugin.json', 'utf8'));
-  if (!/^\d+\.\d+\.\d+$/.test(version || '')) throw new Error('connectors/simhub-plugin/release/plugin.json : version attendue au format 1.2.3.');
-  const dll = await readFile(pluginRelease + 'release/EnduranceManager.SimHub.dll');
-  const installer = await readFile(pluginRelease + 'Installer le plugin.cmd', 'utf8');
-  if (!installer.includes('@@SITE@@')) throw new Error('L’installeur du plugin doit garder l’emplacement @@SITE@@.');
-  await mkdir(new URL('downloads/simhub/', out), {recursive: true});
-  await writeFile(new URL('downloads/simhub/EnduranceManager.SimHub.dll', out), dll);
-  await writeFile(new URL('downloads/simhub/installer.cmd', out), installer);
-  await writeFile(new URL('downloads/simhub/plugin.json', out), JSON.stringify({version, size:dll.length, sha256:createHash('sha256').update(dll).digest('hex')}) + '\n');
+// The SimHub plugin (its code lives in the endurance-manager-plugin repo; each of its Releases opens a PR here that
+// replaces connectors/simhub-plugin/v0/: the DLL, its plugin.json as published, the installer). Served twice:
+// - /downloads/simhub/v0/: what the 0.x plugins and the Télémétrie Mémo page read (plugin.json kept whole, with its
+//   « Ce qui change »; checked here against the DLL so a wrong pair never ships: the plugins would loop on it);
+// - /downloads/simhub/: the same DLL announced as 2.99.0, so the old 2.x plugins update themselves to the 0.x once
+//   (a 0.x reads only v0/ afterwards: no loop). The installer is the 0.x one in both places.
+const pluginDir = root + 'connectors/simhub-plugin/v0/';
+if (await access(pluginDir + 'EnduranceManager.SimHub.dll').then(() => true, () => false)) {
+  const dll = await readFile(pluginDir + 'EnduranceManager.SimHub.dll');
+  const info = JSON.parse((await readFile(pluginDir + 'plugin.json', 'utf8')).replace(/^\uFEFF/, ''));
+  const sha256 = createHash('sha256').update(dll).digest('hex');
+  if (!/^\d+\.\d+\.\d+$/.test(info.version || '')) throw new Error('connectors/simhub-plugin/v0/plugin.json : version attendue au format 1.2.3.');
+  if (info.size !== dll.length || String(info.sha256).toLowerCase() !== sha256) throw new Error('connectors/simhub-plugin/v0 : plugin.json ne correspond pas à la DLL (taille ou empreinte).');
+  const installer = await readFile(pluginDir + 'installer.cmd', 'utf8');
+  if (!installer.includes('@@SITE@@') || !installer.includes('/downloads/simhub/v0/')) throw new Error('L’installeur du plugin doit garder @@SITE@@ et lire /downloads/simhub/v0/.');
+  for (const [folder, json] of [['downloads/simhub/v0/', {...info, sha256}], ['downloads/simhub/', {version:'2.99.0', size:dll.length, sha256}]]) {
+    await mkdir(new URL(folder, out), {recursive: true});
+    await writeFile(new URL(folder + 'EnduranceManager.SimHub.dll', out), dll);
+    await writeFile(new URL(folder + 'installer.cmd', out), installer);
+    await writeFile(new URL(folder + 'plugin.json', out), JSON.stringify(json) + '\n');
+  }
 }
 
 // Module preloads: each page lists every module its scripts import (and their own imports), so the browser
