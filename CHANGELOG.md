@@ -1,5 +1,16 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.13 — 23 novembre 2026
+
+### 🐛 Corrections
+
+- **Gridfest** : un MP du mot de passe refusé par Discord pour une raison passagère est renvoyé par le bot, sans clic, jusqu'à 3 fois. La raison du refus s'affiche sous le pilote dans « Suivi ».
+- **Inscription à un event en plusieurs manches** : la fenêtre s'ouvre par-dessus la page et défile ; le bouton reste accessible sur un petit écran.
+
+### ✨ Améliorations
+
+- **Plugin SimHub** : le site accepte les nouvelles données du plugin 2.5/2.6 (mur des stands, salon suivi depuis SimHub, retours de test).
+
 ## v2.13.12 — 22 novembre 2026
 
 ### ✨ Améliorations

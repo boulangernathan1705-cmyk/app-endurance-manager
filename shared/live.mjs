@@ -8,7 +8,7 @@
 export const LIVE_VERSION = 1;
 // Plugin 1.6 and later (version 2): a complete snapshot when the connection opens, then only what changed (mergeSnapshot).
 export const DELTA_VERSION = 2;
-// One row per car of the field (connectors/simhub-plugin/LiveShare.cs writes them in this order).
+// One row per car of the field (LiveShare.cs of the plugin, repo endurance-manager-plugin, writes them in this order).
 // dist: metres into the lap; pit: 0 on track, 1 in the pit lane, 2 in the garage; ls1/ls2, bs1/bs2, cs1/cs2: the game's
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
 // lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above;
@@ -16,8 +16,14 @@ export const DELTA_VERSION = 2;
 // cmp, dmg, veLap: the compound each car has on, its bodywork damage (0-100, mean of the 8 zones) and the percent of its
 // energy (or fuel) its last lap used, as the game shows them of every car (later plugins; null from older ones).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
-  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank', 'cmp', 'dmg', 'veLap'];
-const TEXT = new Set(['cls', 'driver', 'vehicle', 'num', 'cmp']);
+  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank', 'cmp', 'dmg', 'veLap',
+  'wcmp', 'pst', 'flag', 'yellow', 'outLaps', 'lane', 'box'];
+// Plugin 2.5: wcmp, the compound of each wheel (FL FR RL RR) as the game's index and type (« 1.0 1.0 2.0 2.0 »); pst, the
+// game's pit state (0 none, 1 asked, 2 entering, 3 stopped, 4 leaving); flag, the flag shown to the car (6 blue); yellow,
+// under yellow; outLaps, laps since the car left the pits (null: no stop yet), lane and box, its last stop's time in
+// the pit lane and stopped in the box (s), timed by the plugin.
+const TEXT = new Set(['cls', 'driver', 'vehicle', 'num', 'cmp', 'wcmp']);
+const WHEEL_COMPOUNDS = /^\d{1,3}\.\d{1,3}( \d{1,3}\.\d{1,3}){3}$/;
 const PERCENT = new Set(['tank', 'dmg', 'veLap']);
 export const MAX_CARS = 104;
 // LMU's session numbers (rF2): 0 test day, 1–4 practice, 5–8 qualifying, 9 warm-up, 10–13 race.
@@ -49,11 +55,30 @@ export const median = list => {
 
 // Per wheel: wear left %, carcass °C, kPa, brake °C and (plugin 2.4) the tread's inner, middle and outer °C, the
 // temperatures the game's tyre screen shows (null from older plugins).
+// Plugin 2.5 adds what LMU Drive reads: the inner layer under the tread (inner, middle, outer °C), the compound's best
+// temperature, the compound's index and type on this wheel, a puncture and a lost wheel.
+const threeTemps = list => {
+  const three = Array.isArray(list) ? [0, 1, 2].map(index => num(list[index], -50, 400)) : null;
+  return three && three.every(value => value !== null) ? three : null;
+};
 function cleanWheel(input) {
-  const [left, carcass, kpa, brake, tread] = Array.isArray(input) ? input : [];
-  const three = Array.isArray(tread) ? [0, 1, 2].map(index => num(tread[index], -50, 400)) : null;
+  const [left, carcass, kpa, brake, tread, inner, optimal, index, type, flat, off] = Array.isArray(input) ? input : [];
   return {left:num(left, 0, 100), carcass:num(carcass, -50, 400), kpa:num(kpa, 0, 1000), brake:num(brake, -50, 2000),
-    tread:three && three.every(value => value !== null) ? three : null};
+    tread:threeTemps(tread), inner:threeTemps(inner), optimal:num(optimal, 1, 400), compound:Number.isInteger(index) && index >= 0 && index < 256 ? index : null,
+    type:Number.isInteger(type) && type >= 0 && type < 256 ? type : null, flat:flat === true, off:off === true};
+}
+
+// Plugin 2.5: the aids at work, the hybrid motor, the game's gaps (s to the car ahead, behind) and last impact.
+const flag = value => value === true;
+function cleanAids(input) {
+  if (!input || typeof input !== 'object') return null;
+  return {abs:flag(input.abs), tc:flag(input.tc), pitLimiter:flag(input.pitLimiter), limiter:flag(input.limiter), wipers:num(input.wipers, 0, 10), lights:num(input.lights, 0, 10)};
+}
+function cleanMotor(input) {
+  if (!input || typeof input !== 'object') return null;
+  const state = num(input.state, 1, 3);
+  return state === null ? null : {state, temp:num(input.temp, -50, 400), water:num(input.water, -50, 400), rpm:num(input.rpm, -100000, 100000),
+    torque:num(input.torque, -10000, 10000), soc:num(input.soc, 0, 100)};
 }
 
 // The eight dent zones (plugin 2.4: 0 front, then round by the left to 7 front right), 0 to 2 each; null before.
@@ -74,7 +99,7 @@ function cleanStop(input) {
 }
 
 const CONTROL = ['tc', 'cut', 'slip', 'abs', 'map', 'mig', 'arbF', 'arbR', 'bias'];
-const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'driver', 'driverAlong'];
+const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'driver', 'driverAlong', 'repair'];
 
 // Throws on a message that is not a snapshot; anything odd inside is dropped, never trusted.
 export function cleanSnapshot(input) {
@@ -85,7 +110,8 @@ export function cleanSnapshot(input) {
   const field = (Array.isArray(input.field) ? input.field : []).slice(0, MAX_CARS).map(row => {
     if (!Array.isArray(row)) return null;
     const car = {};
-    FIELD.forEach((key, index) => { car[key] = TEXT.has(key) ? text(row[index], key === 'vehicle' ? 80 : 40) || (key === 'cmp' ? null : '') : PERCENT.has(key) ? num(row[index], 0, 100) : num(row[index]); });
+    FIELD.forEach((key, index) => { car[key] = TEXT.has(key) ? text(row[index], key === 'vehicle' ? 80 : 40) || (key === 'cmp' || key === 'wcmp' ? null : '') : PERCENT.has(key) ? num(row[index], 0, 100) : num(row[index]); });
+    if (car.wcmp !== null && !WHEEL_COMPOUNDS.test(car.wcmp)) car.wcmp = null;
     return car.id === null || car.laps === null ? null : car;
   }).filter(Boolean);
   const id = num(me.id);
@@ -101,13 +127,25 @@ export function cleanSnapshot(input) {
     v:LIVE_VERSION, track, session, et, end:num(input.end, 0, 1e7), maxLaps:num(input.maxLaps, 0, 100000), length:num(input.length, 100, 100000),
     phase:num(input.phase, 0, 20), yellow:num(input.yellow, -1, 20), air:num(input.air, -50, 80), trackTemp:num(input.trackTemp, -50, 100),
     rain:num(input.rain, 0, 1), wet:num(input.wet, 0, 1), light:num(input.light, 0, 1),
+    // Plugin 2.5: yellow per sector, start lights, grip and cloud levels, time of day (s into the day), average wetness, wind (m/s),
+    // track limits steps for a penalty.
+    sectorFlags:Array.isArray(input.sectorFlags) && input.sectorFlags.length === 3 && input.sectorFlags.every(value => num(value, -1, 20) !== null) ? input.sectorFlags : null,
+    lights:num(input.lights, 0, 20), grip:num(input.grip, 0, 20), clouds:num(input.clouds, 0, 20), tod:num(input.tod, 0, 86400),
+    wetAvg:num(input.wetAvg, 0, 1), wind:num(input.wind, 0, 200), limitsPenalty:num(input.limitsPenalty, 0, 255),
     // car: the model as the fiches combo name it (their track + car), vehicle: the entry's full name in the scoring.
     me:{id, driver:text(me.driver, 40), car:text(me.car, 120), vehicle:text(me.vehicle, 80), cls:text(me.cls, 40), compound:text(me.compound, 40),
       cur:num(me.cur, -10, 3600), pit:num(me.pit, 0, 2) ?? 0, ve:num(me.ve, -1, 100), fuel:num(me.fuel, 0, 500), capacity:num(me.capacity, 0, 500),
       wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100), dents:cleanDents(me.dents), detached:me.detached === true,
       limits:num(me.limits, 0, 1000), battery:num(me.battery, 0, 100), regen:num(me.regen, -1000, 1000), delta:num(me.delta, -600, 600),
       water:num(me.water, -50, 250), oil:num(me.oil, -50, 250), control:control && Object.values(control).some(value => value !== null) ? control : null,
-      stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
+      stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile,
+      aids:cleanAids(me.aids), liftCoast:num(me.liftCoast, 0, 255), motor:cleanMotor(me.motor),
+      gaps:Array.isArray(me.gaps) ? [0, 1].map(index => num(me.gaps[index], -3600, 3600)) : null,
+      impact:Array.isArray(me.impact) && num(me.impact[0], 0, 1e7) !== null ? [me.impact[0], num(me.impact[1], 0, 1e9)] : null,
+      flag:num(me.flag, 0, 20), pitState:num(me.pitState, 0, 10),
+      // Plugin 2.5's own calculations: optimal lap (best sectors), predicted lap (best + the game's delta), impacts
+      // this stint, lockups last lap.
+      optimal:time(me.optimal), predicted:time(me.predicted), impacts:num(me.impacts, 0, 1000), lockups:num(me.lockups, 0, 1000)},
     field, map:map && map.length >= 50 ? map : null
   };
 }
@@ -361,6 +399,7 @@ export function publicFeed(feed, gaps = null) {
       ve5:avgOf(ours.laps.slice(-5), lap => lap.ve), fuel5:avgOf(ours.laps.slice(-5), lap => lap.fuel),
       wear5:[0, 1, 2, 3].map(index => avgOf(ours.laps.slice(-5), lap => lap.wear[index])),
       lastVe:ours.laps.at(-1)?.ve ?? null, lastFuel:ours.laps.at(-1)?.fuel ?? null,
+      lastWear:ours.laps.at(-1)?.wear ?? null,
       stintVe:avgOf(stintLaps, lap => lap.ve), stintFuel:avgOf(stintLaps, lap => lap.fuel), stintAvg:avgOf(cleanLaps(stintLaps), lap => lap.t),
       bestSectors:[0, 1, 2].map(index => { const values = laps.filter(lap => lap.s).map(lap => lap.s[index]); return values.length ? Math.min(...values) : null; }),
       stints:ours.stints.map((item, index) => {

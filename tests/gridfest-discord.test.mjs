@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {hash, now} from '../server/core.mjs';
+import {retryGridfestPasswords} from '../server/gridfest-discord.mjs';
 import {validateEvent, validateRegistration} from '../server/core.mjs';
 import {gridfestPasswordValid, isGrindfest} from '../shared/grindfest.mjs';
 import {linkTestServer, setMember, GUILD, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
@@ -248,12 +249,58 @@ test('large grids use bounded batches and can resume from the returned cursor', 
   try {
     const batch = await req(sendPath, 'POST', {version:updated.version});
     assert.equal(batch.status, 200, JSON.stringify(batch.data));
-    assert.equal(discord.messages.length, 8);
+    assert.equal(discord.messages.length, 6);
     assert.ok(batch.data.nextCursor);
-    assert.equal(discord.requests.length, 24);
+    assert.equal(discord.requests.length, 18);
     const remaining = await req(sendPath, 'POST', {version:updated.version, cursor:batch.data.nextCursor});
     assert.equal(remaining.data.nextCursor, null);
     assert.equal(discord.messages.length, 10);
     assert.equal(new Set(discord.messages.map(message => message.recipient)).size, 10);
+  } finally { discord.restore(); }
+});
+
+test('a passing Discord refusal is retried once; any other refusal keeps Discord’s code', async () => {
+  const {req, event, sendPath, enter} = await harness();
+  await enter(FIRST);
+  await enter(SECOND, 'b');
+  const discord = mockDiscord(), inner = globalThis.fetch, refused = new Map([[FIRST, 40003], [SECOND, 50278]]);
+  globalThis.fetch = async (url, options = {}) => {
+    const recipient = options.body && JSON.parse(options.body).recipient_id, code = refused.get(recipient);
+    if (code === 40003) refused.delete(recipient); // too fast once, then fine
+    return code ? Response.json({code}, {status:400}) : inner(url, options);
+  };
+  try {
+    const sent = await req(sendPath, 'POST', {version:event.version});
+    assert.equal(sent.status, 200, JSON.stringify(sent.data));
+    assert.deepEqual(discord.messages.map(message => message.recipient), [FIRST]);
+    assert.match(sent.data.pilots.find(pilot => pilot.name === `Discord ${SECOND}`).error, /\(50278\)/);
+  } finally { discord.restore(); }
+});
+
+test('the bot sends a refused MP again by itself, only when the refusal may pass, a few times', async () => {
+  const {DB, env, req, event, sendPath, enter} = await harness();
+  await enter(FIRST);
+  await enter(SECOND, 'b');
+  const blocked = new Set([SECOND]), discord = mockDiscord({blocked}), inner = globalThis.fetch;
+  let busy = true;
+  globalThis.fetch = async (url, options = {}) => busy && options.body && JSON.parse(options.body).recipient_id === FIRST
+    ? Response.json({code:0}, {status:503}) : inner(url, options);
+  try {
+    const first = await req(sendPath, 'POST', {version:event.version});
+    assert.equal(first.status, 200, JSON.stringify(first.data));
+    assert.equal(discord.messages.length, 0);
+    const row = id => DB.db.prepare('SELECT status,retryable,retries FROM gridfest_password_deliveries WHERE user_id=?').get(id);
+    assert.equal(row(FIRST).retryable, 1, 'Discord busy: may pass later');
+    assert.equal(row(SECOND).retryable, 0, 'MPs closed: an admin must see it, no automatic resend');
+    assert.equal(await retryGridfestPasswords(env, now()), 0, 'not before a few minutes');
+    busy = false;
+    assert.equal(await retryGridfestPasswords(env, now() + 300), 1);
+    assert.deepEqual(discord.messages.map(message => message.recipient), [FIRST]);
+    assert.equal(row(FIRST).status, 'sent');
+    assert.equal(await retryGridfestPasswords(env, now() + 600), 0, 'blocked MPs are never retried by the bot');
+    // At most three automatic sends.
+    DB.db.prepare("UPDATE gridfest_password_deliveries SET status='failed',retryable=1,retries=3 WHERE user_id=?").run(SECOND);
+    blocked.clear();
+    assert.equal(await retryGridfestPasswords(env, now() + 900), 0);
   } finally { discord.restore(); }
 });

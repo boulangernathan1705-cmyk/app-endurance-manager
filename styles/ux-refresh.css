@@ -221,9 +221,9 @@ html[data-game] .page-head .home-create-event { margin: 0 0 0 auto; }
 /* Formulaire d'inscription : le titre précis remplace « Inscriptions » dans l'en-tête ; pas de doublon. */
 .fold-registration .registration-form > .form-title { display: none; }
 
-/* ---------- Inscription en étapes : panneau par-dessus la course ---------- */
+/* ---------- Inscription en étapes : panneau par-dessus la course (endurance, event, event à manches) ---------- */
 body:has(.fold-registration:not([hidden])) { overflow: hidden; }
-.departure-fold .fold-registration:not([hidden]) {
+.fold-section.fold-registration:not([hidden]) {
   position: fixed !important;
   inset: 0;
   z-index: 1200;
@@ -345,7 +345,7 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
 .registration-sheet .registration-summary-row > em { font-size: 14px; }
 
 @media (max-width: 760px) {
-  .departure-fold .fold-registration:not([hidden]) { align-items: flex-end; padding: 0 !important; }
+  .fold-section.fold-registration:not([hidden]) { align-items: flex-end; padding: 0 !important; }
   .registration-sheet { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0; padding: 14px 14px 0; }
   .registration-step-nav { margin: 4px -14px 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); }
   .registration-sheet .registration-workspace-head { flex-wrap: nowrap; }

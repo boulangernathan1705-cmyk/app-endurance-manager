@@ -39,6 +39,8 @@ est déjà inscrit. Il n’est publié ni dans les salons, ni dans les récapitu
 Les MP bloqués sont signalés à l’admin. Après autorisation des MP par le pilote, relance l’envoi :
 les MP déjà réussis pour ce mot de passe sont ignorés. Les envois sont découpés en petits lots
 pour respecter les limites du Worker ; une interruption peut être reprise par la même action.
+Un refus passager de Discord (Discord occupé, trop de MP d’un coup, erreur inconnue) est renvoyé
+par le bot environ toutes les 5 minutes, 3 fois au plus, sans clic. Le code de Discord reste visible dans « Suivi ».
 
 Un mot de passe partagé reste transmissible par son destinataire. Pour retirer l’accès d’un pilote
 qui l’a reçu, change-le **sur le site et sur le serveur de course**, puis envoie le nouveau aux inscrits
