@@ -20,7 +20,7 @@ Devise : « La simplicité, c'est la sophistication suprême » : interface la p
 | Styles | `styles/tokens.css` (valeurs de la charte), `styles/*.css` ; `ux-refresh.css` est la grosse couche finale : y retirer plutôt qu'y ajouter ; vérifier un changement avec `scripts/css-compare.mjs` (styles calculés avant/après) |
 | Cloche (notifications du site) | `server/notifications.mjs`, `front/notifications.mjs` |
 | Page Équipages des responsables | `front/app/crews-page.mjs` ; assistant d'équipage `crew-builder.js` |
-| Plugin SimHub | Dépôt à part `endurance-manager-plugin` ; ici seulement `connectors/simhub-plugin/` (DLL, `plugin.json` et installeur servis pour la mise à jour) et le côté serveur (`server/combos.mjs`, `server/live.mjs`, `shared/live.mjs`) |
+| Plugin SimHub | Dépôt à part `endurance-manager-plugin` (seule source du code, jamais une copie locale) ; ici seulement `connectors/simhub-plugin/` (DLL, `plugin.json` et installeur servis pour la mise à jour, voir son `README.md`) et le côté serveur (`server/combos.mjs`, `server/live.mjs`, `shared/live.mjs`) |
 | Base D1 | `migrations/NNNN_nom.sql` (numéro suivant le dernier) |
 | Build | `scripts/build.mjs` (toute nouvelle page `.html` s'y ajoute, et dans `run_worker_first` de `wrangler.prod.jsonc`) |
 | Tests | `tests/<sujet>.test.mjs` (même nom que le module), navigateur `tests/compat/`, visuels `tests/visual/` |
@@ -37,6 +37,8 @@ Devise : « La simplicité, c'est la sophistication suprême » : interface la p
 
 ## Règles de travail
 
+- Source de vérité : ce dépôt GitHub (`dev` pour travailler, `main` = production). Jamais travailler dans une copie du
+  PC de Nathan ni dans l'ancien dépôt `fmt-managment/fmt-endurance-manager` (version de septembre 2026).
 - Branche de travail → PR vers `dev` (Claude fusionne ses PR vertes dans `dev`). Production = PR `dev → main`
   seulement après le « go prod » de Nathan ; dire alors tout ce qui part avec.
 - `CHANGELOG.md` s'écrit à la release (`## vX.Y — date`), pas dans chaque PR. Il alimente la page Nouveautés.
