@@ -1,22 +1,17 @@
 {
-  "version": "0.1.2",
-  "size": 1825280,
-  "sha256": "22014C53D00BD9D1F74D65FE5ED01426FACA376519B44EE9EEE6356CD3D08E47",
+  "version": "0.1.4",
+  "size": 1868800,
+  "sha256": "0DCFE58DFC85F3DBCA57B1C20E500373334C7ED4DECB7A83CADEC1AED6101441",
   "changes": [
     {
-      "type": "corrige",
-      "text": "Prochain arrêt : cases et libellés alignés dans les profils",
-      "page": "profils"
-    },
-    {
-      "type": "corrige",
-      "text": "Black box : un démarrage bloqué affiche sa cause au lieu de demander un redémarrage",
+      "type": "nouveau",
+      "text": "Black box du jeu sur l'écran VoCore : dash « Endurance Manager · Black box » (page Arrêt aux stands)",
       "page": "bb"
     },
     {
-      "type": "corrige",
-      "text": "Mises à jour : une vérification impossible ne dit plus « À jour »",
-      "page": "maj"
+      "type": "nouveau",
+      "text": "Black box sur boutons : tout FMT companion dans la page (commandes, Préparer LMU, Tester, Stream Deck)",
+      "page": "bb"
     }
   ]
 }
