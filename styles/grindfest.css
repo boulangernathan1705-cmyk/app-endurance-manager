@@ -26,6 +26,7 @@ html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel:is([data-
 .gridfest-mp .gridfest-mp-list {display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
 .gridfest-mp-tag {margin-left:auto;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;background:#2a3336;color:#c7d0d4}
 .gridfest-mp-tag.is-sent {background:#2f6e3f;color:#e6ffec}
+.gridfest-mp-error {display:block;white-space:normal;font-size:.8rem;font-weight:400;color:var(--em-danger-text);overflow-wrap:anywhere}
 .gridfest-mp-tag.is-failed,.gridfest-mp-tag.is-incomplete {background:#6e2f2f;color:#ffe6e6}
 .grindfest-streamer-head .count-pill {font-size:.85rem}
 

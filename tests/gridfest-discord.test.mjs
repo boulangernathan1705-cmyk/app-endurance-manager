@@ -248,12 +248,30 @@ test('large grids use bounded batches and can resume from the returned cursor', 
   try {
     const batch = await req(sendPath, 'POST', {version:updated.version});
     assert.equal(batch.status, 200, JSON.stringify(batch.data));
-    assert.equal(discord.messages.length, 8);
+    assert.equal(discord.messages.length, 6);
     assert.ok(batch.data.nextCursor);
-    assert.equal(discord.requests.length, 24);
+    assert.equal(discord.requests.length, 18);
     const remaining = await req(sendPath, 'POST', {version:updated.version, cursor:batch.data.nextCursor});
     assert.equal(remaining.data.nextCursor, null);
     assert.equal(discord.messages.length, 10);
     assert.equal(new Set(discord.messages.map(message => message.recipient)).size, 10);
+  } finally { discord.restore(); }
+});
+
+test('a passing Discord refusal is retried once; any other refusal keeps Discord’s code', async () => {
+  const {req, event, sendPath, enter} = await harness();
+  await enter(FIRST);
+  await enter(SECOND, 'b');
+  const discord = mockDiscord(), inner = globalThis.fetch, refused = new Map([[FIRST, 40003], [SECOND, 50278]]);
+  globalThis.fetch = async (url, options = {}) => {
+    const recipient = options.body && JSON.parse(options.body).recipient_id, code = refused.get(recipient);
+    if (code === 40003) refused.delete(recipient); // too fast once, then fine
+    return code ? Response.json({code}, {status:400}) : inner(url, options);
+  };
+  try {
+    const sent = await req(sendPath, 'POST', {version:event.version});
+    assert.equal(sent.status, 200, JSON.stringify(sent.data));
+    assert.deepEqual(discord.messages.map(message => message.recipient), [FIRST]);
+    assert.match(sent.data.pilots.find(pilot => pilot.name === `Discord ${SECOND}`).error, /\(50278\)/);
   } finally { discord.restore(); }
 });

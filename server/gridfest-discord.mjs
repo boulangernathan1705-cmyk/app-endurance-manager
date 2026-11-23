@@ -1,19 +1,30 @@
 import {assignStreamerWaitlist, streamersOf, eventDetails, gridfestPasswordValid} from '../shared/grindfest.mjs';
 import {fail, hash, id, now} from './core.mjs';
-import {discordFetch} from './discord-api.mjs';
+import {discordFetch, pause} from './discord-api.mjs';
 
-const BATCH_SIZE = 8; // At most 24 Discord calls, within the Worker's subrequest budget.
+const BATCH_SIZE = 6; // At most 18 Discord calls, 36 with one retry each: within the Worker's subrequest budget.
 const LEASE_SECONDS = 120;
+const RETRY_MS = 2000;
+// Refusals that pass: Discord down for a moment, or « you are opening direct messages too fast » (40003).
+const passing = answer => answer.status >= 500 || answer.code === 40003;
 
 async function discord(env, method, path, data) {
   let answer;
-  try { answer = await discordFetch(env, method, path, data); }
-  catch { throw Error('Discord ne répond pas. Réessaie plus tard.'); }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { answer = await discordFetch(env, method, path, data); }
+    catch { answer = {ok:false, status:0, code:0}; }
+    if (answer.ok || (answer.status && !passing(answer))) break;
+    if (!attempt) await pause(RETRY_MS);
+  }
   if (!answer.ok) {
+    if (!answer.status) throw Error('Discord ne répond pas. Réessaie plus tard.');
     if (answer.status === 429) fail(429, 'Discord limite les envois. Attends un peu avant de réessayer.');
     if (answer.code === 50007) throw Error('MP bloqués : le pilote doit autoriser les messages privés du serveur.');
     if (answer.status === 404 && answer.code === 10007) throw Error('Ce pilote n’est plus membre du Discord de la communauté.');
-    throw Error('Envoi refusé par Discord. Vérifie le bot et les messages privés du pilote.');
+    if (answer.code === 10013) throw Error('Ce compte Discord n’existe plus.');
+    if (answer.code === 40003) throw Error('Discord limite les MP pour l’instant. Renvoie dans quelques minutes.');
+    // Keep Discord's own code: without it, a refusal cannot be explained afterwards.
+    throw Error(`Envoi refusé par Discord (${answer.code || answer.status}). Renvoie, puis vérifie les MP du pilote.`);
   }
   return answer.data;
 }
