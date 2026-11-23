@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.16 — 23 novembre 2026
+
+### ✨ Améliorations
+
+- **Discord : ping du calendrier** : nouvelle question du réglage Discord, « Prévenir @everyone du calendrier ? ». L'admin choisit le jour et l'heure ; chaque semaine, le bot écrit un @everyone sous le calendrier, avec son lien. Désactivé par défaut.
+
 ## v2.13.15 — 23 novembre 2026
 
 ### ✨ Améliorations
