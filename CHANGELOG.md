@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.14 — 23 novembre 2026
+
+### 🐛 Corrections
+
+- **Plugin SimHub** : le site sert à nouveau la dernière version du plugin (0.1.2). Les plugins installés proposent la mise à jour dans SimHub ; les anciens 2.x passent une seule fois à la 0.x.
+- **Télémétrie Mémo** : le bouton d'installation donne l'installeur du plugin actuel.
+
 ## v2.13.13 — 23 novembre 2026
 
 ### 🐛 Corrections
