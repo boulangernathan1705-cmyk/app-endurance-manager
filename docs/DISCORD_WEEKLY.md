@@ -26,6 +26,8 @@ Un réglage fait avant ce questionnaire continue tel quel (catégories et salons
 
 Le message « 📅 Calendrier de la semaine du … » liste les events (format solo) de la semaine en heure de Paris (ou de la prochaine semaine qui en a), un paragraphe par event : nom (lien vers le site), simu, circuit, départ, puis places (« 14/20 places », « complet · 3 en attente ») ou nombre d’inscrits de la communauté. Les events ne sont jamais dans les récaps d’endurance ni dans les catégories de course.
 
+**Prévenir @everyone du calendrier ?** (réglage « Discord », question après celle des events ; désactivé par défaut) : l’admin choisit un jour et une heure (Paris). Chaque semaine à ce moment (jusqu’à 2 h après si un passage est manqué, jamais plus tard), le bot écrit sous le calendrier « @everyone 📅 Le calendrier de la semaine est à jour » avec le lien du calendrier, et supprime le ping de la semaine d’avant (`server/discord-calendar-ping.mjs`). Le calendrier lui-même reste modifié sans notification. Un réglage activé après l’heure de la semaine attend la semaine suivante. Sans « Mentionner @everyone » dans ce salon, rien n’est envoyé et les admins sont prévenus dans la cloche.
+
 ## Bot et permissions
 
 Le Worker doit disposer de `DISCORD_CLIENT_ID` et du secret `DISCORD_BOT_TOKEN`. Ne jamais placer ce secret dans le dépôt ou dans le navigateur. Utiliser **Donner les droits au bot** pour l’inviter sur le serveur concerné.

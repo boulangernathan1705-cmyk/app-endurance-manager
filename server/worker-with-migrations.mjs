@@ -10,6 +10,7 @@ import {purgeNotifications} from './notifications.mjs';
 import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {syncAnnouncements} from './discord-announce.mjs';
+import {syncCalendarPings} from './discord-calendar-ping.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse,withoutProductionCookies} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
@@ -229,8 +230,8 @@ export default {
       const tasks = [() => syncDueRecaps(env, 1, at.getTime(), {pending:true, then:voices}), () => addThreadMembers(env, at.getTime(), 25)];
       if (Math.floor(at.getUTCMinutes() / 2) % 2) tasks.reverse();
       if (env.DISCORD_BOT_TOKEN) ctx.waitUntil((async () => {
-        // The morning announcement first (7h30), then the changes on the site.
-        for (const task of [() => syncAnnouncements(env, at.getTime()), () => flushDiscord(env, 1), ...tasks]) if (await task()) return;
+        // The morning announcement first (7h30), the calendar's weekly @everyone, then the changes on the site.
+        for (const task of [() => syncAnnouncements(env, at.getTime()), () => syncCalendarPings(env, at.getTime()), () => flushDiscord(env, 1), ...tasks]) if (await task()) return;
       })().catch(error => console.error('Discord pass failed', error instanceof Error ? error.message : 'unknown')));
       return;
     }

@@ -274,11 +274,17 @@ function discordRead(form) {
   if (radio('copy')) answers.copy = radio('copy') === 'private';
   if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
-  for (const name of ['under','events','pitAt','announce','stream','streamName','requests']) if (field(name)) answers[name] = field(name).value.trim();
+  for (const name of ['under','events','pitAt','announce','stream','streamName','requests','calendarPingDay','calendarPingTime']) if (field(name)) answers[name] = field(name).value.trim();
+  // The saved ping (layout.calendarPing) until the question is shown.
+  answers.calendarPingDay ??= answers.calendarPing ? String(answers.calendarPing.day) : '';
+  answers.calendarPingTime ??= answers.calendarPing?.time || '08:00';
   answers.week ||= {};
   for (const key of ['all','lmu','iracing']) if (field(`week-${key}`)) answers.week[key] = field(`week-${key}`).value;
   return answers;
 }
+// The week's calendar of events is on the server (the events module, shown somewhere).
+const discordCalendar = (form, answers) => form.dataset.solo === 'true' && (answers.mode === 'events' ? answers.showEvents : discordEvents(answers) !== '');
+const PING_DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const discordSims = answers => answers.sims === 'all' ? ['lmu','iracing'] : [answers.sims];
 const discordApart = answers => answers.sims === 'all' && answers.split;
 const SIM_NAMES = {lmu:'LMU', iracing:'iRacing'};
@@ -342,6 +348,10 @@ function discordQuestions(form, answers) {
     const events = discordEvents(answers);
     if (solo) questions.push(['Où mettre les events de la semaine ?', row(`# ${discordEventChannel(form)}`, '', place('events', events, `<option value="same" ${events === 'same' ? 'selected' : ''}>Avec les endurances</option>`, apart ? discordSims(answers).map(sim => [`bot-${sim}`, SIM_NAMES[sim]]) : undefined), help(events))]);
   }
+  // « Prévenir @everyone du calendrier ? » (TDZ, 2026-11-23): once a week, at the day and hour chosen.
+  if (discordCalendar(form, answers)) questions.push(['Prévenir @everyone du calendrier ?', row('📅 Ping du calendrier', 'Une fois par semaine, un message @everyone sous le calendrier. Le calendrier passe à la semaine suivante le lundi à 7h30.',
+    `<select name="calendarPingDay"><option value="" ${!answers.calendarPingDay ? 'selected' : ''}>Ne pas prévenir</option>${PING_DAYS.map((day, index) => `<option value="${index + 1}" ${answers.calendarPingDay === String(index + 1) ? 'selected' : ''}>${day}</option>`).join('')}</select>`)
+    + (answers.calendarPingDay ? row('Heure', '', `<input type="time" name="calendarPingTime" required value="${esc(answers.calendarPingTime || '08:00')}">`) : '')]);
   const made = quoted(discordBotCategories(answers)), several = discordBotCategories(answers).length > 1;
   if (discordUsesBot(answers)) questions.push([several ? 'Où placer les catégories du bot ?' : 'Où placer la catégorie du bot ?', row(made, race ? 'Juste sous cette catégorie, puis les catégories des courses.' : 'Juste sous cette catégorie.', category('under', answers.under || 'top'))
     + privacy('copy', answers.under, made, answers.copy)
@@ -472,7 +482,7 @@ async function loadDiscordDestinations(form) {
 function discordInput(form) {
   const answers = discordRead(form), list = form._destinations || [];
   const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
-  return {layout:{...answers, events:discordEvents(answers), copy:answers.copy !== false && isPrivate(answers.under), pitCopy:answers.pitCopy !== false && isPrivate(answers.pitAt)}};
+  return {layout:{...answers, calendarPingDay:discordCalendar(form, answers) ? answers.calendarPingDay : '', events:discordEvents(answers), copy:answers.copy !== false && isPrivate(answers.under), pitCopy:answers.pitCopy !== false && isPrivate(answers.pitAt)}};
 }
 const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''))
   .replace(/&lt;:em_([a-z0-9_]+):\d+&gt;/g,'<img src="/images/discord-emojis/$1.png" width="18" height="18" alt="">');
@@ -542,6 +552,7 @@ function discordTabMarkup(setup, settings, look) {
       ${fact('Courses de la semaine', `${esc(MODE_NAMES[answers.mode] || '')} · ${sims}${answers.split && answers.sims === 'all' ? ' séparés' : ''}`, answers.mode === 'events' ? 'Le lundi à 7h30, le bot publie les courses de la semaine dans # endurances-de-la-semaine et ouvre un fil par course. Les pilotes inscrits y sont ajoutés sans notification.' : 'Le lundi à 7h30, le bot publie le récap de la semaine dans le salon choisi, avec un fil par course.')}
       ${fact('Vocaux d’équipage', answers.voices ? (answers.reminders ? 'Oui, avec rappels' : 'Oui') : 'Non', 'Un salon vocal par équipage, ouvert le lundi de la semaine de la course et supprimé 2 h après la fin. Avec les rappels : 24 h et 1 h avant le départ dans son chat.')}
       ${fact('Annonce du jour', answers.announce ? 'Oui, à 7h30' : 'Non', 'Chaque matin à 7h30, une affiche des courses du jour dans le salon choisi. @everyone seulement les jours de stream.')}
+      ${answers.calendarPing ? fact('Ping du calendrier', `${PING_DAYS[answers.calendarPing.day - 1]} à ${esc(answers.calendarPing.time.replace(':', 'h'))}`, 'Une fois par semaine, un message @everyone sous le calendrier des events.') : ''}
       ${fact('Demandes d’équipage', answers.requests ? 'Postées sur Discord' : 'Sur le site seulement', 'Chaque demande d’équipage faite sur le site, postée sans ping dans le salon choisi. La carte devient verte quand l’équipage est créé.')}
       ${answers.announce ? fact('Stream', answers.stream ? esc(answers.stream.replace(/^https?:\/\//, '')) : 'Aucun', 'Facultatif : le lien et le nom du streamer s’affichent sur l’affiche des jours de stream.') : ''}
     </dl></section>` : '';

@@ -15,6 +15,8 @@
 //   announce: the text or announcement channel of the morning announcement (server/discord-announce.mjs), '' for none
 //   stream: the community's stream, linked in the intro of the announcement, '' for none
 //   requests: the text channel where the bot posts the pilots' crew requests (server/crew-request-discord.mjs), '' for none
+//   calendarPing: {day:1 (Monday) … 7 (Sunday), time:'HH:MM', from}, the weekly @everyone under the calendar
+//     (server/discord-calendar-ping.mjs); absent for none
 // Discord shows every name in the same size: an emoji in front makes the bot's own stand out (custom emojis are not allowed
 // in names).
 export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
@@ -80,7 +82,17 @@ export function layoutInput(input) {
   const requests = String(input.requests ?? '').trim();
   if (requests && !ID.test(requests)) throw bad('Choisis le salon des demandes d’équipage.');
   if (requests) layout.requests = requests;
+  const ping = calendarPingInput(input.calendarPingDay, input.calendarPingTime);
+  if (ping) layout.calendarPing = ping;
   return layout;
+}
+// « Prévenir @everyone du calendrier ? »: a day (1 Monday … 7 Sunday) and an hour, or null for « Ne pas prévenir ».
+export function calendarPingInput(day, time) {
+  const number = Number(day);
+  if (!day || !Number.isInteger(number) || number < 1 || number > 7) return null;
+  const text = String(time || '').trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) throw bad('Choisis l’heure du ping du calendrier.');
+  return {day:number, time:text};
 }
 
 const eventsPlace = layout => layout.split && layout.events === 'bot' ? `bot-${SIMS.all.find(sim => layout.week?.[sim] === 'bot') || 'lmu'}`
