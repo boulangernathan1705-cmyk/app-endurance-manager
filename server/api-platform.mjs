@@ -65,12 +65,22 @@ export async function platformApi({path, method, request, env, actor, community,
       .map(table => env.DB.prepare(`DELETE FROM ${table} WHERE community_id=?`).bind(row.id)), env.DB.prepare('DELETE FROM communities WHERE id=?').bind(row.id)]);
     return json({ok:true});
   }
+  // The « Plugin SimHub » module (permission and data « combos »): opened for a community by the platform managers only.
+  if (platformCommunity && method === 'PATCH') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const input = await body(request);
+    if (typeof input.plugin !== 'boolean') fail(400, 'Réglage inconnu.');
+    const row = await env.DB.prepare('SELECT id FROM communities WHERE slug=?').bind(platformCommunity[1]).first();
+    if (!row) fail(404, 'Communauté introuvable.');
+    await env.DB.prepare(`UPDATE communities SET modules=json_set(COALESCE(modules,'{}'),'$.combos',json(?)) WHERE id=?`).bind(String(input.plugin), row.id).run();
+    return json({ok:true, plugin:input.plugin});
+  }
   if (path === '/api/platform/communities' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     const list = [];
     for (const item of await allCommunities(env)) {
       const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
-      list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
+      list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId), plugin:item.modules?.combos === true});
     }
     return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite, testSite:isDevelopment(env),
       official:mainAddress && community.discordGuildId ? list.find(item => item.guildId === community.discordGuildId) || null : null});

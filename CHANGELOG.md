@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.18 — 24 novembre 2026
+
+### ✨ Améliorations
+
+- **Plugin SimHub** : le module s'ouvre par communauté depuis la plateforme. Dans l'administration, l'autorisation « Fiches combo » s'appelle désormais « Plugin SimHub ».
+
 ## v2.13.17 — 24 novembre 2026
 
 ### ✨ Améliorations
