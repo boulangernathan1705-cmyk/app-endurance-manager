@@ -21,11 +21,11 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {access:'Accès Endurance Manager', endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', combos:'Fiches combo', admin:'Administrer'};
+const PERMISSION_LABELS = {access:'Accès Endurance Manager', endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', combos:'Plugin SimHub', admin:'Administrer'};
 const PERMISSION_HELP = {access:'Accéder au site de la communauté. Sans cette autorisation sur au moins un rôle, le membre ne peut pas consulter les courses ni utiliser le site.', endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
   solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
   crews:'Créer et gérer les équipages.',
-  combos:'Consulter les fiches combo de l’équipe et y envoyer ses séances avec le plugin SimHub.',
+  combos:'Voir l’onglet Plugin SimHub de l’équipe et y envoyer ses séances avec le plugin.',
   admin:'Administrer le site : réglages, rôles, créer et gérer les courses et les événements, inscrire n’importe quel pilote.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
@@ -490,8 +490,8 @@ function recapPreviewMarkup(previews) {
   return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Rien à publier pour le moment. Les prochaines courses apparaîtront toutes seules.</p>';
 }
 // Short names of the permissions (the chips) and of the modules (overview).
-const PERMISSION_SHORT = {access:'Accès au site', endurance:'Endurances', solo_open:'Events OPEN', solo_safe:'Events SAFE', crews:'Équipages', combos:'Fiches combo', admin:'Administrer'};
-const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Fiches combo'], ['grindfest', 'Gridfest']];
+const PERMISSION_SHORT = {access:'Accès au site', endurance:'Endurances', solo_open:'Events OPEN', solo_safe:'Events SAFE', crews:'Équipages', combos:'Plugin SimHub', admin:'Administrer'};
+const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Plugin SimHub'], ['grindfest', 'Gridfest']];
 
 // Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
 const BOT_PROBLEMS = {
@@ -513,8 +513,6 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}
       : {key:'soloRaces', name:'EVENT SOLO', sub:'Un calendrier d’events : inscription en un clic, liste d’attente.', tip:'Les events de toutes les simus, avec des places limitées si besoin et une liste d’attente.'},
     {key:'categoryEntry', name:'Inscription par catégorie', sub:'Le pilote choisit ses catégories, les responsables forment les équipages.', tip:'Sur une course à plusieurs départs, le pilote coche ses catégories et ses départs possibles. Seuls les responsables d’équipage (autorisation « Équipages ») forment les équipages.'},
-    // Private module: opened for a team by the platform managers, shown to the community's admins once open.
-    ...(settings.modules.combosManager || states.combos ? [{key:'combos', name:'Fiches combo', sub:'Les données de practice de l’équipe, par voiture et circuit.', tip:'Énergie, pneus, rythme et arrêts, envoyés par le plugin SimHub de chaque pilote. Visible des rôles qui ont l’autorisation « Fiches combo ».', locked:!settings.modules.combosManager}] : []),
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', sub:'Inscription par streamer.', tip:'Le pilote choisit le streamer qu’il représente et donne son nom en jeu ; le mot de passe arrive par message privé Discord.'}] : [])];
   const line = item => `<article class="adm-module${states[item.key] ? ' is-on' : ''}" data-module-tile="${item.key}">
     <div class="adm-module-line"><span class="admin-module-icon">${icon(item.key)}</span>
@@ -629,7 +627,9 @@ async function platformMarkup() {
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
+  const plugin = communities.map(item => `<label class="platform-row platform-plugin"><strong>${esc(item.name)}</strong><span class="admin-switch"><input type="checkbox" role="switch" data-platform-plugin="${esc(item.slug)}" aria-label="Plugin SimHub pour ${esc(item.name)}" ${item.plugin ? 'checked' : ''}><i aria-hidden="true"></i></span></label>`).join('');
   return `${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
+    <section class="settings-card"><h2>Plugin SimHub</h2><p class="members-help">Ouvre l’onglet Plugin SimHub d’une communauté. Ses administrateurs donnent ensuite l’autorisation « Plugin SimHub » aux rôles.</p><div class="platform-list">${plugin}</div></section>
     ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>
       <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Vue d’ensemble ».</p>
       <form class="settings-appearance" data-new-community>
@@ -1145,6 +1145,12 @@ app.addEventListener('change', async event => {
   // Discord: the rows and the sketch follow the choices; nothing is saved before « Activer ».
   const discord = box.closest('form[data-discord-form]');
   if (discord) { discord.querySelector('[data-recap-preview]').innerHTML = ''; discordRefresh(discord); return; }
+  if (box.dataset.platformPlugin) {
+    box.disabled = true;
+    try { await api(`/api/platform/communities/${encodeURIComponent(box.dataset.platformPlugin)}`, 'PATCH', {plugin:box.checked}); }
+    catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
+    return;
+  }
   if (box.dataset.module) {
     box.disabled = true;
     try {

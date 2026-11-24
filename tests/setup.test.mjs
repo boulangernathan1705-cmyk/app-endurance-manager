@@ -101,6 +101,13 @@ test('platform managers create a community, linked to its Discord server; nobody
   assert.equal((await as(MANAGER,'/api/platform/communities','POST',{...input,slug:'-bad-',guildId:'900000000000000097'})).status,400);
   const list=(await as(MANAGER,'/api/platform/communities')).data.communities;
   assert.deepEqual(list.map(item=>item.slug).sort(),['commu-dev','team-rookie']);
+  // Plugin SimHub: opened per community by the platform managers only.
+  assert.equal(list.find(item=>item.slug==='team-rookie').plugin,false);
+  assert.equal((await as(OWNER,'/api/platform/communities/team-rookie','PATCH',{plugin:true})).status,403,'community admins cannot');
+  assert.equal((await as(MANAGER,'/api/platform/communities/team-rookie','PATCH',{plugin:'oui'})).status,400);
+  assert.equal((await as(MANAGER,'/api/platform/communities/nulle-part','PATCH',{plugin:true})).status,404);
+  assert.equal((await as(MANAGER,'/api/platform/communities/team-rookie','PATCH',{plugin:true})).status,200);
+  assert.equal((await as(MANAGER,'/api/platform/communities')).data.communities.find(item=>item.slug==='team-rookie').plugin,true);
 });
 
 test('historical site webhook secret never causes publication', async t => {
