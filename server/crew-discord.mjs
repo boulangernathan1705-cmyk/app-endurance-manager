@@ -172,7 +172,7 @@ async function pilotsOf(env, crewIds) {
 
 // Keeps the crews of the communities with the modules on Discord. `community`: only this one (after a change
 // on its site); `requests`: the most requests made to Discord in this run.
-export async function syncCrewDiscord(env, timestamp = Date.now(), {community = null, requests = 8, bell = !community} = {}) {
+export async function syncCrewDiscord(env, timestamp = Date.now(), {community = null, requests = 8, bell = !community, largeCleanup = false} = {}) {
   if (!env?.DB || !String(env.DISCORD_BOT_TOKEN || '').trim()) return {skipped:'not-configured'};
   const budget = {left:requests};
   const communities = new Map((community ? [community] : await allCommunities(env)).map(item => [item.id, item]));
@@ -216,21 +216,33 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
     if (!await needsWork(env, timestamp, owner, setting, row, crewPilots)) continue;
     const lock = await env.DB.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=? AND lock_until<? AND closed_at IS NULL').bind(timestamp + LOCK_MS, row.row_id, timestamp).run();
     if (!lock.meta.changes) continue;
+    let dedicatedCleanup = false;
     try {
       // Another sync may have created the channel since the initial read, or the crew may be gone.
       // Read again under the lock so an outdated snapshot cannot create an untracked duplicate.
       const current = await env.DB.prepare(`${TRACKED_CREWS} WHERE d.crew_id=? AND d.closed_at IS NULL`).bind(row.row_id).first();
       if (!current) continue;
+      // For a large expired crew, use one bounded scheduled pass to check everyone freshly
+      // and delete the channel. Never persist absence between passes: a pilot may rejoin.
+      const start = current.crew_id && current.event_name ? startOf(current) : null;
+      const members = new Set([...JSON.parse(current.members || '[]'), ...discordIds(crewPilots)]);
+      const needed = members.size + 1;
+      if (largeCleanup && current.voice_id && start && timestamp >= start.endsAt + CLOSE_AFTER && needed > requests && budget.left === requests) {
+        if (needed > 24) throw new Error('Trop de pilotes à vérifier pour une suppression automatique sûre ; intervention requise.');
+        budget.left = needed;
+        dedicatedCleanup = true;
+      }
       const done = await syncRow(env, budget, timestamp, owner, setting, current, crewPilots);
       if (done) { report[done] += 1; succeeded.add(row.row_community); }
     } catch (error) {
       if (!(error instanceof Stop)) {
         failed.add(row.row_community);
         console.error('Crew Discord sync failed', owner?.slug, error instanceof Error ? error.message : 'unknown', error.method || '', error.path || '');
-        if ([400,403,404].includes(error?.status)) await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
+        if ([400,401,403,404,429].includes(error?.status) || !error?.status || error?.status >= 500) await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
           .bind(errorText(error), Math.floor(timestamp / 1000), row.row_community).run().catch(() => {});
       }
     } finally {
+      if (dedicatedCleanup) budget.left = 0;
       await env.DB.prepare('UPDATE crew_discord SET lock_until=0 WHERE crew_id=?').bind(row.row_id).run().catch(() => {});
     }
   }
@@ -248,7 +260,7 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
       AND community_id IN (${ids.map(() => '?').join(',')}) LIMIT 3`).bind(timestamp - KEEP_ARCHIVES, ...ids).all()).results || [];
     for (const row of old) {
       try { await discord(env, budget, 'DELETE', `/channels/${row.archived_id}`); }
-      catch (error) { if (error instanceof Stop) break; if (error?.status !== 404 && error?.status !== 403) continue; }
+      catch (error) { if (error instanceof Stop) break; if (error?.status !== 404) continue; }
       await env.DB.prepare('UPDATE crew_discord SET archived_id=NULL WHERE crew_id=?').bind(row.crew_id).run();
       report.purged += 1;
     }
@@ -508,7 +520,7 @@ async function sortVoices(env, budget, row, parent) {
 
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
-  const members = JSON.parse(row.members || '[]');
+  const members = [...new Set([...JSON.parse(row.members || '[]'), ...discordIds(pilots)])];
   // Crew, race or start gone: closed now; 2 h after the planned end: closed once the voice channel is empty.
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) {
     // A failed DELETE is still pending, regardless of the age of the crew or race.
