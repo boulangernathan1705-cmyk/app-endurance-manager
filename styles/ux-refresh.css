@@ -2489,7 +2489,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-block::before { display: block; width: 76px;
     background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(180deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
   .week-block-head { display: contents; }
-  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block-band, .week-block-live, .week-block-gauge { display: none; }
+  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block .week-block-band, .week-block-live, .week-block-gauge { display: none; }
   .week-block-facts .week-chip.is-warn { display: inline-block; }
   .week-plan-row .week-stream-link { justify-self: end; font-size: 12.5px; white-space: nowrap; }
   .week-plan-time { white-space: nowrap; }
