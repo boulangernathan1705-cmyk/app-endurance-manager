@@ -634,6 +634,56 @@ function reportsMarkup(reports) {
 }
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
+const SUPERVISION_PANEL = `<section class="settings-card"><h2>Supervision Discord</h2>
+  <p class="members-help">État de toutes les communautés, d’après la base du site. Aucune action sur Discord.</p>
+  <details class="discord-diagnostic" data-bot-supervision><summary>Ouvrir le tableau de suivi</summary>
+    <div class="setup-actions"><button type="button" class="secondary-button" data-supervision-refresh>Actualiser</button></div>
+    <div data-supervision-body aria-live="polite"><p class="members-help">Chargement…</p></div></details></section>`;
+function supervisionMarkup(result) {
+  const states={error:['bad','Erreur enregistrée'],attention:['wait','À surveiller'],recorded:['ok','Aucune anomalie détectée'],off:['wait','Modules désactivés']};
+  const labels={'thread':'Fil à fermer','voice-close':'Vocal à fermer (peut être occupé)','voice-create':'Vocal attendu','voice-message':'Message du vocal manquant'};
+  const when=value=>value?diagWhen(value):'non enregistré';
+  const rows=result.communities.map(item=>{
+    const [tone,label]=states[item.state]||states.attention;
+    const issues=item.issues.map(issue=>`<li>${esc(labels[issue.kind]||issue.kind)} : ${esc(issue.name)}${issue.since?' · '+esc(when(issue.since)):''}</li>`).join('');
+    const errors=item.errors.map(error=>`<p class="settings-status" role="alert">⚠ ${esc(error)}</p>`).join('');
+    return `<details class="discord-diagnostic"><summary>${esc(item.name)} · <span class="${tone==='bad'?'platform-ko':tone==='ok'?'platform-ok':''}">${esc(label)}</span></summary>
+      <ul class="members-help diag-facts">
+      <li>Récap : ${item.recapOn?'actif':'inactif'} · Vocaux : ${item.voicesOn?'actifs':'inactifs'}</li>
+      <li>Dernière vérification du récap : ${esc(when(item.lastRecap))}</li>
+      <li>Dernière vérification d’un équipage : ${esc(when(item.lastVoice))}</li>
+      <li>File de synchronisation : ${item.queueAt?'depuis '+esc(when(item.queueAt)):item.dirty?'mise à jour attendue':'aucune entrée'}</li>
+      <li>${item.openThreads} publication(s) de course suivie(s) · ${item.openVoices} vocal(aux) suivi(s)</li>
+      <li>${item.waitingVoices} vocal(aux) attendu(s) · ${item.incompleteVoices} message(s) manquant(s)</li>
+      <li>${item.overdueThreads} publication(s) à fermer · ${item.overdueVoices} vocal(aux) à vérifier avant fermeture</li>
+      <li>${item.orphanCount} ancien(s) suivi(s) avec salon restant</li>
+      ${item.wrongServer?'<li>Le serveur configuré ne correspond plus à la communauté.</li>':''}</ul>
+      ${errors}${issues?`<ul class="members-help">${issues}</ul>`:''}
+      ${item.issueCount>item.issues.length?`<p class="members-help">${item.issueCount-item.issues.length} autre(s) anomalie(s).</p>`:''}</details>`;
+  }).join('');
+  const problems=result.communities.filter(item=>['error','attention'].includes(item.state)).length;
+  return `<p class="members-help">Relevé : ${esc(when(result.generatedAt))} · ${result.communities.length} communauté(s) · ${problems} à surveiller.</p>
+    ${result.development?'<p class="members-help">DEV : les tâches planifiées sont désactivées. Les dates ne prouvent pas une panne.</p>':''}
+    ${!result.botConfigured?'<p class="settings-status" role="alert">Le token du bot n’est pas configuré.</p>':''}
+    <p class="members-help">Les états sont déclaratifs : ils ne prouvent pas la présence réelle des salons ou du bot. Pour un contrôle réel, utilise le diagnostic Discord de la communauté.</p>
+    ${rows||'<p class="members-help">Aucun serveur lié.</p>'}`;
+}
+async function loadSupervision(panel) {
+  const body=panel.querySelector('[data-supervision-body]'), button=panel.querySelector('[data-supervision-refresh]');
+  button.disabled=true;
+  body.textContent='Chargement…';
+  try {body.innerHTML=supervisionMarkup(await api('/api/platform/discord/supervision'));panel.dataset.loaded='1';}
+  catch(error){body.innerHTML=`<p class="settings-status" role="alert">${esc(error.message)}</p>`;}
+  finally {button.disabled=false;}
+}
+app.addEventListener('toggle',event=>{
+  const panel=event.target;
+  if(panel.matches?.('[data-bot-supervision]')&&panel.open&&!panel.dataset.loaded&&!panel.querySelector('button').disabled)loadSupervision(panel);
+},true);
+app.addEventListener('click',event=>{
+  const button=event.target.closest('[data-supervision-refresh]');
+  if(button)loadSupervision(button.closest('[data-bot-supervision]'));
+});
 async function platformMarkup() {
   // The testers' reports sent from the plugin to this community (module Plugin SimHub open here), else nothing.
   const [{communities, baseDomain, showcase, testSite, official}, {requests}, reports] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests'),
@@ -643,7 +693,7 @@ async function platformMarkup() {
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
   const plugin = communities.map(item => `<label class="platform-row platform-plugin"><strong>${esc(item.name)}</strong><span class="admin-switch"><input type="checkbox" role="switch" data-platform-plugin="${esc(item.slug)}" aria-label="Plugin SimHub pour ${esc(item.name)}" ${item.plugin ? 'checked' : ''}><i aria-hidden="true"></i></span></label>`).join('');
-  return `${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
+  return `${SUPERVISION_PANEL}${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
     <section class="settings-card"><h2>Plugin SimHub</h2><p class="members-help">Ouvre l’onglet Plugin SimHub d’une communauté. Ses administrateurs donnent ensuite l’autorisation « Plugin SimHub » aux rôles.</p><div class="platform-list">${plugin}</div></section>
     ${reports ? reportsMarkup(reports) : ''}
     ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>

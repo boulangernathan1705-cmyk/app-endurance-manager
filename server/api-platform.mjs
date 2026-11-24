@@ -7,8 +7,13 @@ import {discordGuild} from './access.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 import {botInvite} from './api-community.mjs';
+import {discordSupervision} from './discord-supervision.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
+  if (path === '/api/platform/discord/supervision' && method === 'GET') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    return json(await discordSupervision(env));
+  }
   // Platform managers: the communities, and a new one (its admins then set it up on its « Mise en place » page).
   // Showcase of the main address: its data replaced by fictional races, crews and pilots (server/demo.mjs).
   if (path === '/api/platform/showcase' && method === 'POST') {

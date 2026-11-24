@@ -289,8 +289,10 @@ export function eventChannelName(name, eventId) {
   return `${slug.slice(0, Math.max(1, 99 - suffix.length))}-${suffix}`.slice(0,100);
 }
 export function eventDeletionTime(event) {
-  const departures = parse(event?.departures);
-  if (!departures.length || event?.schedule_pending || departures.some(item => item.tbd || !Number.isFinite(Number(item.startsAt)))) return null;
+  // A tbd entry is an event-level waiting area kept for registrations, not an actual start.
+  // Once the schedule is published, only real departures determine the Discord lifecycle.
+  const departures = parse(event?.departures).filter(item => !item?.tbd);
+  if (!departures.length || event?.schedule_pending || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
   const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
   if (!(minutes > 0)) return null;
   // A race's thread goes with its week, when the next one turns (Monday 7h30, Paris): the channel never shows two weeks
@@ -536,7 +538,13 @@ async function removeRaceChannels(env, row, anchors, budget) {
     catch (error) {
       if (error.status === 404) continue;
       // Deleting a thread asks for « Gérer les fils » (a bot invited before it): archived instead, out of the list.
-      if (error.status === 403 && row.in_thread && id === row.channel_id) { await discord(env,'PATCH',`/channels/${id}`,{archived:true},budget).catch(() => {}); continue; }
+      if (error.status === 403 && row.in_thread && id === row.channel_id) {
+        // Closing the publication is safe only after Discord confirms deletion or archival.
+        await discord(env,'PATCH',`/channels/${id}`,{archived:true},budget).catch(archiveError => {
+          if (archiveError.status !== 404) throw archiveError;
+        });
+        continue;
+      }
       throw error;
     }
   }
@@ -1124,25 +1132,35 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
     FROM discord_recap_publications p LEFT JOIN community_recap_settings s ON s.community_id=p.community_id LEFT JOIN events e ON e.id=p.event_id
     WHERE p.event_id NOT LIKE 'week:%' AND p.event_id<>'' AND p.closed_at IS NULL`).all()).results || [];
   const due = rows.map(row => ({...row,expiry:row.current_event_id ? eventDeletionTime(row) : row.delete_after}))
-    .filter(row => row.expiry !== null && timestamp >= row.expiry).sort((a,b) => a.expiry-b.expiry);
+    .filter(row => row.expiry !== null && timestamp >= row.expiry)
+    .sort((a,b) => (a.checked_at || 0)-(b.checked_at || 0) || a.expiry-b.expiry || a.community_id.localeCompare(b.community_id) || a.event_id.localeCompare(b.event_id));
   let deleted = 0;
-  for (const row of due.slice(0,limit)) {
+  // A refused deletion must not occupy the first slots forever; rotate even after failure.
+  // A locked community is skipped without consuming the deletion budget.
+  let attempted = 0;
+  for (const row of due) {
+    if (attempted >= limit) break;
     const token = crypto.randomUUID(), now = Date.now();
     const lock = await env.DB.prepare('UPDATE community_recap_settings SET lock_token=?,lock_until=? WHERE community_id=? AND lock_until<?')
       .bind(token,now+180000,row.community_id,now).run();
     if (!lock.meta.changes) continue;
+    attempted++;
     try {
       // Configuration synchronisations cannot race this deletion; recheck the event after taking the lock.
       const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
-      await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:2});
+      await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:3});
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=? AND closed_at IS NULL').bind(timestamp,row.community_id,row.event_id).run();
       deleted++;
     } catch (error) {
       await env.DB.prepare('UPDATE community_recap_settings SET last_error=? WHERE community_id=?').bind(recapError(error),row.community_id).run();
     } finally {
-      await env.DB.prepare("UPDATE community_recap_settings SET lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(row.community_id,token).run();
+      try {
+        await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=? AND checked_at<=?').bind(timestamp,row.community_id,row.event_id,timestamp).run();
+      } finally {
+        await env.DB.prepare("UPDATE community_recap_settings SET lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(row.community_id,token).run();
+      }
     }
   }
   return deleted;

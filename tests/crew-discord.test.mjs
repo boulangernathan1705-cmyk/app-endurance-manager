@@ -337,6 +337,24 @@ test('a crew opened by the first version loses its text channel and category, an
   assert.equal(now.text_id,null);assert.equal(now.category_id,null);assert.equal(now.voice_id,row.voice_id);
 });
 
+test('refused archive deletions stay tracked and let later archives be cleaned', async () => {
+  const {DB,env,discord}=harness();
+  const at=Date.now();
+  const insert=DB.db.prepare(`INSERT INTO crew_discord(crew_id,community_id,guild_id,created_at,closed_at,archived_id)
+    VALUES(?,?,?,0,?,?)`);
+  const archives=Array.from({length:4},(_,i)=>String(700000000000000000n+BigInt(i)));
+  for (const [index,id] of archives.entries()) insert.run(`archive-${index}`,DEV,GUILD,at-KEEP_ARCHIVES-HOUR,id);
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=(url,options)=>options?.method==='DELETE'&&archives.slice(0,3).some(id=>String(url).endsWith('/'+id))
+    ? Response.json({code:50013},{status:403}) : discord.handler(url,options);
+  try {
+    assert.equal((await syncCrewDiscord(env,at,{bell:false})).purged,0);
+    assert.equal((await syncCrewDiscord(env,at+5*60_000,{bell:false})).purged,1);
+    const remaining=DB.db.prepare('SELECT archived_id FROM crew_discord WHERE archived_id IS NOT NULL ORDER BY crew_id').all();
+    assert.deepEqual(remaining.map(row=>row.archived_id),archives.slice(0,3));
+  } finally {globalThis.fetch=originalFetch;}
+});
+
 test('a deleted crew is closed at once, and nothing happens without the module', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
@@ -898,4 +916,71 @@ test('automatic recovery also removes an untracked crew voice left in the « pit
     discord.state.messages=[];
     assert.equal(await cleanupOrphanCrewDiscord(env),0);
   }finally{globalThis.fetch=realFetch;}
+});
+
+
+test('scheduled cleanup checks every member of a large crew afresh and never deletes an occupied voice', async () => {
+  const {DB,env,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Grand équipage',category:'GT3'},'admin');
+  await sync(Date.now());
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  assert.ok(row.voice_id);
+  const members=Array.from({length:10},(_,i)=>String(800000000000000000n+BigInt(i)));
+  DB.db.prepare('UPDATE crew_discord SET members=?').run(JSON.stringify(members));
+  const expiry=departure.startsAt+24*HOUR;
+  const realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
+  try {
+    discord.voiceStates.set(members.at(-1),row.voice_id);
+    let mark=discord.calls.length;
+    assert.equal((await syncCrewDiscord(env,expiry,{requests:8,largeCleanup:true,bell:false})).closed,0);
+    assert.equal(discord.calls.slice(mark).filter(call=>call.path.includes('/voice-states/')).length,10);
+    assert.ok(discord.state.channels.some(item=>item.id===row.voice_id));
+    discord.voiceStates.clear();
+    mark=discord.calls.length;
+    assert.equal((await syncCrewDiscord(env,expiry+5*60_000,{requests:8,largeCleanup:true,bell:false})).closed,1);
+    assert.equal(discord.calls.slice(mark).filter(call=>call.path.includes('/voice-states/')).length,10);
+    assert.ok(!discord.state.channels.some(item=>item.id===row.voice_id));
+  } finally {globalThis.fetch=realFetch;}
+});
+
+test('maintenance confirms a missing voice directly and the next sync recreates only that voice',async()=>{
+  const {DB,env,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'À réparer',category:'GT3'},'admin');
+  await sync(Date.now());
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  assert.ok(row.voice_id);
+  const at=Date.now()+15*60_000, original=globalThis.fetch;
+  // A guild list may omit a channel for reasons other than deletion; direct 403 is not proof.
+  const voice=discord.state.channels.find(item=>item.id===row.voice_id);
+  discord.state.channels=discord.state.channels.filter(item=>item.id!==row.voice_id);
+  globalThis.fetch=async(url,options)=>String(url).endsWith(`/channels/${row.voice_id}`)
+    ? Response.json({code:50013},{status:403}) : discord.handler(url,options);
+  try {await cleanupOrphanCrewDiscord(env,at);} finally {globalThis.fetch=original;}
+  assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,row.voice_id);
+  globalThis.fetch=discord.handler;
+  try {await cleanupOrphanCrewDiscord(env,at+15*60_000);} finally {globalThis.fetch=original;}
+  assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,null);
+  assert.equal((await sync(at+16*60_000)).opened,1);
+  const repaired=DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id;
+  assert.ok(repaired);assert.notEqual(repaired,row.voice_id);
+  assert.equal(discord.state.channels.filter(item=>item.type===2).length,1);
+});
+
+test('a refused deletion of a historical archived text channel retains its id', async()=>{
+  const {DB,env,sync,discord}=harness();
+  const now=Date.now(), id='700000000000000098';
+  DB.db.prepare('INSERT INTO crew_discord(crew_id,community_id,guild_id,created_at,closed_at,archived_id) VALUES(?,?,?,?,?,?)')
+    .run('old-archive',DEV,GUILD,now-KEEP_ARCHIVES-2*HOUR,now-KEEP_ARCHIVES-HOUR,id);
+  discord.state.deleteStatus=403;
+  assert.equal((await sync(now)).purged,0);
+  assert.equal(DB.db.prepare("SELECT archived_id FROM crew_discord WHERE crew_id='old-archive'").get().archived_id,id);
+  discord.state.deleteStatus=null;
+  assert.equal((await sync(now+60_000)).purged,1);
+  assert.equal(DB.db.prepare("SELECT archived_id FROM crew_discord WHERE crew_id='old-archive'").get().archived_id,null);
 });
