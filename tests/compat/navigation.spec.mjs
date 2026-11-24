@@ -144,3 +144,21 @@ test('the standalone help offers a retry when its module cannot load', async ({p
   await page.getByRole('button',{name:'Réessayer',exact:true}).click();
   await expect(page.getByRole('heading',{name:/^aide$/i})).toBeVisible();
 });
+
+test('weekly multi-start cards show only one schedule at mobile and desktop widths', async ({page}) => {
+  await page.goto('/');
+  // Use the real bundled stylesheet with a deterministic multi-start card, without a Discord session.
+  await page.evaluate(() => {
+    const fixture=document.createElement('div');
+    fixture.id='week-schedule-regression';
+    fixture.innerHTML='<button class="week-block is-endurance is-lmu"><span class="week-block-band is-many"><span><b>3h</b><small> → 7h30</small></span><span><b>8h</b><small> → 12h30</small></span></span><span class="week-block-body"><span class="week-block-title"><span class="week-block-name">Endurance</span></span><span class="week-block-plan"><span class="week-plan-row">Départ 1 · 3h → 7h30</span><span class="week-plan-row">Départ 2 · 8h → 12h30</span></span></span></button>';
+    document.body.append(fixture);
+  });
+  const card=page.locator('#week-schedule-regression .week-block');
+  for (const width of [320,390,760,761,1366]) {
+    await page.setViewportSize({width,height:900});
+    const mobile=width<=760;
+    await expect(card.locator('.week-block-band')).toHaveCSS('display',mobile?'none':'block');
+    await expect(card.locator('.week-block-plan')).toHaveCSS('display',mobile?'grid':'none');
+  }
+});
