@@ -148,6 +148,7 @@ test('the standalone help offers a retry when its module cannot load', async ({p
 test('weekly multi-start cards show only one schedule at mobile and desktop widths', async ({page}) => {
   await page.goto('/');
   // Use the real bundled stylesheet with a deterministic multi-start card, without a Discord session.
+  // Check both sides of the 760px breakpoint so the desktop band remains available.
   await page.evaluate(() => {
     const fixture=document.createElement('div');
     fixture.id='week-schedule-regression';
