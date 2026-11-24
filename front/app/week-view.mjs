@@ -163,12 +163,13 @@ function block(item,now){
   const sim2=!solo?` is-${event.otherGame||activeGame}`:kind.key==='event'?` sim-${simForEvent(event)}`:'';
   // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
   // championship endurances. Other races keep their simulator's colour.
-  const type=solo?(state.eventTdz&&!stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
+  const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
   const cls=`week-block is-${kind.key}${sim2}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
-  const kindLine=[sim,solo?kind.label:'Endurance'].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
+  const access=state.eventTdz&&solo&&!stream?(event.access==='safe'?'SAFE':'OPEN'):'';
+  const kindLine=[sim,solo?kind.label:'Endurance',access].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
@@ -278,7 +279,9 @@ function crewsBox(){
   if(!can('crews'))return '';
   const starts=crewStarts().filter(start=>start.alone.length||start.requests.length);
   const row=start=>`<li>${button('crews-page',`<span><strong>${esc(start.event.name)}</strong><small>${esc(when(start.startsAt))}${start.departure.hideClock?'':` · ${esc(hour(start.startsAt))}`}</small></span><span class="week-chip ${start.requests.length?'is-warn':'is-alert'}">${start.requests.length?`${start.requests.length} demande${start.requests.length>1?'s':''}`:`${start.alone.length} seul${start.alone.length>1?'s':''}`}</span>`,`data-departure="${esc(start.departure.id)}" data-game="${esc(gameForEvent(start.event))}"`,'home-crews-row')}</li>`;
-  return `<aside class="home-crews-box"><h2 class="home-next-label">Équipages à former</h2>
+  const count=starts.length;
+  const compact=button('crews-page',`<span><strong>Équipages à former</strong></span><span class="week-chip ${count?'is-warn':'is-ok'}">${count?`${count} à traiter ›`:'Tout est prêt ›'}</span>`,'','home-crews-row home-crews-compact');
+  return `<aside class="home-crews-box">${compact}<h2 class="home-next-label">Équipages à former</h2>
     ${starts.length?`<ul>${starts.slice(0,4).map(row).join('')}</ul>${starts.length>4?`<p class="home-crews-more">+ ${starts.length-4} autre${starts.length-4>1?'s':''} départ${starts.length-4>1?'s':''}</p>`:''}`:'<p class="home-crews-done">✓ Tout le monde a un équipage.</p>'}
     ${button('crews-page','Voir les équipages →','','home-next-go')}</aside>`;
 }

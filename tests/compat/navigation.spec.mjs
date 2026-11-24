@@ -120,3 +120,27 @@ test('iRacing space opens from home', async ({page}) => {
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   expect(apiFailures).toEqual([]);
 });
+test('the public information menu fits and its destinations can be opened', async ({page}) => {
+  const session = {access:'anonymous', discordReady:true, community:{slug:'tdz', shortName:'TDZ', name:'Tondeuz Agazon'}};
+  await page.route('**/api/session', route => route.fulfill({json:session}));
+  for (const width of [340, 454, 1366]) {
+    await page.setViewportSize({width,height:900});
+    await page.goto('/privacy.html');
+    for (const selector of ['.nav-game-switcher-lmu', '.nav-game-switcher-iracing', '.account-discord-login']) {
+      const control = page.locator(selector);
+      await expect(control).toBeInViewport({ratio:0.99});
+    }
+    const menu = page.locator('.nav-information');
+    await menu.locator('summary').click();
+    await expect(menu.getByRole('link',{name:'Crédits des circuits'})).toBeInViewport({ratio:0.99});
+  }
+});
+
+test('the standalone help offers a retry when its module cannot load', async ({page}) => {
+  await page.route('**/help.js*', route => route.abort());
+  await page.goto('/help.html');
+  await expect(page.getByRole('alert')).toHaveText('L’aide n’a pas pu se charger.');
+  await page.unroute('**/help.js*');
+  await page.getByRole('button',{name:'Réessayer',exact:true}).click();
+  await expect(page.getByRole('heading',{name:/^aide$/i})).toBeVisible();
+});

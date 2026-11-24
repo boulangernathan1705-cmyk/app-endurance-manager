@@ -52,7 +52,7 @@ function entries(events) {
   return byDay;
 }
 function timeOf(departure) { const [hour, minute] = String(departure.time || '').split(':'); return /^\d{2}$/.test(hour || '') ? `${Number(hour)}h${minute && minute !== '00' ? minute : ''}` : ''; }
-const TYPES = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']];
+const TYPES = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['gridfest', 'Gridfest'], ['stream', 'Stream']];
 const typeLabel = type => TYPES.find(([key]) => key === type)?.[1] || '';
 // An endurance start the community streams (« Je streame ce départ », Nathan 2026-11-08): the stream's time, then the
 // start and the streamer's crew; it opens the endurance (on the other sim's site when it is there).
@@ -165,7 +165,7 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   const selected = chosenDay(state.calendarMonth, byDay), day = byDay.get(selected) || [];
-  const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3>${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}` : ''}</aside>`;
+  const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3 tabindex="-1">${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}` : ''}</aside>`;
   // The months go up in the page's head, on the line of the other choices (Nathan 2026-11-07: more room for the month).
   const head = `<div class="cal-tabs" role="group" aria-label="Mois">${shift(-1, 'Mois précédent')}<div class="cal-months">${tabs}</div>${shift(1, 'Mois suivant')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>`;
   return {head, body:`<div class="cal">
