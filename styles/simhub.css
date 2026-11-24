@@ -1,15 +1,28 @@
-/* Module « Plugin SimHub » (simhub.html, front/simhub-page.mjs): its three pages share one tab bar (Accueil, Fiche
-   mémo, Mur des stands); the home page holds the plugin's install and link, then one tile per page that uses it. */
-.sh-tabs { display: flex; gap: var(--em-space-1); width: fit-content; max-width: 100%; box-sizing: border-box; padding: var(--em-space-1);
-  background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-pill); }
-.sh-tabs a { padding: 9px 16px; border-radius: var(--em-radius-pill); color: var(--em-text); text-decoration: none; font-size: var(--em-text-md); white-space: nowrap; }
-.sh-tabs a:hover { background: var(--em-panel-2); }
-.sh-tabs a[aria-current="page"] { background: var(--em-accent); color: var(--em-bg); font-weight: 700; }
-.simhub-tabs-wrap { padding-bottom: 0; }
-.simhub-tabs-wrap + .combos-page { padding-top: var(--em-space-3); }
-
-.simhub-page #simhub-body { display: grid; gap: 18px; }
+/* Module « Plugin SimHub » (simhub.html, front/simhub-page.mjs): one page, two tabs (Fiche mémo, Mur des stands).
+   The plugin's install and link open from a pill at the top right. */
+.members-main.simhub-page { margin-bottom: 0; padding-bottom: 0; display: grid; gap: var(--em-space-3); }
+.sh-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--em-space-3); }
 .sh-head h1 { margin-top: 2px; }
+.sh-pill { display: inline-flex; align-items: center; gap: var(--em-space-2); min-height: 0; padding: 8px 14px; border: 1px solid var(--em-border); border-radius: var(--em-radius-pill);
+  background: var(--em-panel); color: var(--em-text); font: inherit; font-size: var(--em-text-sm); font-weight: 700; cursor: pointer; }
+.sh-pill:hover, .sh-pill[aria-expanded="true"] { border-color: var(--em-muted); }
+.sh-pill em { font-style: normal; font-weight: 400; color: var(--em-muted); }
+.sh-pill.is-todo { border-color: var(--em-accent); color: var(--em-accent); }
+.sh-pill .sh-beta { padding: 1px 6px; border-radius: var(--em-radius-pill); background: var(--em-warn); color: var(--em-bg); font-size: var(--em-text-xs); }
+.simhub-page #simhub-body { display: grid; gap: var(--em-space-3); }
+.sh-tabs { display: flex; gap: var(--em-space-1); border-bottom: 1px solid var(--em-border); }
+.sh-tabs a { padding: 10px 16px; color: var(--em-muted); text-decoration: none; font-size: var(--em-text-md); font-weight: 700; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.sh-tabs a:hover { color: var(--em-text); }
+.sh-tabs a[aria-selected="true"] { color: var(--em-text); border-bottom-color: var(--em-accent); }
+.simhub-page ~ .combos-page { margin-top: var(--em-space-3); }
+/* The wall inside the page: its own colours, the page's width; « Second écran » opens it alone (mur.html). */
+.pw-body.sh-wall { min-height: 0; background: transparent; width: min(1360px, calc(100% - 32px)); margin: var(--em-space-3) auto 60px; }
+.pw-body.sh-wall .pw-app { padding: 0 var(--em-space-4); }
+[data-sh-panel][hidden] { display: none !important; }
+.pw-body.sh-wall:fullscreen { overflow: auto; background: var(--pw-bg); }
+.sh-wall .pw-brand b { font-size: var(--em-text-sm); }
+
 .sh-card { background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); padding: var(--em-space-5);
   display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--em-space-5) 32px; }
 .sh-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2) var(--em-space-3); }
@@ -37,37 +50,10 @@
 .sh-more summary { cursor: pointer; }
 .sh-more p { margin: var(--em-space-2) 0 0; }
 
-.sh-section { margin: 6px 0 0; font-size: var(--em-text-sm); letter-spacing: .08em; text-transform: uppercase; color: var(--em-muted); }
-.combos-page h2.sh-section { font-size: var(--em-text-sm); }
-.sh-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--em-space-4); }
-.sh-tile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto 1fr; gap: var(--em-space-2) var(--em-space-3); align-items: start;
-  padding: 20px; background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); color: var(--em-text); text-decoration: none;
-  font: inherit; text-align: left; cursor: pointer; }
-.sh-tile:hover { border-color: var(--em-muted); }
-.sh-tile svg { grid-row: 1 / span 3; color: var(--em-accent); }
-.sh-tile b { font-size: var(--em-text-lg); }
-.sh-tile .sh-go { color: var(--em-faint); font-size: 22px; line-height: 1; }
-.sh-tile .sh-what { grid-column: 2 / span 2; color: var(--em-muted); font-size: var(--em-text-md); line-height: 1.45; }
-.sh-tile .sh-info { grid-column: 2 / span 2; color: var(--em-text); font-size: var(--em-text-sm); align-self: end; }
-.sh-tile.is-private { border-style: dashed; }
-.sh-tile.is-private svg, .sh-tile .sh-new { color: var(--em-warn); }
-
-.sh-reports { display: grid; gap: var(--em-space-2); margin: 0; padding: 0; list-style: none; }
-.sh-report { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--em-space-1) var(--em-space-3); align-items: center;
-  padding: var(--em-space-3) var(--em-space-4); background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-md); }
-.sh-report b { font-size: var(--em-text-md); }
-.sh-report span { color: var(--em-muted); font-size: var(--em-text-sm); }
-.sh-report p { grid-column: 1 / -1; margin: 0; font-size: var(--em-text-md); white-space: pre-line; overflow-wrap: anywhere; }
-.sh-report.is-new { border-color: var(--em-warn); }
-
 @media (max-width: 760px) {
-  .sh-tabs { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sh-tabs a { padding: 10px 4px; text-align: center; font-size: var(--em-text-sm); }
+  .sh-tabs a { flex: 1; padding: 10px 4px; text-align: center; }
   .sh-card { grid-template-columns: minmax(0, 1fr); padding: 18px; }
   .sh-get .cb-btn.is-main { width: 100%; }
   .sh-steps { border-left: 0; border-top: 1px solid var(--em-border); padding: 14px 0 0; }
-  .sh-tiles { grid-template-columns: minmax(0, 1fr); }
-  .sh-tile { padding: var(--em-space-4); }
-  .sh-tile .sh-what { display: none; }
 }
 .combos-page .cb-message a { color: var(--em-accent); }

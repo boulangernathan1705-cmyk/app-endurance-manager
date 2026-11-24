@@ -42,7 +42,7 @@ async function call(path, method = 'GET', data) {
 }
 
 function renderError(error) {
-  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent('/fiches-combo.html')}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
+  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent('/simhub.html')}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
   app.innerHTML = `<section class="members-panel members-error"><h1>Fiche mémo</h1><p>${esc(error.message)}</p>${login}</section>`;
 }
 
@@ -290,7 +290,7 @@ function delta(row, key, digits, unit) {
 
 // Not linked yet: the install and the link are on the module's home page (simhub.html).
 function linkCard() {
-  return '<p class="cb-message">SimHub n’est pas encore relié : tes séances n’arrivent pas ici. <a href="/simhub.html">Installer et relier le plugin</a></p>';
+  return '<p class="cb-message">SimHub n’est pas encore relié : tes séances n’arrivent pas ici. <a href="/simhub.html#installer">Installer et relier le plugin</a></p>';
 }
 
 function header() {
@@ -538,7 +538,7 @@ function periodsCard() {
 function render() {
   const message = view.message ? `<p class="cb-message" role="status">${esc(view.message)}</p>` : '';
   if (!view.combo) {
-    app.innerHTML = `<div class="cb-topline"><div><div class="cb-crumb">Plugin SimHub · Le Mans Ultimate</div><h1>Fiche mémo</h1></div></div>${message}
+    app.innerHTML = `${message}
       <p class="cb-empty">Aucune séance reçue pour l’instant. Relie SimHub et roule : la fiche de chaque voiture et de chaque circuit se remplit toute seule, avec les chiffres de chaque pilote.</p>${linkCard()}`;
     return;
   }

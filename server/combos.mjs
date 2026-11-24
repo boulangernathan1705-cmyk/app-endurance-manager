@@ -480,7 +480,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     }
   }
 
-  // « Retours des testeurs » (simhub.html): what the pilots sent from the plugin, for the platform managers only.
+  // « Retours des testeurs » (Administration › Plateforme): what the pilots sent from the plugin, for the platform managers only.
   if (path === '/api/combos/reports' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     const rows = await all(env, `SELECT r.id, r.created_at, r.version, r.kind, r.note, length(r.body) AS size, COALESCE(NULLIF(m.nickname,''), u.name) AS pilot

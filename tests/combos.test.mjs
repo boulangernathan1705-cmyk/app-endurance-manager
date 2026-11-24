@@ -496,25 +496,28 @@ test('notes: the team writes, only the author or an admin changes them; the expo
   assert.equal((await req(`/api/combos/notes/${note.id}`, 'DELETE', {}, GUEST)).status, 200);
 });
 
-test('the fiches combo page: its own tab for the roles that see them, nothing run from the page text', () => {
-  const page = readFileSync(new URL('../fiches-combo.html', import.meta.url), 'utf8');
-  assert.match(page, /<main id="combos-app"/);
-  assert.match(page, /src="\/front\/combos-page\.mjs/);
-  assert.match(page, /data-module-link="combos"/);
-  assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
-  const front = readFileSync(new URL('../front/combos-page.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(front, /\son[a-z]+="/i, 'no inline handler (CSP)');
-  // Module « Plugin SimHub »: one tab in the menu, its home page holds the install and the link, a tab bar joins its pages.
+test('the Plugin SimHub page: one tab in the menu and the phone bar, the fiche and the wall as its two tabs, nothing run from the page text', () => {
   const home = readFileSync(new URL('../simhub.html', import.meta.url), 'utf8');
   assert.match(home, /src="\/front\/simhub-page\.mjs/);
-  assert.match(home, /href="\/simhub\.html" data-module-link="combos" aria-current="page">Plugin SimHub</);
+  assert.match(home, /class="nav-section-button nav-plugin-button" href="\/simhub\.html" data-module-link="combos" aria-current="page">Plugin SimHub</);
+  assert.match(home, /<main id="combos-app"[^>]*data-sh-panel="memo"/);
+  assert.match(home, /class="pw-body sh-wall" data-sh-panel="wall" hidden><main id="pw-app"/);
+  assert.match(home, /data-panel="memo"[^>]*>Fiche mémo<\/a><a [^>]*data-panel="wall"[^>]*>Mur des stands<\/a>/);
   assert.doesNotMatch(home, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
-  for (const source of [home, page]) assert.match(source, /class="sh-tabs"[^>]*><a href="\/simhub\.html"[^>]*>Accueil<\/a><a href="\/fiches-combo\.html"[^>]*>Fiche mémo<\/a><a href="\/mur\.html">Mur des stands<\/a>/);
+  // The old address of the fiche leads to the page, with the combo it named.
+  const old = readFileSync(new URL('../fiches-combo.html', import.meta.url), 'utf8');
+  assert.match(old, /src="\/front\/fiche-redirect\.mjs/);
+  assert.match(readFileSync(new URL('../front/fiche-redirect.mjs', import.meta.url), 'utf8'), /location\.replace\(`\/simhub\.html\$\{location\.search\}/);
+  for (const name of ['combos-page', 'simhub-page', 'pit-wall'])
+    assert.doesNotMatch(readFileSync(new URL(`../front/${name}.mjs`, import.meta.url), 'utf8'), /\son[a-z]+="/i, `no inline handler in ${name} (CSP)`);
   const simhub = readFileSync(new URL('../front/simhub-page.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(simhub, /\son[a-z]+="/i, 'no inline handler (CSP)');
   assert.match(simhub, /bêta/, 'a 0.x plugin is announced as a beta');
+  assert.match(simhub, /import\(PAGES\[panel\]\)/, 'each tab loads the first time it is shown');
+  // Hidden, the wall stops asking the room for the cars.
+  assert.match(readFileSync(new URL('../front/pit-wall.mjs', import.meta.url), 'utf8'), /watch:shown\(\)/);
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/simhub\.html">Plugin SimHub<\/a>'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button nav-plugin-button" href="\/simhub\.html">Plugin SimHub<\/a>'/);
+  assert.match(readFileSync(new URL('../front/tab-bar.mjs', import.meta.url), 'utf8'), /\['nav-plugin-button', 'Plugin'/);
 });
 
 test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {

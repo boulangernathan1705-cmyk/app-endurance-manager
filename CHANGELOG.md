@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.19 — 24 novembre 2026
+
+### ✨ Améliorations
+
+- **Plugin SimHub** : une seule page, avec la Fiche mémo et le Mur des stands en onglets. L'installation et la liaison du plugin s'ouvrent depuis la pastille en haut à droite. Sur téléphone, « Plugin » rejoint la barre du bas.
+
 ## v2.13.18 — 24 novembre 2026
 
 ### ✨ Améliorations

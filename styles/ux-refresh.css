@@ -2589,9 +2589,7 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 
 /* ---------- Téléphone : barre d'onglets en bas (front/tab-bar.mjs, Nathan 2026-11-03) ---------- */
 .tab-bar { display: none; }
-.account-phone-only { display: none !important; }
 @media (max-width: 760px) {
-  body.has-tab-bar .account-phone-only { display: flex !important; }
   body.has-tab-bar { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
   .tab-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 1100;

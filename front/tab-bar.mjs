@@ -1,13 +1,15 @@
 // Phone: the main sections (Accueil, Events, Endurance, Inscriptions, Équipages) in a bar at the bottom of the
 // screen, one thumb away (Nathan, 2026-11-03). The bar mirrors the top navigation's own buttons: a tap clicks the
-// real one, so every page keeps its behaviour (sim chooser, hash pages). Other tabs (LMU / iRacing, Fiches combo,
-// Administration…) stay at the top. On a computer the bar is hidden (styles/tab-bar.css).
+// real one, so every page keeps its behaviour (sim chooser, hash pages). Plugin SimHub joins them when its module is
+// open; other tabs (LMU / iRacing, Administration…) stay at the top. On a computer the bar is hidden (styles/tab-bar.css).
 const SECTIONS = [
   ['nav-week-button', 'Accueil', '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>'],
   ['nav-events-button', 'Events', '<path d="M5 21V4h11l-1.5 4L16 12H5"/>'],
   ['nav-endurance-button', 'Endurance', '<path d="M3 16v-4l2-5h14l2 5v4zM6 16v2M18 16v2"/><circle cx="7.5" cy="13" r="1"/><circle cx="16.5" cy="13" r="1"/>'],
   ['nav-entries-button', 'Inscriptions', '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>'],
-  ['nav-crews-button', 'Équipages', '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.4 5 2.8 5 5.8"/>']
+  ['nav-crews-button', 'Équipages', '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.4 5 2.8 5 5.8"/>'],
+  // Module Plugin SimHub (LMU), when it is open for the pilot (Nathan, 2026-11-24).
+  ['nav-plugin-button', 'Plugin', '<path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/>']
 ];
 
 const nav = document.getElementById('navigation');
