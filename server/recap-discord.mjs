@@ -289,8 +289,10 @@ export function eventChannelName(name, eventId) {
   return `${slug.slice(0, Math.max(1, 99 - suffix.length))}-${suffix}`.slice(0,100);
 }
 export function eventDeletionTime(event) {
-  const departures = parse(event?.departures);
-  if (!departures.length || event?.schedule_pending || departures.some(item => item.tbd || !Number.isFinite(Number(item.startsAt)))) return null;
+  // A tbd entry is an event-level waiting area kept for registrations, not an actual start.
+  // Once the schedule is published, only real departures determine the Discord lifecycle.
+  const departures = parse(event?.departures).filter(item => !item?.tbd);
+  if (!departures.length || event?.schedule_pending || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
   const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
   if (!(minutes > 0)) return null;
   // A race's thread goes with its week, when the next one turns (Monday 7h30, Paris): the channel never shows two weeks
@@ -536,7 +538,13 @@ async function removeRaceChannels(env, row, anchors, budget) {
     catch (error) {
       if (error.status === 404) continue;
       // Deleting a thread asks for « Gérer les fils » (a bot invited before it): archived instead, out of the list.
-      if (error.status === 403 && row.in_thread && id === row.channel_id) { await discord(env,'PATCH',`/channels/${id}`,{archived:true},budget).catch(() => {}); continue; }
+      if (error.status === 403 && row.in_thread && id === row.channel_id) {
+        // Closing the publication is safe only after Discord confirms deletion or archival.
+        await discord(env,'PATCH',`/channels/${id}`,{archived:true},budget).catch(archiveError => {
+          if (archiveError.status !== 404) throw archiveError;
+        });
+        continue;
+      }
       throw error;
     }
   }
@@ -1136,7 +1144,7 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
       const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
-      await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:2});
+      await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:3});
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=? AND closed_at IS NULL').bind(timestamp,row.community_id,row.event_id).run();
       deleted++;
     } catch (error) {
