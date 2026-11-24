@@ -337,6 +337,24 @@ test('a crew opened by the first version loses its text channel and category, an
   assert.equal(now.text_id,null);assert.equal(now.category_id,null);assert.equal(now.voice_id,row.voice_id);
 });
 
+test('refused archive deletions stay tracked and let later archives be cleaned', async () => {
+  const {DB,env,discord}=harness();
+  const at=Date.now();
+  const insert=DB.db.prepare(`INSERT INTO crew_discord(crew_id,community_id,guild_id,created_at,closed_at,archived_id)
+    VALUES(?,?,?,0,?,?)`);
+  const archives=Array.from({length:4},(_,i)=>String(700000000000000000n+BigInt(i)));
+  for (const [index,id] of archives.entries()) insert.run(`archive-${index}`,DEV,GUILD,at-KEEP_ARCHIVES-HOUR,id);
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=(url,options)=>options?.method==='DELETE'&&archives.slice(0,3).some(id=>String(url).endsWith('/'+id))
+    ? Response.json({code:50013},{status:403}) : discord.handler(url,options);
+  try {
+    assert.equal((await syncCrewDiscord(env,at,{bell:false})).purged,0);
+    assert.equal((await syncCrewDiscord(env,at+5*60_000,{bell:false})).purged,1);
+    const remaining=DB.db.prepare('SELECT archived_id FROM crew_discord WHERE archived_id IS NOT NULL ORDER BY crew_id').all();
+    assert.deepEqual(remaining.map(row=>row.archived_id),archives.slice(0,3));
+  } finally {globalThis.fetch=originalFetch;}
+});
+
 test('a deleted crew is closed at once, and nothing happens without the module', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');

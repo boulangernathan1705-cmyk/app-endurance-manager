@@ -258,11 +258,20 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   // Text channels archived by the first version, 30 days after: deleted now.
   if (budget.left > 0) {
     const old = (await env.DB.prepare(`SELECT crew_id, archived_id FROM crew_discord WHERE archived_id IS NOT NULL AND closed_at<?
-      AND community_id IN (${ids.map(() => '?').join(',')}) LIMIT 3`).bind(timestamp - KEEP_ARCHIVES, ...ids).all()).results || [];
+      AND community_id IN (${ids.map(() => '?').join(',')})
+      ORDER BY checked_at, closed_at, crew_id LIMIT 3`).bind(timestamp - KEEP_ARCHIVES, ...ids).all()).results || [];
     for (const row of old) {
       try { await discord(env, budget, 'DELETE', `/channels/${row.archived_id}`); }
-      catch (error) { if (error instanceof Stop) break; if (error?.status !== 404) continue; }
-      await env.DB.prepare('UPDATE crew_discord SET archived_id=NULL WHERE crew_id=?').bind(row.crew_id).run();
+      catch (error) {
+        if (error instanceof Stop) break;
+        if (error?.status !== 404) {
+          // Preserve the archive for a retry without letting it block untouched archives.
+          await env.DB.prepare('UPDATE crew_discord SET checked_at=? WHERE crew_id=? AND archived_id=? AND checked_at<=?')
+            .bind(timestamp, row.crew_id, row.archived_id, timestamp).run();
+          continue;
+        }
+      }
+      await env.DB.prepare('UPDATE crew_discord SET archived_id=NULL WHERE crew_id=? AND archived_id=?').bind(row.crew_id, row.archived_id).run();
       report.purged += 1;
     }
   }
