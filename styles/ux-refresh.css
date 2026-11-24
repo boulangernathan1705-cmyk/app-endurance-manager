@@ -142,6 +142,71 @@ html[data-game] .site-nav-shell .account-oauth-trust { display: none !important;
   max-width: calc(100vw - 20px);
 }
 
+/* Pages d’information : les contrôles gardent leur place avec ou sans compte. */
+.site-nav-shell.info-nav-shell {
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto !important;
+  grid-template-areas: "lang switch info sections account" !important;
+}
+.info-nav-shell > .game-space-bar { justify-content: flex-start; gap: var(--em-space-2); }
+.info-nav-shell .account-oauth-trust {
+  display: none;
+}
+.info-nav-shell .nav-information { grid-area: info; position: relative; }
+.info-nav-shell .nav-information > summary,
+.info-nav-shell .nav-information-links a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--em-space-3);
+  color: var(--em-text);
+  font-size: var(--em-text-sm);
+  font-weight: 750;
+}
+.info-nav-shell .nav-information > summary {
+  justify-content: space-between;
+  gap: var(--em-space-2);
+  list-style: none;
+  border: 1px solid var(--em-border);
+  border-radius: var(--em-radius-sm);
+  cursor: pointer;
+}
+.info-nav-shell .nav-information > summary::-webkit-details-marker { display: none; }
+.info-nav-shell .nav-information > summary::after { content: "⌄"; }
+.info-nav-shell .nav-information[open] > summary,
+.info-nav-shell .nav-information-links a[aria-current=page] { color: var(--em-accent); }
+.info-nav-shell .nav-information-links {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 100%;
+  min-width: max-content;
+  padding: var(--em-space-1);
+  border: 1px solid var(--em-border);
+  border-radius: var(--em-radius-sm);
+  background: var(--em-panel);
+}
+.info-nav-shell .nav-information-links a { text-decoration: none; }
+.info-nav-shell .nav-information-links a:hover,
+.info-nav-shell .nav-information-links a:focus-visible { background: var(--em-panel-2); }
+@media (max-width: 900px) {
+  .site-nav-shell.info-nav-shell {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas: "lang account" "switch info" "sections sections" !important;
+  }
+  .info-nav-shell #navigation > .nav-game-switcher { justify-self: start; }
+  .info-nav-shell #navigation > .nav-sections { width: 100%; min-width: 0; }
+  .info-nav-shell .nav-information { justify-self: end; }
+  .info-nav-shell .nav-information-links { inset-inline-end: 0; }
+}
+@media (max-width: 760px) {
+  body:has(.info-nav-shell, .community-gate) .site-footer > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: var(--em-space-2);
+  }
+  body:has(.info-nav-shell, .community-gate) .site-footer > span { display: none; }
+}
+
 /* ---------- En-tête de la liste des événements ---------- */
 html[data-game] .page-head {
   display: flex;
@@ -614,8 +679,15 @@ html[data-game] #app .crew-self-actions > .danger-link { margin-left: auto !impo
 
 /* Tuiles d'équipage : 4 par ligne au maximum, toutes de la même hauteur (la tienne comprise). */
 html[data-game] #app .ux-course-crews-body {
-  grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 30px) / 4)), 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(240px, calc((100% - 30px) / 4))), 1fr)) !important;
   align-items: stretch;
+}
+@media (min-width: 761px) {
+  html[data-game] #app .ux-course-crews-body:has(> .crew-card-shell > .crew-self-actions) > .crew-card-shell:has(> details:not([open])):not(:has(> .crew-self-actions))::after {
+    content: "";
+    display: block;
+    min-height: 51px;
+  }
 }
 html[data-game] #app .crew-card-shell { grid-template-rows: 1fr auto; }
 html[data-game] #app .crew-card-shell > details { height: 100%; }
@@ -729,6 +801,7 @@ html[data-game] .event-list {
   gap: 16px;
   align-items: stretch;
 }
+html[data-game] .event-list > .race-card:only-child { grid-column: 1 / -1; }
 html[data-game] .event-card.race-card { padding: 0 !important; min-height: 0; margin: 0; height: 100%; text-align: left; }
 html[data-game] .race-card .race-card-body {
   display: flex !important;
@@ -1129,7 +1202,13 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-form-start .departure-field { display: contents; }
 @media (max-width: 600px) { .sim-option { flex: 1 1 40%; } .sim-option span { width: 100%; } }
 /* Le liseré de couleur suit le simulateur : rouge LMU, bleu iRacing, orange AMS2, vert ACE. */
-.event-card.is-solo-open, .race-header.is-solo-open, .event-card.is-solo-safe, .race-header.is-solo-safe { --event-accent: var(--sim, #52d3d8) !important; }
+.event-card[data-race-kind], .race-header[data-race-kind] { --event-accent: var(--race-kind, var(--em-kind-event)) !important; }
+[data-race-kind="open"] { --race-kind: var(--em-kind-open); }
+[data-race-kind="safe"] { --race-kind: var(--em-kind-safe); }
+[data-race-kind="bouloules"] { --race-kind: var(--em-kind-bouloules); }
+[data-race-kind="gridfest"] { --race-kind: var(--em-kind-gridfest); }
+[data-race-kind="training"] { --race-kind: var(--em-muted); }
+[data-race-kind="stream"] { --race-kind: var(--em-kind-stream); }
 .solo-fill { display: flex; flex-direction: column; gap: 5px; min-width: 180px; }
 .solo-fill-copy { font-size: 13.5px; color: #c7d0d4; }
 .solo-fill-copy strong { color: #f4f6f5; font-size: 15px; }
@@ -1258,6 +1337,7 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
 .welcome-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .welcome-discord { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border-radius: 12px; background: #5865f2; color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; box-shadow: 0 10px 26px rgba(88,101,242,.35); transition: transform .15s, box-shadow .15s, background .15s; }
 .welcome-discord:hover, .welcome-discord:focus-visible { background: #4752c4; transform: translateY(-1px); box-shadow: 0 14px 30px rgba(88,101,242,.45); }
+.welcome-invite { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; text-decoration: none; }
 .welcome-discord svg { width: 22px; height: 22px; flex: 0 0 22px; }
 .welcome-elsewhere { margin-top: 18px; }
 .welcome-elsewhere p { margin: 0 0 8px; color: #99a3a0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
@@ -1271,7 +1351,12 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
 .welcome-features strong { color: #f4f6f5; font-size: 15px; }
 .welcome-features span { color: #99a3a0; font-size: 13.5px; line-height: 1.5; }
 @media (max-width: 900px) { .welcome-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .community-gate.welcome { margin-top: 16px; } .welcome-features { grid-template-columns: minmax(0, 1fr); } .welcome-discord { width: 100%; justify-content: center; } }
+@media (max-width: 560px) {
+  .community-gate.welcome { margin-top: var(--em-space-3); }
+  .welcome-hero { padding: var(--em-space-4); }
+  .welcome-features { grid-template-columns: minmax(0, 1fr); }
+  .welcome-actions > a { width: 100%; justify-content: center; }
+}
 
 /* Presence timeline: a thin white separator between the hours inside the bar; a small tick rises only towards
    the hours written above it (the labels shown depend on the width, timeline.css). */
@@ -2375,7 +2460,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
   .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
   .home-side { order: -1; }
-  .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .week-filters { flex-wrap: wrap; overflow: visible; }
   .week-filters .week-filter { flex: none; white-space: nowrap; }
   .week-grid { grid-template-columns: minmax(0, 1fr); }
   .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
@@ -2458,6 +2543,12 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .home-crews-row:hover strong { color: var(--em-accent); }
 .home-crews-row .week-chip { flex: none; }
 .home-crews-done, .home-crews-more { margin: 4px 0 0; font-size: var(--em-text-sm); color: var(--em-muted); }
+.home-crews-compact { display: none; }
+@media (max-width: 760px) {
+  .home-crews-box > :not(.home-crews-compact) { display: none; }
+  .home-crews-box { padding-block: var(--em-space-1); }
+  .home-crews-box .home-crews-compact { display: flex; min-height: 44px; border-top: 0; }
+}
 .home-crews-box .home-next-go { background: var(--em-accent); color: var(--em-bg); }
 
 /* Counter of the « Équipages » tab. */
@@ -2501,6 +2592,29 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .crews-crew-head small { color: var(--em-muted); }
 .crews-crew-head .crews-chip { margin-left: auto; }
 .crews-manage { font-size: var(--em-text-sm); }
+.crews-more { position: relative; }
+.crews-more > summary {
+  display: grid;
+  place-items: center;
+  list-style: none;
+  min-width: 36px;
+  min-height: 36px;
+  color: var(--em-text);
+  border: 1px solid var(--em-border);
+  border-radius: var(--em-radius-sm);
+  cursor: pointer;
+}
+.crews-more > summary::-webkit-details-marker { display: none; }
+.crews-more > button {
+  position: absolute;
+  z-index: 2;
+  inset-inline-end: 0;
+  top: 100%;
+  padding-inline: var(--em-space-3);
+  background: var(--em-panel);
+  border: 1px solid var(--em-border);
+  border-radius: var(--em-radius-sm);
+}
 .crews-cat { display: inline-flex; vertical-align: middle; }
 .crews-line { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 5px; font-size: var(--em-text-sm); }
 .crews-line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2567,13 +2681,15 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .crews-cols > section + section { border-left: 0; border-top: 1px solid var(--em-border); }
   .crews-cols > section:last-child { order: -1; }
   .crews-status { margin-left: 0; }
-  .crews-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .crews-filters { flex-wrap: wrap; overflow: visible; }
   .crews-filters .crews-filter { flex: none; white-space: nowrap; }
   .crews-request-row { flex-wrap: wrap; }
   .crews-line { grid-template-columns: 84px minmax(0, 1fr); }
   .crews-coverage-text { margin-left: 92px; }
   .crews-gauge-bar { flex-basis: 100%; }
-  .crews-filters-hint { display: none; }
+  .crews-filters-hint, .crews-sep { display: none; }
+  .crews-crew-head small { flex: 1 0 100%; }
+  .crews-crew-head .crews-chip { margin-left: 0; }
   .crews-crew.is-done .crews-line:not(.crews-coverage) { display: none; }
   .crews-crew.is-done .crews-names { display: block; }
 }

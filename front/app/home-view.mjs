@@ -4,7 +4,7 @@ import {contextHelpMarker as helpContext} from './core.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
-import {seasonCalendar} from './season-calendar.mjs';
+import {calendarType,seasonCalendar} from './season-calendar.mjs';
 import {loadArchive} from './core.mjs';
 import {crewsTodoCount} from './crews-page.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
@@ -99,7 +99,7 @@ export function streamEventCard(event,{preview=false,archived=false}={}) {
   const details=streamDetails(event),title=esc(event.name || 'Le titre de ton stream');
   const open=preview ? `<span class="event-name">${title}</span>` : `<button type="button" class="event-name stream-card-title" data-action="open" data-id="${esc(event.id)}">${title}</button>`;
   const watch=details.streamUrl ? `<a class="primary-button stream-button" href="${esc(details.streamUrl)}" target="_blank" rel="noopener noreferrer">Regarder sur ${esc(streamPlatform(details.streamUrl))} →</a>` : '';
-  return `<article class="event-card event-card-harmonized race-card event-type-private is-solo is-solo-open sim-stream stream-event-card${archived?' archived':''}"><div class="event-card-body race-card-body"><div class="race-card-content"><div class="race-card-top">${raceDateBlock(event,archived)}<div class="race-head">${open}${details.streamerName?`<span class="race-meta">Avec ${esc(details.streamerName)}</span>`:''}${accessBadge(event)}</div></div>${details.description?`<p class="stream-description">${esc(details.description)}</p>`:''}<div class="stream-card-times">${esc(streamTimes(event))}</div>${soloCardInfo(event)}<div class="stream-card-actions"><small>${archived?'Stream passé':'Horaires de Paris'}</small>${watch}</div></div><div class="race-card-circuit race-card-type-logo is-stream">${streamPanel(event)}</div></div></article>`;
+  return `<article class="event-card event-card-harmonized race-card event-type-private is-solo is-solo-open sim-stream stream-event-card${archived?' archived':''}" data-race-kind="stream"><div class="event-card-body race-card-body"><div class="race-card-content"><div class="race-card-top">${raceDateBlock(event,archived)}<div class="race-head">${open}${details.streamerName?`<span class="race-meta">Avec ${esc(details.streamerName)}</span>`:''}${accessBadge(event)}</div></div>${details.description?`<p class="stream-description">${esc(details.description)}</p>`:''}<div class="stream-card-times">${esc(streamTimes(event))}</div>${soloCardInfo(event)}<div class="stream-card-actions"><small>${archived?'Stream passé':'Horaires de Paris'}</small>${watch}</div></div><div class="race-card-circuit race-card-type-logo is-stream">${streamPanel(event)}</div></div></article>`;
 }
 function eventCard({event,next,archived,end}){
   if(isStream(event))return streamEventCard(event,{archived});
@@ -107,7 +107,7 @@ function eventCard({event,next,archived,end}){
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(timeLabel(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
-  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 // Filters of the race list (communities, type, category, dates, situation), kept in the browser.
 const emptyFilters=emptyRaceFilters;
@@ -176,8 +176,8 @@ const WELCOME_FEATURES=[
   ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z','Pensé pour Discord','Connexion en un clic avec ton compte Discord, et récap des courses de la semaine sur le serveur.']];
 export function communityGate(){
   const name=esc(state.community?.name||'cette communauté');
-  const login=`<a class="welcome-discord" href="/api/auth/discord?return=${encodeURIComponent(location.pathname)}">${DISCORD_MARK}<span>Se connecter avec Discord</span></a>`;
-  const invite=state.community?.discordInviteUrl?`<a class="welcome-discord" href="${esc(state.community.discordInviteUrl)}" rel="noopener">${DISCORD_MARK}<span>Rejoindre le Discord de ${name}</span></a>`:'';
+  const login=`<a class="welcome-discord" href="/api/auth/discord?return=${encodeURIComponent(location.pathname+location.hash)}">${DISCORD_MARK}<span>Se connecter avec Discord</span></a>`;
+  const invite=state.community?.discordInviteUrl?`<a class="secondary-button welcome-invite" href="${esc(state.community.discordInviteUrl)}" rel="noopener"><span>Rejoindre le serveur Discord</span></a>`:'';
   const partner=state.platformDiscordUrl?`<a class="secondary-button" href="${esc(state.platformDiscordUrl)}" rel="noopener">Trouver une communauté partenaire</a>`:'';
   const trust='<p class="welcome-trust"><span aria-hidden="true">🔒</span> Connexion via Discord : aucun mot de passe, seuls ton pseudo et ton avatar sont utilisés. <a href="/about.html#connexion">En savoir plus</a></p>';
   let kicker,title,lead,actions;
@@ -186,8 +186,11 @@ export function communityGate(){
     lead='Inscriptions, disponibilités, création d’équipage et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';
     actions=`<div class="welcome-actions">${login}<a class="secondary-button" href="/demande-communaute.html">Demander un espace pour ta communauté</a></div>${trust}`;
   }else if(state.access==='anonymous'){
-    kicker=name;title=`Bienvenue sur l’espace ${/^[aeiouyhàâéèêëîïôûü]/i.test(name)?'d’':'de '}${name}`;
-    lead='Cet espace est réservé aux membres autorisés de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;
+    kicker=name;
+    const section=location.pathname.split('/')[1];
+    title=section==='events'?(state.soloLabel||'Événements'):section==='iracing'?'Endurances iRacing':section==='lmu'?'Endurances Le Mans Ultimate':'Bienvenue dans ta communauté';
+    lead='Connecte-toi avec Discord pour voir les courses et t’inscrire.';
+    actions=`<div class="welcome-actions">${login}${invite}</div>${trust}`;
   }else if(state.access==='not-member'){
     kicker=name;title=`Rejoins ${name} pour rouler avec eux`;
     lead=`Tu n’es pas encore membre du serveur Discord de ${name}. Rejoins-le, puis demande à un administrateur un rôle autorisé à accéder à Endurance Manager.`;actions=`<div class="welcome-actions">${invite}${partner}</div>`;
@@ -197,10 +200,10 @@ export function communityGate(){
   }else{
     kicker=name;title='Accès momentanément indisponible';lead=`L’accès à ${name} ne peut pas être vérifié pour le moment. Réessaie dans quelques minutes.`;actions='';
   }
-  if (state.grindfest && !state.openSite && ['anonymous','not-member'].includes(state.access)) {
+  if (state.grindfest && !state.openSite && state.access==='not-member' && location.pathname.startsWith('/events/')) {
     title=`Rejoins ${name} pour le Gridfest`;
-    lead=`Connecte-toi avec Discord et rejoins le serveur de ${name}.`;
-    actions=`<div class="welcome-actions">${invite}${state.access==='anonymous'?login:button('refresh','Vérifier mon accès','','secondary-button')}</div>${state.access==='anonymous'?trust:'<p class="welcome-trust">Déjà rejoint ? Attends une minute puis vérifie ton accès.</p>'}`;
+    lead=`Rejoins le serveur Discord de ${name} pour participer.`;
+    actions=`<div class="welcome-actions">${invite}${button('refresh','Vérifier mon accès','','secondary-button')}</div><p class="welcome-trust">Déjà rejoint ? Attends une minute puis vérifie ton accès.</p>`;
   }
   // Signed in but without access here: the communities he can enter, one click each.
   const elsewhere=['not-member','forbidden'].includes(state.access)?(state.elsewhere||[]):[];

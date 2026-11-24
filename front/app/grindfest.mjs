@@ -50,7 +50,7 @@ export function streamerColumns(event, departure) {
   return `<div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable');
     const confirmed = entries.filter(reg => !reg.waitlistPosition).length;
-    const heading = `${streamerLogo(streamer)}<span class="gridfest-streamer-copy"><strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span></span>`;
+    const heading = `${streamerLogo(streamer)}<span class="gridfest-streamer-copy"><strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span><small>${streamer.capacity>confirmed?`${streamer.capacity-confirmed} place${streamer.capacity-confirmed===1?'':'s'} libre${streamer.capacity-confirmed===1?'':'s'}`:'Complet · liste d’attente'}</small></span>`;
     const head = streamer.twitchUrl ? `<a class="grindfest-streamer-head" href="${esc(streamer.twitchUrl)}" target="_blank" rel="noopener noreferrer">${heading}</a>` : `<div class="grindfest-streamer-head">${heading}</div>`;
     return `<section class="grindfest-column">${head}${soloEntryList(event, departure, entries, {title:'Inscrits', capacity:streamer.capacity})}</section>`;
   }).join('')}</div>`;

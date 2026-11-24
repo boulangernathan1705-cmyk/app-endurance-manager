@@ -18,7 +18,7 @@ let bar = null, queued = false;
 function render() {
   queued = false;
   const found = SECTIONS.map(([css, label, icon]) => [nav.querySelector(`.nav-sections .${css}`), label, icon, css]).filter(([item]) => item);
-  if (found.length < 2) { bar?.remove(); bar = null; document.body.classList.remove('has-tab-bar'); return; }
+  if (found.length < 2 || document.querySelector('.community-gate')) { bar?.remove(); bar = null; document.body.classList.remove('has-tab-bar'); return; }
   if (!bar) {
     bar = document.createElement('nav');
     bar.className = 'tab-bar';
@@ -44,5 +44,7 @@ function queue() { if (!queued) { queued = true; requestAnimationFrame(render); 
 
 if (nav) {
   new MutationObserver(queue).observe(nav, {subtree:true, childList:true, attributes:true, attributeFilter:['aria-current', 'class']});
+  const app = document.getElementById('app');
+  if (app) new MutationObserver(queue).observe(app, {childList:true});
   queue();
 }

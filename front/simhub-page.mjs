@@ -60,7 +60,7 @@ function pillMarkup() {
   const version = view.plugin ? String(view.plugin.version) : '';
   const beta = version.startsWith('0.') ? '<span class="sh-beta">bêta</span>' : '';
   const inner = link.linked ? `<span class="sh-dot is-on" aria-hidden="true"></span>SimHub relié${version ? `<em>· ${esc(version)}</em>` : ''}${beta}`
-    : '<span class="sh-dot" aria-hidden="true"></span>Installer le plugin';
+    : '<span class="sh-dot" aria-hidden="true"></span>Plugin à lier';
   return `<button type="button" class="sh-pill${link.linked ? '' : ' is-todo'}" data-action="pill" aria-expanded="${view.open}" aria-controls="simhub-body">${inner}</button>`;
 }
 

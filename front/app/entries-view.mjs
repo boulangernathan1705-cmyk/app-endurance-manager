@@ -65,12 +65,12 @@ function soloCard({event,departure,reg}, grouped=false) {
   if(grouped)return slotCard(departure,reg,`${category}${situation}`,renderSoloEntries(event,departure));
   return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
-      <span class="native-my-entry-toggle" aria-hidden="true">+</span>
+      <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
-        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
+        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">${esc(departureLabel(departure))}</span>${situation}</span>
       </span>${eventAccessLogo(event)||circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement</button>
     </summary>
@@ -124,12 +124,12 @@ function card({event,departure,reg}, grouped=false) {
   if(grouped)return slotCard(departure,reg,`${(reg.groupCategories||[reg.category]).map(badge).join('')}${situation}`,body,true);
   return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
-      <span class="native-my-entry-toggle" aria-hidden="true">+</span>
+      <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span></span>
-        <span class="race-badges">${eventTypeBadge(event.eventType)}${(reg.groupCategories||[reg.category]).map(badge).join('')}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
+        <span class="race-badges">${eventTypeBadge(event.eventType)}${(reg.groupCategories||[reg.category]).map(badge).join('')}<span class="race-start">${esc(departureLabel(departure))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>
@@ -138,9 +138,13 @@ function card({event,departure,reg}, grouped=false) {
 }
 
 // Keep each start's crew and entry status together inside a single race card.
+function departureLabel(departure) {
+  return departure.hideClock || departure.tbd ? 'Créneau à choisir' : `Départ ${timeLabel(departure.time)}`;
+}
+
 function slotCard(departure,reg,badges,body,columns=false){
   return `<section class="my-entry-slot" id="entry-${reg.id}" data-entry-departure="${departure.id}">
-    <h3 class="my-entry-slot-heading"><span>${esc(new Date(departure.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'}))} · Départ ${esc(timeLabel(departure.time))}</span><span class="race-badges">${badges}</span></h3>
+    <h3 class="my-entry-slot-heading"><span>${esc(new Date(departure.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'}))} · ${esc(departureLabel(departure))}</span><span class="race-badges">${badges}</span></h3>
     <div class="native-my-entry-body${columns?' my-entry-focus':''}">${body}</div>
   </section>`;
 }
@@ -158,12 +162,12 @@ function raceCards(list){
     const {event,departure,reg}=items[0],solo=isSolo(event);
     const starts=[...new Map(items.map(item=>[item.departure.id,item.departure])).values()];
     return `<details class="native-my-entry-card race-card my-entry-race my-entry-grouped ${solo?`is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:`event-type-${event.eventType||'private'}`}" data-entry-event="${event.id}">
-      <summary class="native-my-entry-header"><span class="native-my-entry-toggle" aria-hidden="true">+</span>
+      <summary class="native-my-entry-header"><span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
         <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
           ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
           <h2 class="event-name">${esc(event.name)}</h2>
           <span class="race-meta">${solo?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span>
-          <span class="race-badges">${solo?accessBadge(event):eventTypeBadge(event.eventType)}${[...new Set(items.flatMap(item=>item.reg.groupCategories||[item.reg.category]))].filter(Boolean).map(badge).join('')}<span class="race-start">${starts.length} créneau${starts.length>1?'x':''}</span>${starts.map(start=>`<span class="race-start">${esc(new Date(start.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',day:'numeric',month:'short'}))} · ${esc(timeLabel(start.time))}</span>`).join('')}</span>
+          <span class="race-badges">${solo?accessBadge(event):eventTypeBadge(event.eventType)}${[...new Set(items.flatMap(item=>item.reg.groupCategories||[item.reg.category]))].filter(Boolean).map(badge).join('')}<span class="race-start">${starts.length} créneau${starts.length>1?'x':''}</span>${starts.map(start=>`<span class="race-start">${esc(new Date(start.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',day:'numeric',month:'short'}))} · ${esc(departureLabel(start))}</span>`).join('')}</span>
         </span>${solo?eventAccessLogo(event)||circuitVisual(event.circuit,true):circuitVisual(event.circuit,true)}</span>
         <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}">Voir ${solo?'l’événement':'la course'}</button>
       </summary>
