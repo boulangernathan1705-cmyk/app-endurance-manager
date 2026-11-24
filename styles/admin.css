@@ -253,3 +253,5 @@ img.admin-preview-badge { width: 22px; min-width: 0; padding: 0; border: 0; bord
 .diag-row.is-ok { border-left-color: var(--em-ok); } .diag-row.is-ok b { color: var(--em-ok); }
 .diag-row.is-wait { border-left-color: var(--em-warn); } .diag-row.is-wait b { color: var(--em-warn); }
 .diag-row.is-bad { border-left-color: var(--em-danger); } .diag-row.is-bad b { color: var(--em-danger-text); }
+/* Plateforme › Plugin SimHub: one community per line, its switch on the right. */
+.platform-row.platform-plugin { grid-template-columns: minmax(0, 1fr) auto; cursor: pointer; }
