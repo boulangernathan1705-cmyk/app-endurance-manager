@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v2.13.17 — 24 novembre 2026
+
+### ✨ Améliorations
+
+- **Plugin SimHub 0.2 bêta** : profils de réglages par voiture et circuit, black box du VoCore comme celle du jeu, profil Stream Deck FMT, commandes des modules coupés cachées dans SimHub. Le plugin est encore en développement : signalez tout souci depuis le plugin. Les plugins installés proposent la mise à jour dans SimHub.
+- **Plugin SimHub** : un seul onglet « Plugin SimHub » remplace « Fiches combo » et « Mur des stands ». Il porte l'installeur, la liaison et les retours des testeurs ; la fiche devient « Fiche mémo ».
+
 ## v2.13.16 — 23 novembre 2026
 
 ### ✨ Améliorations
