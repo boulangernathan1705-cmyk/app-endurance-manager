@@ -1492,3 +1492,26 @@ test('a thread archived successfully after a refused DELETE can be closed',async
   assert.equal(channels.find(channel=>channel.id===thread).archived,true);
   assert.ok(DB.db.prepare("SELECT closed_at FROM discord_recap_publications WHERE event_id='race-a'").get().closed_at);
 });
+
+
+test('a refused expired recap does not starve other expired races',async t=>{
+  const {DB,env,channels,setFailure}=setup(t);
+  const {cleanupEventRecaps}=await import('../server/recap-discord.mjs');
+  race(DB,'race-a','Blocked');
+  race(DB,'race-b','Next');
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  const first='777777777777777781', second='777777777777777782';
+  channels.push({id:first,type:11,parent_id:TEXT,name:'Blocked'},{id:second,type:11,parent_id:TEXT,name:'Next'});
+  const insert=DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,channel_id,in_thread,marker,checked_at) VALUES(?,?,?,?,1,?,?)");
+  insert.run(DEV_COMMUNITY,'race-a',GUILD,first,'first',1);
+  insert.run(DEV_COMMUNITY,'race-b',GUILD,second,'second',2);
+  setFailure((path,method)=>path===`/channels/${first}`&&['DELETE','PATCH'].includes(method));
+  const at=NOW+10*DAY;
+  assert.equal(await cleanupEventRecaps(env,at,1),0);
+  assert.equal(DB.db.prepare("SELECT closed_at FROM discord_recap_publications WHERE event_id='race-a'").get().closed_at,null);
+  assert.equal(await cleanupEventRecaps(env,at+60_000,1),1);
+  assert.ok(DB.db.prepare("SELECT closed_at FROM discord_recap_publications WHERE event_id='race-b'").get().closed_at);
+  assert.ok(channels.some(channel=>channel.id===first));
+  setFailure(null);
+  assert.equal(await cleanupEventRecaps(env,at+120_000,1),1);
+});

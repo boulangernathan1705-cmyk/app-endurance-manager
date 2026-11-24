@@ -215,7 +215,7 @@ export default {
     if (!job) return;
     // About every 5 minutes: crew vocals and race reminders.
     if (job === 'crews') {
-      run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:8}));
+      run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:8, largeCleanup:true}));
       // Gridfest MPs refused for a reason that may pass: sent again by the bot (2 pilots, at most 12 requests).
       if (!isDevelopment(env)) run('Gridfest MP retry failed', () => retryGridfestPasswords(env, Math.floor(at.getTime() / 1000)));
       return;
