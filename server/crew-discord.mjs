@@ -56,6 +56,7 @@ async function discord(env, budget, method, path, body) {
 
 // What an admin can do when the bot is refused.
 function errorText(error) {
+  if (error?.diagnostic) return error.message;
   if (error?.status === 403) {
     const channelId = error.path?.match(/^\/channels\/(\d+)/)?.[1];
     const action = error.method === 'DELETE' ? 'la suppression du salon'
@@ -228,7 +229,7 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
       const members = new Set([...JSON.parse(current.members || '[]'), ...discordIds(crewPilots)]);
       const needed = members.size + 1;
       if (largeCleanup && current.voice_id && start && timestamp >= start.endsAt + CLOSE_AFTER && needed > requests && budget.left === requests) {
-        if (needed > 24) throw new Error('Trop de pilotes à vérifier pour une suppression automatique sûre ; intervention requise.');
+        if (needed > 24) throw Object.assign(new Error('Trop de pilotes à vérifier pour une suppression automatique sûre ; intervention requise.'), {diagnostic:true});
         budget.left = needed;
         dedicatedCleanup = true;
       }
@@ -317,7 +318,8 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   // on the previous schema, using the cron slot to rotate without the optional cursors.
   const settings = (await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
     WHERE c.discord_guild_id IS NOT NULL AND (s.voice_category_id IS NOT NULL OR EXISTS(SELECT 1 FROM discord_recap_publications p
-      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>''))
+      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'') OR EXISTS(SELECT 1 FROM crew_discord d
+      WHERE d.community_id=s.community_id AND d.closed_at IS NULL AND d.voice_id IS NOT NULL))
     ORDER BY s.community_id`).all()).results || [];
   if (!settings.length) return 0;
   const slot = Math.floor(timestamp / (15 * 60_000));
@@ -327,7 +329,7 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     : settings[slot % settings.length];
   if (persistentCursor) await env.DB.prepare('UPDATE community_crew_discord SET orphan_checked_at=? WHERE community_id=?').bind(timestamp,setting.community_id).run();
   const community = await communityById(env,setting.community_id);
-  const budget = {left:3};
+  const budget = {left:4};
   const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
     WHERE community_id=? AND category_id IS NOT NULL AND event_id<>''`).bind(community.id).all()).results || [];
   const races = new Map(publications.map(row => [row.category_id,row.event_id]));
@@ -335,10 +337,39 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   const shared = new Set([setting.voice_category_id].filter(Boolean));
   const recap = await env.DB.prepare('SELECT enabled,bot_categories FROM community_recap_settings WHERE community_id=?').bind(community.id).first().catch(() => null);
   if (recap?.enabled) { try { for (const id of Object.values(JSON.parse(recap.bot_categories || '{}') || {})) if (typeof id === 'string') shared.add(id); } catch { /* unreadable: ignored */ } }
-  const tracked = (await env.DB.prepare('SELECT voice_id FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
+  const tracked = (await env.DB.prepare('SELECT crew_id,community_id,voice_id,closed_at,created_at FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
     .bind(community.discordGuildId).all()).results || [];
   const known = new Set(tracked.map(row => row.voice_id));
   const channels = await discord(env,budget,'GET',`/guilds/${community.discordGuildId}/channels`);
+  // A missing entry in a guild listing alone is NOT proof of deletion (permissions can hide it).
+  // Confirm at most one missing tracked voice directly under its crew lock. The ordinary sync
+  // recreates it only if the crew is still eligible; no changes to Discord rights or destinations.
+  if (!Array.isArray(channels)) return 0;
+  const visible = new Set(channels.map(channel => channel.id));
+  const missing = tracked.filter(row => row.community_id === community.id && row.closed_at === null
+    && Number(row.created_at) <= timestamp - 5 * 60_000 && !visible.has(row.voice_id));
+  if (missing.length) {
+    const row = missing[Math.floor(slot / settings.length) % missing.length];
+    const lock = await env.DB.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=? AND community_id=? AND voice_id=? AND closed_at IS NULL AND lock_until<?')
+      .bind(timestamp+LOCK_MS,row.crew_id,community.id,row.voice_id,timestamp).run();
+    if (lock.meta.changes) {
+      try {
+        await discord(env,budget,'GET',`/channels/${row.voice_id}`);
+      } catch (error) {
+        if (error?.status === 404 && error?.code === 10003) {
+          await env.DB.prepare('UPDATE crew_discord SET voice_id=NULL,message_id=NULL,parent_id=NULL,checked_at=0 WHERE crew_id=? AND community_id=? AND voice_id=?')
+            .bind(row.crew_id,community.id,row.voice_id).run();
+        } else if (!(error instanceof Stop)) {
+          await env.DB.prepare('UPDATE community_crew_discord SET last_error=?,last_error_at=? WHERE community_id=?')
+            .bind(errorText(error),Math.floor(timestamp/1000),community.id).run();
+        }
+      } finally {
+        await env.DB.prepare('UPDATE crew_discord SET lock_until=0 WHERE crew_id=? AND community_id=? AND lock_until=?')
+          .bind(row.crew_id,community.id,timestamp+LOCK_MS).run();
+      }
+    }
+  }
+  if (budget.left < 2) return 0;
   const candidates = (Array.isArray(channels) ? channels : []).filter(channel => channel.type === VOICE
     && (races.has(channel.parent_id) || shared.has(channel.parent_id)) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
     && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
