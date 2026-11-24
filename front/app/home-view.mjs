@@ -188,7 +188,7 @@ export function communityGate(){
   }else if(state.access==='anonymous'){
     kicker=name;
     const section=location.pathname.split('/')[1];
-    title=section==='events'?(state.soloLabel||'Événements'):section==='iracing'?'Endurances iRacing':section==='lmu'?'Endurances Le Mans Ultimate':'Bienvenue dans ta communauté';
+    title=section==='events'?(esc(state.soloLabel)||'Événements'):section==='iracing'?'Endurances iRacing':section==='lmu'?'Endurances Le Mans Ultimate':'Bienvenue dans ta communauté';
     lead='Connecte-toi avec Discord pour voir les courses et t’inscrire.';
     actions=`<div class="welcome-actions">${login}${invite}</div>${trust}`;
   }else if(state.access==='not-member'){

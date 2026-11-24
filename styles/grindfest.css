@@ -31,8 +31,8 @@ html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel:is([data-
 .grindfest-streamer-head .count-pill {font-size:.85rem}
 
 /* Gridfest: a festive look of its own (streamers gathering), on its page and its card only. */
-/* TDZ colours: its orange accent (Réglages → Apparence), with gold and a deep orange. */
-:root {--gf-pink:#ff3d00;--gf-violet:var(--community-accent,#ff7b00);--gf-cyan:#ffc400;--gf-gold:#fff1c2;--gf-grad:linear-gradient(100deg,var(--gf-pink),var(--gf-violet) 45%,var(--gf-cyan))}
+/* Gridfest uses its own event colour with gold and deep orange accents. */
+:root {--gf-pink:#ff3d00;--gf-violet:var(--em-kind-gridfest);--gf-cyan:#ffc400;--gf-gold:#fff1c2;--gf-grad:linear-gradient(100deg,var(--gf-pink),var(--gf-violet) 45%,var(--gf-cyan))}
 .gridfest-avatar {flex:none;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;object-fit:cover;background:#10151a;box-shadow:0 0 0 2px rgba(255,255,255,.08)}
 .gridfest-avatar.is-initial {background:linear-gradient(135deg,hsl(var(--hue) 85% 58%),hsl(calc(var(--hue) + 40) 85% 45%));color:#fff;font-weight:900;font-size:26px}
 .gridfest-streamer-copy {display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}

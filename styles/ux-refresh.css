@@ -688,6 +688,10 @@ html[data-game] #app .ux-course-crews-body {
     display: block;
     min-height: 51px;
   }
+  html[data-game] #app .crew-card-shell > details:not([open]) > .crew-tile-summary {
+    height: 100%;
+    box-sizing: border-box;
+  }
 }
 html[data-game] #app .crew-card-shell { grid-template-rows: 1fr auto; }
 html[data-game] #app .crew-card-shell > details { height: 100%; }
@@ -801,7 +805,17 @@ html[data-game] .event-list {
   gap: 16px;
   align-items: stretch;
 }
-html[data-game] .event-list > .race-card:only-child { grid-column: 1 / -1; }
+@media (min-width: 1101px) {
+  html[data-game] .event-list > .race-card:not(.is-solo):only-child { grid-column: 1 / -1; }
+  html[data-game] .event-list > .race-card:not(.is-solo):only-child .race-card-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--em-space-5);
+    align-content: center;
+  }
+  html[data-game] .event-list > .race-card:not(.is-solo):only-child .race-card-top { grid-row: span 3; }
+  html[data-game] .event-list > .race-card:not(.is-solo):only-child :is(.race-starts, .race-situation, .race-fill) { grid-column: 2; }
+}
 html[data-game] .event-card.race-card { padding: 0 !important; min-height: 0; margin: 0; height: 100%; text-align: left; }
 html[data-game] .race-card .race-card-body {
   display: flex !important;
@@ -1209,6 +1223,10 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 [data-race-kind="gridfest"] { --race-kind: var(--em-kind-gridfest); }
 [data-race-kind="training"] { --race-kind: var(--em-muted); }
 [data-race-kind="stream"] { --race-kind: var(--em-kind-stream); }
+[data-race-kind] .event-type-badge {
+  border-color: color-mix(in srgb, var(--race-kind, var(--em-kind-event)) 55%, transparent);
+  background: color-mix(in srgb, var(--race-kind, var(--em-kind-event)) 10%, var(--em-panel));
+}
 .solo-fill { display: flex; flex-direction: column; gap: 5px; min-width: 180px; }
 .solo-fill-copy { font-size: 13.5px; color: #c7d0d4; }
 .solo-fill-copy strong { color: #f4f6f5; font-size: 15px; }
