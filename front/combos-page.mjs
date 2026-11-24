@@ -1,7 +1,7 @@
-// « Fiches combo » (server/combos.mjs, module "combos"): what the team measured in practice on one car and one
+// « Fiche mémo » (module Plugin SimHub; server/combos.mjs, module "combos"): what the team measured in practice on one car and one
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
-import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
+import {COLORS, CONDITIONS} from '../shared/combos.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
@@ -19,9 +19,9 @@ const CREW = {id:'crew', name:'Équipage', color:'#f0f3f2', crew:true};
 const STORE = 'em-combos-hidden';
 
 const view = {
-  combos:[], combo:null, sheet:null, compare:null, link:null, code:'', copied:false, linkBusy:false,
+  combos:[], combo:null, sheet:null, compare:null, link:null,
   event:'', version:'', since:'', until:'', setup:'', moment:'', trackMin:'', trackMax:'', compareEvent:'', cond:null, compound:null, stint:null, hidden:new Set(),
-  pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
+  pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false,
   editing:null, message:'', error:'',
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
   tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, zone:null, sort:'lap', sessions:new Map(), loading:false, error:''}
@@ -43,7 +43,7 @@ async function call(path, method = 'GET', data) {
 
 function renderError(error) {
   const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent('/fiches-combo.html')}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
-  app.innerHTML = `<section class="members-panel members-error"><h1>Fiches combo</h1><p>${esc(error.message)}</p>${login}</section>`;
+  app.innerHTML = `<section class="members-panel members-error"><h1>Fiche mémo</h1><p>${esc(error.message)}</p>${login}</section>`;
 }
 
 // ---------- Loading ----------
@@ -75,10 +75,8 @@ async function start() {
   view.since = dayParam(params.get('from')); view.until = dayParam(params.get('to'));
   if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
-    // The plugin build this site hands out, when there is one (scripts/build.mjs).
-    const plugin = fetch('/downloads/simhub/v0/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link; view.plugin = await plugin;
+    view.combos = list.combos; view.link = link;
   } catch (error) { renderError(error); return; }
   const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
   view.combo = wanted || view.combos[0] || null;
@@ -290,29 +288,15 @@ function delta(row, key, digits, unit) {
 
 // ---------- Rendering ----------
 
+// Not linked yet: the install and the link are on the module's home page (simhub.html).
 function linkCard() {
-  const link = view.link || {};
-  const open = view.linkOpen ?? (!link.linked || Boolean(view.code));
-  const state = link.linked ? `<span class="cb-state is-on" aria-hidden="true"></span><b>SimHub relié</b><span>${link.lastSeen ? `dernier contact le ${esc(dayTime(seconds(link.lastSeen)))}` : 'en attente de la première séance'}</span>`
-    : '<span class="cb-state" aria-hidden="true"></span><b>Relier SimHub</b><span>une seule fois, pour que tes séances arrivent ici toutes seules</span>';
-  const code = view.code ? `<div class="cb-code"><input type="text" readonly value="${esc(view.code)}" aria-label="Ton code de liaison" data-code><button type="button" class="cb-btn" data-action="copy-code">Copier le code</button></div>
-    <p class="${view.copied ? 'cb-ok' : 'cb-src'}">${view.copied ? 'Code copié. Ouvre le menu « Fiches combo » de SimHub : il le trouve tout seul.' : 'Copie ce code, puis colle-le dans SimHub.'} Il ne s’affiche qu’une fois : un nouveau code remplace l’ancien.</p>` : '';
-  return `<details class="cb-link" data-fold="link"${open ? ' open' : ''}><summary>${state}</summary><div class="cb-link-body">
-    <ol class="cb-steps">
-      <li>${view.plugin ? `<b>Installe le plugin</b> : <button type="button" class="cb-btn" data-action="download-plugin">Télécharger l’installeur</button> (version ${esc(view.plugin.version)}), puis double-clique dessus. Il télécharge le plugin, ferme et relance SimHub ; accepte le nouveau plugin. Si Windows te prévient, clique sur « Informations complémentaires » puis « Exécuter quand même ». Les mises à jour se font ensuite depuis SimHub.`
-        : '<b>Installe le plugin</b> : double-clique sur « Installer le plugin », livré avec <code>EnduranceManager.SimHub.dll</code>. Il ferme et relance SimHub ; accepte le nouveau plugin.'}</li>
-      <li><b>Crée ton code</b> avec le bouton ci-dessous : il est copié tout seul.</li>
-      <li><b>Ouvre le menu « Fiches combo » de SimHub</b> : il trouve le code tout seul. Ensuite, roule : chaque séance part toute seule quand tu reviens au menu.</li>
-    </ol>
-    <div class="cb-actions"><button type="button" class="cb-btn is-main" data-action="new-code"${view.linkBusy ? ' disabled' : ''}>${link.linked ? 'Créer un nouveau code' : 'Créer mon code'}</button>
-      ${link.linked ? '<button type="button" class="cb-btn is-quiet" data-action="unlink">Retirer la liaison</button>' : ''}</div>
-    ${code}</div></details>`;
+  return '<p class="cb-message">SimHub n’est pas encore relié : tes séances n’arrivent pas ici. <a href="/simhub.html">Installer et relier le plugin</a></p>';
 }
 
 function header() {
   const sheet = view.sheet;
   const time = view.loadedAt ? `À jour à ${new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 'Actualiser';
-  return `<div class="cb-hero"><div class="cb-hero-top"><span class="cb-crumb">Fiches combo · <span class="cb-word">Le Mans Ultimate</span><span class="cb-short">LMU</span></span>
+  return `<div class="cb-hero"><div class="cb-hero-top"><span class="cb-crumb">Fiche mémo · <span class="cb-word">Le Mans Ultimate</span><span class="cb-short">LMU</span></span>
       <div class="cb-tools"><button type="button" class="cb-btn is-quiet" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${esc(time)}" aria-label="Actualiser">↻<span class="cb-word"> ${view.refreshing ? 'Actualisation…' : 'Actualiser'}</span></button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn is-quiet" data-action="export" title="Exporter la fiche (JSON)">Exporter</button>' : ''}</div></div>
     ${picker()}${sheet ? sample() : ''}</div>
     <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
@@ -554,7 +538,7 @@ function periodsCard() {
 function render() {
   const message = view.message ? `<p class="cb-message" role="status">${esc(view.message)}</p>` : '';
   if (!view.combo) {
-    app.innerHTML = `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate</div><h1>Fiches combo</h1></div></div>${message}
+    app.innerHTML = `<div class="cb-topline"><div><div class="cb-crumb">Plugin SimHub · Le Mans Ultimate</div><h1>Fiche mémo</h1></div></div>${message}
       <p class="cb-empty">Aucune séance reçue pour l’instant. Relie SimHub et roule : la fiche de chaque voiture et de chaque circuit se remplit toute seule, avec les chiffres de chaque pilote.</p>${linkCard()}`;
     return;
   }
@@ -577,7 +561,7 @@ function render() {
       <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours. Équipage = moyenne des pilotes affichés. <span class="cb-best-key">En violet</span> : le meilleur pilote de la colonne.</p>
       ${c.laps ? `<div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyres()}` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
     ${pitStop()}${notes()}
-    <div class="cb-foot">${periodsCard()}${linked ? linkCard() : ''}</div>`;
+    <div class="cb-foot">${periodsCard()}</div>`;
 }
 
 // The filters in use, for the folded panel's title.
@@ -594,43 +578,7 @@ async function act(work, success = '') {
   catch (error) { view.message = error.message; }
 }
 
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch {
-    const field = app.querySelector('[data-code]');
-    if (!field) return false;
-    field.select();
-    try { return document.execCommand('copy'); } catch { return false; }
-  }
-}
-
-async function newCode() {
-  if (view.link?.linked && !confirm('Un nouveau code remplace l’ancien : il faudra le recoller dans SimHub. Continuer ?')) return;
-  view.linkBusy = true; render();
-  await act(async () => {
-    const result = await call('/api/combos/link', 'POST', {});
-    view.code = result.code; view.linkOpen = true;
-    view.link = await call('/api/combos/link');
-  });
-  view.linkBusy = false;
-  render();
-  if (view.code) { view.copied = await copy(view.code); render(); }
-}
-
 const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0).getTime() : null; };
-
-// The installer with this site written in: it fetches the latest plugin from here when double-clicked.
-async function downloadPlugin() {
-  await act(async () => {
-    const response = await fetch('/downloads/simhub/v0/installer.cmd', {cache:'no-store'});
-    if (!response.ok) throw Error('Installeur indisponible pour l’instant.');
-    const url = URL.createObjectURL(new Blob([installerFor(await response.text(), location.origin)], {type:'application/octet-stream'}));
-    const link = Object.assign(document.createElement('a'), {href:url, download:'Installer le plugin Fiches combo.cmd'});
-    document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
-  render();
-}
 
 async function exportSheet() {
   await act(async () => {
@@ -692,15 +640,8 @@ app.addEventListener('click', async event => {
     await loadSheet(); return;
   }
   switch (target.dataset.action) {
-    case 'new-code': await newCode(); break;
-    case 'copy-code': view.copied = await copy(view.code); render(); break;
-    case 'unlink':
-      if (!confirm('Retirer la liaison ? Ton plugin n’enverra plus rien tant que tu ne recolles pas un nouveau code.')) return;
-      await act(async () => { await call('/api/combos/link', 'DELETE', {}); view.link = await call('/api/combos/link'); view.code = ''; }, 'Liaison retirée.');
-      render(); break;
     case 'export': await exportSheet(); break;
     case 'refresh': await refresh(); break;
-    case 'download-plugin': await downloadPlugin(); break;
     case 'edit-note': view.editing = target.dataset.id; render(); break;
     case 'cancel-note': view.editing = null; render(); break;
     case 'delete-note':
@@ -785,7 +726,6 @@ app.addEventListener('toggle', event => {
   if (fold === 'periods') view.periodsOpen = event.target.open;
   if (fold === 'side') view.sideOpen = event.target.open;
   if (fold === 'laps') view.analysis.lapsOpen = event.target.open;
-  if (fold === 'link') view.linkOpen = event.target.open;
   if (fold === 'picker') view.pickerOpen = event.target.open;
 }, true);
 

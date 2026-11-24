@@ -480,6 +480,22 @@ export async function combosApi(path, method, request, env, actor, community) {
     }
   }
 
+  // « Retours des testeurs » (simhub.html): what the pilots sent from the plugin, for the platform managers only.
+  if (path === '/api/combos/reports' && method === 'GET') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const rows = await all(env, `SELECT r.id, r.created_at, r.version, r.kind, r.note, length(r.body) AS size, COALESCE(NULLIF(m.nickname,''), u.name) AS pilot
+      FROM plugin_reports r JOIN users u ON u.id=r.user_id LEFT JOIN memberships m ON m.user_id=r.user_id AND m.community_id=r.community_id
+      WHERE r.community_id=? ORDER BY r.created_at DESC LIMIT 100`, community.id);
+    return json({reports:rows.map(row => ({id:row.id, at:row.created_at, version:row.version, kind:row.kind, note:row.note, size:row.size, pilot:row.pilot}))});
+  }
+  const reportMatch = path.match(/^\/api\/combos\/reports\/([a-f0-9-]{36})$/);
+  if (reportMatch && method === 'GET') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const row = await env.DB.prepare('SELECT body FROM plugin_reports WHERE id=? AND community_id=?').bind(reportMatch[1], community.id).first();
+    if (!row) fail(404, 'Retour introuvable.');
+    return json({data:parsed(row.body)});
+  }
+
   if (path === '/api/combos/color' && method === 'PUT') {
     const input = await body(request);
     const color = String(input.color || '').toLowerCase();

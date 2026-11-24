@@ -98,6 +98,7 @@ const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
+const sourceSimhub = await readFile(root + 'simhub.html', 'utf8');
 const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
 const sourceWall = await readFile(root + 'mur.html', 'utf8');
 const sourceCharte = await readFile(root + 'charte.html', 'utf8');
@@ -106,9 +107,9 @@ const sourceCharte = await readFile(root + 'charte.html', 'utf8');
 // pages, styles/ux-refresh.css (the final layer) last.
 const PAGES = [
   ['index.html', sourceIndex], ['game.html', sourceGame], ['members.html', sourceMembers], ['diagnostics.html', sourceDiagnostics],
-  ['help.html', sourceHelp], ['demande-communaute.html', sourceRequest], ['fiches-combo.html', sourceCombos],
+  ['help.html', sourceHelp], ['demande-communaute.html', sourceRequest], ['fiches-combo.html', sourceCombos], ['simhub.html', sourceSimhub],
   ['mur-des-stands.html', sourceLive], ['mur.html', sourceWall], ['charte.html', sourceCharte]];
-const PAGE_ONLY = {'styles/combos.css':'combos', 'styles/live.css':'live', 'styles/pit-wall.css':'wall',
+const PAGE_ONLY = {'styles/combos.css':'combos', 'styles/simhub.css':'combos', 'styles/live.css':'live', 'styles/pit-wall.css':'wall',
   'styles/charte.css':'charte', 'styles/diagnostics.css':'diagnostics', 'help.css':'help'};
 const FINAL_LAYER = 'styles/ux-refresh.css';
 const pagePaths = PAGES.map(([name, source]) => stylesheetPaths(source, name));
@@ -130,7 +131,7 @@ const pageHtml = name => {
 const uniqueStylesheetPaths = order;
 
 await writeFile(new URL('index.html', out), pageHtml('index.html'));
-for (const name of ['members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html', 'charte.html'])
+for (const name of ['members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'simhub.html', 'mur-des-stands.html', 'mur.html', 'charte.html'])
   await writeFile(new URL(name, out), pageHtml(name));
 const gameHtml = pageHtml('game.html');
 await writeFile(new URL('lmu/index.html', out), gameHtml);
@@ -157,7 +158,7 @@ await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 
 // The SimHub plugin (its code lives in the endurance-manager-plugin repo; each of its Releases opens a PR here that
 // replaces connectors/simhub-plugin/v0/: the DLL, its plugin.json as published, the installer). Served twice:
-// - /downloads/simhub/v0/: what the 0.x plugins and the Télémétrie Mémo page read (plugin.json kept whole, with its
+// - /downloads/simhub/v0/: what the 0.x plugins and the Plugin SimHub page read (plugin.json kept whole, with its
 //   « Ce qui change »; checked here against the DLL so a wrong pair never ships: the plugins would loop on it);
 // - /downloads/simhub/: the same DLL announced as 2.99.0, so the old 2.x plugins update themselves to the 0.x once
 //   (a 0.x reads only v0/ afterwards: no loop). The installer is the 0.x one in both places.
@@ -207,7 +208,7 @@ async function addModulePreloads(file) {
   const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
-for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'simhub.html', 'mur-des-stands.html', 'mur.html',
   'lmu/index.html', 'iracing/index.html', 'events/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
@@ -235,6 +236,9 @@ await writeFile(new URL('_headers', out), `/*
   X-Robots-Tag: noindex, nofollow
 
 /fiches-combo.html
+  X-Robots-Tag: noindex, nofollow
+
+/simhub.html
   X-Robots-Tag: noindex, nofollow
 
 /mur-des-stands.html
@@ -266,6 +270,7 @@ Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
 Disallow: /fiches-combo.html
+Disallow: /simhub.html
 Disallow: /mur-des-stands.html
 Disallow: /mur.html
 Disallow: /mur
