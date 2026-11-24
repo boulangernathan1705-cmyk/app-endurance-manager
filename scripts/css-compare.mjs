@@ -35,7 +35,7 @@ async function snap(file) {
   const pages = [['/lmu/', admin], ['/lmu/', pilot], [`/lmu/#event=${race('24h du Mans')}`, admin], [`/lmu/#event=${race('6h de Spa')}`, pilot],
     [`/lmu/#event=${races.find(item => item.format === 'solo')?.id}`, pilot], ['/lmu/#inscriptions', pilot], ['/lmu/#semaine', admin], ['/lmu/#equipages', admin],
     ['/events/', admin], ['/iracing/', admin], ['/members.html', admin], ['/charte.html', admin], ['/help.html', pilot], ['/diagnostics.html', admin],
-    ['/demande-communaute.html', pilot], ['/fiches-combo.html', admin], ['/mur-des-stands.html', admin], ['/mur.html', admin], ['/', null]];
+    ['/demande-communaute.html', pilot], ['/fiches-combo.html', admin], ['/simhub.html', admin], ['/mur-des-stands.html', admin], ['/mur.html', admin], ['/', null]];
   // CHROMIUM: another browser than the one of the repo's Playwright (a cloud machine: /opt/pw-browsers/chromium).
   const browser = await chromium.launch(process.env.CHROMIUM ? {executablePath:process.env.CHROMIUM} : {}), out = {};
   for (const [width, height] of [[1366, 900], [390, 844]]) for (const [path, session] of pages) {

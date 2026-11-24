@@ -149,6 +149,17 @@ test('the plugin sends sessions with the pilot’s key, once each, and stops whe
   assert.deepEqual({...kept, body:JSON.parse(kept.body)}, {kind:'signal', version:'2.6.0', note:'Le profil Pluie ne s’applique pas', body:{log:[{at:1, what:'Profil1', text:'TC introuvable'}]}});
   assert.equal((await plugin('/api/combos/plugin/report', key, 'POST', {kind:'autre'})).status, 400);
   assert.equal((await plugin('/api/combos/plugin/report', 'nope', 'POST', {kind:'journal'})).status, 401);
+  // « Retours des testeurs » on the site: the platform managers only, the journal fetched on its own.
+  assert.equal((await req('/api/combos/reports', 'GET', null, NATHAN)).status, 403);
+  assert.equal((await req(`/api/combos/reports/${report.data.id}`, 'GET', null, NATHAN)).status, 403);
+  signIn(MANAGER, 'Max');
+  const reports = (await req('/api/combos/reports', 'GET', null, MANAGER)).data.reports;
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].pilot, 'Nathan');
+  assert.equal(reports[0].kind, 'signal');
+  assert.equal(reports[0].body, undefined);
+  assert.deepEqual((await req(`/api/combos/reports/${report.data.id}`, 'GET', null, MANAGER)).data.data, {log:[{at:1, what:'Profil1', text:'TC introuvable'}]});
+  assert.equal((await req(`/api/combos/reports/${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}`, 'GET', null, MANAGER)).status, 404);
 
   // Lost the team role on Discord: the key is refused, the data stays.
   setMember(DB.db, NATHAN, []);
@@ -493,8 +504,17 @@ test('the fiches combo page: its own tab for the roles that see them, nothing ru
   assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
   const front = readFileSync(new URL('../front/combos-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(front, /\son[a-z]+="/i, 'no inline handler (CSP)');
+  // Module « Plugin SimHub »: one tab in the menu, its home page holds the install and the link, a tab bar joins its pages.
+  const home = readFileSync(new URL('../simhub.html', import.meta.url), 'utf8');
+  assert.match(home, /src="\/front\/simhub-page\.mjs/);
+  assert.match(home, /href="\/simhub\.html" data-module-link="combos" aria-current="page">Plugin SimHub</);
+  assert.doesNotMatch(home, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
+  for (const source of [home, page]) assert.match(source, /class="sh-tabs"[^>]*><a href="\/simhub\.html"[^>]*>Accueil<\/a><a href="\/fiches-combo\.html"[^>]*>Fiche mémo<\/a><a href="\/mur\.html">Mur des stands<\/a>/);
+  const simhub = readFileSync(new URL('../front/simhub-page.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(simhub, /\son[a-z]+="/i, 'no inline handler (CSP)');
+  assert.match(simhub, /bêta/, 'a 0.x plugin is announced as a beta');
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a><a class="nav-section-button" href="\/mur\.html">Mur des stands<\/a>'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/simhub\.html">Plugin SimHub<\/a>'/);
 });
 
 test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {
