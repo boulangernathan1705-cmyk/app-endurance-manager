@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import {discordDiagnostic} from '../server/discord-diagnostic.mjs';
+import {discordSupervision} from '../server/discord-supervision.mjs';
+import {platformApi} from '../server/api-platform.mjs';
 
 // « Diagnostic Discord »: what the bot should have made this week (threads, crew voices) and where each one stands.
 const MIGRATIONS = readdirSync(new URL('../migrations/', import.meta.url)).filter(name => name.endsWith('.sql')).sort();
@@ -54,4 +56,37 @@ test('without the modules, nothing is expected', async () => {
   env.DB.db.prepare("UPDATE community_recap_settings SET enabled=0").run();
   const result = await discordDiagnostic(env, {...COMMUNITY, modules:{}}, {timestamp:NOW});
   assert.deepEqual([result.recap.on, result.voices.on, result.threads.length, result.crews.length], [false, false, 0, 0]);
+});
+
+
+test('platform supervision reports pending voices, overdue recaps and errors without contacting Discord or writing', async()=>{
+  const env=setup(), db=env.DB.db;
+  db.prepare("UPDATE communities SET modules=? WHERE id='c1'").run(JSON.stringify({crewChannels:true}));
+  db.prepare("UPDATE community_recap_settings SET last_error='Discord refused' WHERE community_id='c1'").run();
+  db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,channel_id,marker,delete_after) VALUES('c1','deleted-race',?,'602','m',?)").run(GUILD,NOW-HOUR);
+  db.prepare("INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES('c1','e1',?)").run(NOW-HOUR);
+  db.prepare("INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at,closed_at) VALUES('orphan','c1',?,'702',0,?)").run(GUILD,NOW-HOUR);
+  db.prepare("INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES('c2','other','Other','O','400000000000000002',0)").run();
+  const original=globalThis.fetch, prepare=env.DB.prepare.bind(env.DB);
+  globalThis.fetch=async()=>{throw Error('No external requests allowed');};
+  env.DB.prepare=sql=>{assert.match(sql.trim(),/^SELECT/i);return prepare(sql);};
+  try{
+    const result=await discordSupervision({...env,SITE_ENV:'development',DISCORD_BOT_TOKEN:'secret-test'},NOW);
+    assert.equal(result.development,true);
+    assert.equal(result.botConfigured,true);
+    assert.doesNotMatch(JSON.stringify(result),/secret-test/);
+    const first=result.communities.find(row=>row.slug==='test'), second=result.communities.find(row=>row.slug==='other');
+    assert.equal(first.state,'error');assert.deepEqual(first.errors,['Discord refused']);
+    assert.equal(first.openThreads,3);assert.equal(first.overdueThreads,1);
+    assert.equal(first.waitingVoices,1);assert.equal(first.incompleteVoices,1);
+    assert.equal(first.orphanCount,1);assert.equal(first.queueAt,NOW-HOUR);
+    assert.equal(second.state,'off');assert.equal(second.waitingVoices,0);assert.deepEqual(second.errors,[]);
+  }finally{globalThis.fetch=original;env.DB.prepare=prepare;}
+});
+
+test('platform supervision refuses community administrators who are not platform managers',async()=>{
+  await assert.rejects(platformApi({path:'/api/platform/discord/supervision',method:'GET',actor:{manager:false,permissions:new Set(['admin'])}}),error=>error.status===403);
+  const env=setup(), response=await platformApi({path:'/api/platform/discord/supervision',method:'GET',env,actor:{manager:true}});
+  assert.equal(response.status,200);
+  assert.ok((await response.json()).communities.some(row=>row.slug==='test'));
 });
