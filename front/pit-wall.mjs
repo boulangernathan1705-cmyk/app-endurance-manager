@@ -7,6 +7,9 @@ import {COLORS} from '../shared/combos.mjs';
 import {addToPath, isRace, lapsLeft, median, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('pw-app');
+// Inside the « Plugin SimHub » page (simhub.html, tab « Mur des stands »), or alone in full screen (mur.html).
+const embed = app.closest('.sh-wall');
+const shown = () => document.visibilityState !== 'hidden' && !app.closest('[hidden]');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const known = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 const fr = (value, digits = 1) => known(value) ? Number(value).toLocaleString('fr-FR', {minimumFractionDigits:digits, maximumFractionDigits:digits}) : '—';
@@ -34,7 +37,7 @@ async function call(path) {
 }
 
 function renderError(error) {
-  const action = error.status === 401 ? `<a class="pw-button" href="/api/auth/discord?return=${encodeURIComponent('/mur.html')}">Se connecter avec Discord</a>` : '<a class="pw-button" href="/lmu/">Retour aux courses</a>';
+  const action = error.status === 401 ? `<a class="pw-button" href="/api/auth/discord?return=${encodeURIComponent(embed ? '/simhub.html' : '/mur.html')}">Se connecter avec Discord</a>` : '<a class="pw-button" href="/lmu/">Retour aux courses</a>';
   app.innerHTML = `<div class="pw-card pw-empty"><h1>Mur des stands</h1><p>${esc(error.message)}</p>${action}</div>`;
 }
 
@@ -87,13 +90,15 @@ async function connect() {
 // The room sends only to a page on screen, and the cars' positions only while the map is shown.
 let viewSent = null;
 function tellView(again = false) {
-  const state = {type:'view', watch:document.visibilityState !== 'hidden', map:view.tab === 'map'};
+  const state = {type:'view', watch:shown(), map:view.tab === 'map'};
   const text = JSON.stringify(state);
   if (!socket || socket.readyState !== WebSocket.OPEN || (text === viewSent && !again)) return;
   socket.send(JSON.stringify(again ? {...state, again:true} : state));
   viewSent = text;
 }
 document.addEventListener('visibilitychange', () => tellView());
+// The page's tabs (front/simhub-page.mjs): hidden, the wall stops watching; shown again, it catches up.
+document.addEventListener('sh-panel', () => { tellView(); if (shown() && view.started) render(); });
 
 // Only the session under way: a car's feed in a new session replaces its earlier ones.
 function keep(input, pos = null) {
@@ -205,7 +210,8 @@ function header(feed) {
   const full = document.fullscreenEnabled ? `<button class="pw-icon" type="button" data-full aria-label="${document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran'}">${document.fullscreenElement ? '🗗' : '⛶'}</button>` : '';
   const session = feed ? `<div class="pw-session"><span>${esc(sessionName(feed.snap.session))}</span><b>${clock(timeLeft(feed))}</b></div>` : '';
   return `<div class="pw-top pw-card">
-    <a class="pw-brand" href="/simhub.html" aria-label="Retour au module Plugin SimHub"><img src="/images/endurance-manager-logo.webp" alt="" width="30" height="30"><b>Mur des stands</b></a>
+    ${embed ? '<a class="pw-brand" href="/mur.html" target="_blank" rel="noopener" title="Ouvrir le mur seul, pour un second écran"><b>Second écran ↗</b></a>'
+      : '<a class="pw-brand" href="/simhub.html#mur" aria-label="Retour au module Plugin SimHub"><img src="/images/endurance-manager-logo.webp" alt="" width="30" height="30"><b>Mur des stands</b></a>'}
     ${session}<div class="pw-status">${link}${rate}${full}</div></div>`;
 }
 
@@ -713,7 +719,7 @@ function showTab(tab) {
   history.replaceState(null, '', `#${view.tab}`);
   remember();
   tellView();
-  window.scrollTo(0, 0);
+  if (!embed) window.scrollTo(0, 0);
   render();
 }
 app.addEventListener('click', event => {
@@ -725,14 +731,14 @@ app.addEventListener('click', event => {
   else if (button.dataset.feed) view.key = button.dataset.feed;
   else if ('full' in button.dataset) {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else document.documentElement.requestFullscreen().catch(() => {});
+    else (embed || document.documentElement).requestFullscreen().catch(() => {});
     return;
   } else return;
   render();
 });
 // Keys 1 to 5 open the tabs, as on PitData.
 document.addEventListener('keydown', event => {
-  if (event.ctrlKey || event.metaKey || event.altKey || /input|textarea|select/i.test(event.target.tagName)) return;
+  if (!shown() || event.ctrlKey || event.metaKey || event.altKey || /input|textarea|select/i.test(event.target.tagName)) return;
   const tab = TABS[Number(event.key) - 1];
   if (tab) showTab(tab[0]);
 });
@@ -745,7 +751,7 @@ async function start() {
   render();
   connect();
   // Clocks and ages move between two messages; the curves scroll.
-  setInterval(render, 1000);
+  setInterval(() => { if (shown()) render(); }, 1000);
   requestAnimationFrame(glide);
 }
 start();

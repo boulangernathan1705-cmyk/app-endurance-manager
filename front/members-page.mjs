@@ -621,15 +621,31 @@ function requestsMarkup(requests, baseDomain, testSite) {
     ${requests.length ? `<div class="request-list">${cards}</div>` : '<p class="members-help">Aucune demande pour le moment. Les gérants de serveur Discord la font depuis la page <a href="/demande-communaute.html">Demander un espace</a>.</p>'}</section>`;
 }
 
+// « Retours des testeurs »: problems and session journals sent from the plugin to this community, kept 60 days.
+let platformReports = [];
+const REPORT_KINDS = {signal:'Problème signalé', journal:'Journal de séance'};
+function reportsMarkup(reports) {
+  const day = seconds => new Date(seconds * 1000).toLocaleString('fr-FR', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  const rows = reports.map(item => `<article class="platform-row platform-report"><div><strong>${esc(item.pilot)} · ${esc(REPORT_KINDS[item.kind] || item.kind)}</strong>
+    <span>${esc(day(item.at))}${item.version ? ` · plugin ${esc(item.version)}` : ''}</span>${item.note ? `<p>${esc(item.note)}</p>` : ''}</div>
+    <button type="button" class="secondary-button" data-report="${esc(item.id)}">Télécharger</button></article>`).join('');
+  return `<section class="settings-card"><h2>Retours des testeurs (${reports.length})</h2><p class="members-help">Envoyés depuis le plugin par les pilotes de cette communauté. Ils restent 60 jours.</p>
+    ${reports.length ? `<div class="platform-list">${rows}</div>` : '<p class="members-help">Aucun retour pour l’instant.</p>'}</section>`;
+}
+
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const [{communities, baseDomain, showcase, testSite, official}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
+  // The testers' reports sent from the plugin to this community (module Plugin SimHub open here), else nothing.
+  const [{communities, baseDomain, showcase, testSite, official}, {requests}, reports] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests'),
+    api('/api/combos/reports').then(result => result.reports, () => null)]);
+  platformReports = reports || [];
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
   const plugin = communities.map(item => `<label class="platform-row platform-plugin"><strong>${esc(item.name)}</strong><span class="admin-switch"><input type="checkbox" role="switch" data-platform-plugin="${esc(item.slug)}" aria-label="Plugin SimHub pour ${esc(item.name)}" ${item.plugin ? 'checked' : ''}><i aria-hidden="true"></i></span></label>`).join('');
   return `${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
     <section class="settings-card"><h2>Plugin SimHub</h2><p class="members-help">Ouvre l’onglet Plugin SimHub d’une communauté. Ses administrateurs donnent ensuite l’autorisation « Plugin SimHub » aux rôles.</p><div class="platform-list">${plugin}</div></section>
+    ${reports ? reportsMarkup(reports) : ''}
     ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>
       <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Vue d’ensemble ».</p>
       <form class="settings-appearance" data-new-community>
@@ -894,6 +910,21 @@ app.addEventListener('click', async event => {
     refresh.disabled = true; refresh.textContent = 'Actualisation…';
     try { await api('/api/members/refresh', 'POST', {}); await reload('members'); }
     catch (error) { refresh.disabled = false; refresh.textContent = 'Actualiser depuis Discord'; alert(error.message); }
+    return;
+  }
+  // A tester's report: its journal saved as a file.
+  const report = event.target.closest('[data-report]');
+  if (report) {
+    const item = platformReports.find(entry => entry.id === report.dataset.report);
+    if (!item) return;
+    report.disabled = true;
+    try {
+      const {data} = await api(`/api/combos/reports/${encodeURIComponent(item.id)}`);
+      const url = URL.createObjectURL(new Blob([JSON.stringify({...item, data}, null, 2)], {type:'application/json'}));
+      const link = Object.assign(document.createElement('a'), {href:url, download:`retour-${item.pilot}-${new Date(item.at * 1000).toISOString().slice(0, 16)}.json`.replace(/[^\w.-]+/g, '-')});
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { alert(error.message); } finally { report.disabled = false; }
     return;
   }
   const remove = event.target.closest('[data-delete-community]');
