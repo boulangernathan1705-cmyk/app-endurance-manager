@@ -34,7 +34,7 @@ export function accessBadge(event) {
   // A stream: its violet badge, then the freely chosen activity.
   if (isStream(event)) { const {activity} = streamDetails(event); return `<span class="event-badge-row">${simBadge(event)}${activity ? `<span class="event-type-badge stream-activity">${esc(activity)}</span>` : ''}</span>`; }
   if (!state.eventTdz) return `<span class="event-badge-row">${simBadge(event)}</span>`;
-  const safe = event.access === 'safe', type = event.details?.type || '';
+  const safe = event.access === 'safe', type = isGrindfest(event) ? 'Gridfest' : event.details?.type || '';
   const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
   if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
   return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;

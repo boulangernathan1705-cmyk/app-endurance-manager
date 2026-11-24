@@ -25,7 +25,10 @@
   --em-kind-lmu: #e5484d;
   --em-kind-iracing: #4f74d8;
   --em-kind-event: #f3b33d;
-  --em-kind-gridfest: #ff7a1a;
+  --em-kind-open: #52d3d8;
+  --em-kind-safe: #e9bb5f;
+  --em-kind-bouloules: #ef8197;
+  --em-kind-gridfest: #f47c57;
   --em-kind-stream: #a970ff;
   /* Sizes */
   --em-text-xs: 11.5px;

@@ -209,3 +209,6 @@
     font-size: 11px;
   }
 }
+
+.help-load-error { margin: var(--em-space-4) auto; padding: var(--em-space-4); max-width: 36rem; background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); }
+.help-load-error p { margin-top: 0; }

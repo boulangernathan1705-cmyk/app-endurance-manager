@@ -40,7 +40,8 @@ export function slotPicker(event,departure,{kind,id,version,label}){
 function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,event,otherCommunity=false){
   if(startHasBegun(departure))return '';
   const actions=[];
-  if(crew.canManage)actions.push(slotPicker(event,departure,{kind:'crew',id:crew.id,version:crew.version,label:'Choisir notre départ'}));
+  const slots=crew.canManage?slotPicker(event,departure,{kind:'crew',id:crew.id,version:crew.version,label:'Choisir notre départ'}):'';
+  if(slots)actions.push(slots);
   // « Inscription par catégorie »: the TM places the pilots, they don't join by themselves.
   if(!ownMember&&!memberElsewhere&&!otherCommunity&&!crew.locked&&state.user&&!(state.categoryEntry&&!can('crews'))){
     const registration=joinRegistration?.id||'';
