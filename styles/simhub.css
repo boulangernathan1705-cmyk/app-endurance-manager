@@ -1,0 +1,73 @@
+/* Module « Plugin SimHub » (simhub.html, front/simhub-page.mjs): its three pages share one tab bar (Accueil, Fiche
+   mémo, Mur des stands); the home page holds the plugin's install and link, then one tile per page that uses it. */
+.sh-tabs { display: flex; gap: var(--em-space-1); width: fit-content; max-width: 100%; box-sizing: border-box; padding: var(--em-space-1);
+  background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-pill); }
+.sh-tabs a { padding: 9px 16px; border-radius: var(--em-radius-pill); color: var(--em-text); text-decoration: none; font-size: var(--em-text-md); white-space: nowrap; }
+.sh-tabs a:hover { background: var(--em-panel-2); }
+.sh-tabs a[aria-current="page"] { background: var(--em-accent); color: var(--em-bg); font-weight: 700; }
+.simhub-tabs-wrap { padding-bottom: 0; }
+.simhub-tabs-wrap + .combos-page { padding-top: var(--em-space-3); }
+
+.simhub-page #simhub-body { display: grid; gap: 18px; }
+.sh-head h1 { margin-top: 2px; }
+.sh-card { background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); padding: var(--em-space-5);
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--em-space-5) 32px; }
+.sh-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2) var(--em-space-3); }
+.sh-state b { font-size: var(--em-text-lg); }
+.sh-state span { color: var(--em-muted); font-size: var(--em-text-md); }
+.sh-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--em-faint); flex: none; }
+.sh-dot.is-on { background: var(--em-ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--em-ok) 20%, transparent); }
+.sh-install { display: grid; gap: var(--em-space-4); align-content: start; }
+.sh-get { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-3) var(--em-space-4); }
+.sh-get .cb-btn.is-main { background: var(--em-accent); border-color: var(--em-accent); color: var(--em-bg); padding: 12px 20px; font-size: var(--em-text-md); border-radius: var(--em-radius-md); }
+.sh-version { display: grid; gap: 2px; }
+.sh-version b { font-size: var(--em-text-md); }
+.sh-version span { color: var(--em-muted); font-size: var(--em-text-sm); }
+.sh-version .sh-beta { margin-left: var(--em-space-1); padding: 1px 8px; border-radius: var(--em-radius-pill); background: var(--em-warn); color: var(--em-bg); font-size: var(--em-text-xs); font-weight: 700; }
+.sh-steps { margin: 0; padding: 0 0 0 28px; border-left: 1px solid var(--em-border); list-style: none; display: grid; gap: var(--em-space-3); align-content: start;
+  font-size: var(--em-text-md); counter-reset: sh; }
+.sh-steps li { counter-increment: sh; display: flex; align-items: baseline; gap: var(--em-space-3); }
+.sh-steps li::before { content: counter(sh); color: var(--em-accent); font-weight: 700; }
+.sh-steps .sh-alone { color: var(--em-muted); font-size: var(--em-text-sm); }
+.sh-steps .sh-alone::before { content: ''; min-width: 8px; }
+.sh-link { min-height: 0; min-width: 0; font: inherit; font-weight: 600; color: var(--em-accent); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+.sh-link:disabled { opacity: .6; cursor: default; }
+.sh-code { grid-column: 1 / -1; display: grid; gap: var(--em-space-2); }
+.sh-more { grid-column: 1 / -1; color: var(--em-muted); font-size: var(--em-text-sm); }
+.sh-more summary { cursor: pointer; }
+.sh-more p { margin: var(--em-space-2) 0 0; }
+
+.sh-section { margin: 6px 0 0; font-size: var(--em-text-sm); letter-spacing: .08em; text-transform: uppercase; color: var(--em-muted); }
+.combos-page h2.sh-section { font-size: var(--em-text-sm); }
+.sh-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--em-space-4); }
+.sh-tile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto 1fr; gap: var(--em-space-2) var(--em-space-3); align-items: start;
+  padding: 20px; background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); color: var(--em-text); text-decoration: none;
+  font: inherit; text-align: left; cursor: pointer; }
+.sh-tile:hover { border-color: var(--em-muted); }
+.sh-tile svg { grid-row: 1 / span 3; color: var(--em-accent); }
+.sh-tile b { font-size: var(--em-text-lg); }
+.sh-tile .sh-go { color: var(--em-faint); font-size: 22px; line-height: 1; }
+.sh-tile .sh-what { grid-column: 2 / span 2; color: var(--em-muted); font-size: var(--em-text-md); line-height: 1.45; }
+.sh-tile .sh-info { grid-column: 2 / span 2; color: var(--em-text); font-size: var(--em-text-sm); align-self: end; }
+.sh-tile.is-private { border-style: dashed; }
+.sh-tile.is-private svg, .sh-tile .sh-new { color: var(--em-warn); }
+
+.sh-reports { display: grid; gap: var(--em-space-2); margin: 0; padding: 0; list-style: none; }
+.sh-report { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--em-space-1) var(--em-space-3); align-items: center;
+  padding: var(--em-space-3) var(--em-space-4); background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-md); }
+.sh-report b { font-size: var(--em-text-md); }
+.sh-report span { color: var(--em-muted); font-size: var(--em-text-sm); }
+.sh-report p { grid-column: 1 / -1; margin: 0; font-size: var(--em-text-md); white-space: pre-line; overflow-wrap: anywhere; }
+.sh-report.is-new { border-color: var(--em-warn); }
+
+@media (max-width: 760px) {
+  .sh-tabs { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sh-tabs a { padding: 10px 4px; text-align: center; font-size: var(--em-text-sm); }
+  .sh-card { grid-template-columns: minmax(0, 1fr); padding: 18px; }
+  .sh-get .cb-btn.is-main { width: 100%; }
+  .sh-steps { border-left: 0; border-top: 1px solid var(--em-border); padding: 14px 0 0; }
+  .sh-tiles { grid-template-columns: minmax(0, 1fr); }
+  .sh-tile { padding: var(--em-space-4); }
+  .sh-tile .sh-what { display: none; }
+}
+.combos-page .cb-message a { color: var(--em-accent); }

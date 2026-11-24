@@ -100,7 +100,7 @@ function communitiesMarkup(communities) {
 function renderConnected(user, communities = []) {
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
   // On a phone the top bar keeps only the icons: the LMU tools move into this menu (styles/ux-refresh.css).
-  const tools = siteCombos ? `<a class="account-menu-item account-phone-only" href="/fiches-combo.html">Fiches combo</a><a class="account-menu-item account-phone-only" href="/mur.html">Mur des stands</a>` : '';
+  const tools = siteCombos ? `<a class="account-menu-item account-phone-only" href="/simhub.html">Plugin SimHub</a>` : '';
 
   root.innerHTML = `<div class="account-menu">
     <button type="button" class="account-trigger" aria-haspopup="menu" aria-expanded="false">
@@ -206,7 +206,7 @@ async function loadSession() {
     // EVENT TDZ on: the banner leads to the events (all sims).
     if (session.soloRaces === true && session.access === 'member')
       for (const link of document.querySelectorAll('a.brand-button')) link.href = '/events/';
-    // The LMU module's own tab (fiches-combo.html): only for the roles that see the fiches combo.
+    // The LMU module's own tab (Plugin SimHub: simhub.html, fiches-combo.html): only for the roles that see the fiches combo.
     for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = link.dataset.moduleLink === 'combos' && session.combos !== true;
     // The administration's own tabs (Administration · Diagnostics): only for those who may open them.
     const admin = Array.isArray(session.permissions) && session.permissions.includes('admin');

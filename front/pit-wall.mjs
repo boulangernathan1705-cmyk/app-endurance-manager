@@ -205,7 +205,7 @@ function header(feed) {
   const full = document.fullscreenEnabled ? `<button class="pw-icon" type="button" data-full aria-label="${document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran'}">${document.fullscreenElement ? '🗗' : '⛶'}</button>` : '';
   const session = feed ? `<div class="pw-session"><span>${esc(sessionName(feed.snap.session))}</span><b>${clock(timeLeft(feed))}</b></div>` : '';
   return `<div class="pw-top pw-card">
-    <a class="pw-brand" href="/" aria-label="Retour à l’accueil Endurance Manager"><img src="/images/endurance-manager-logo.webp" alt="" width="30" height="30"><b>Mur des stands</b></a>
+    <a class="pw-brand" href="/simhub.html" aria-label="Retour au module Plugin SimHub"><img src="/images/endurance-manager-logo.webp" alt="" width="30" height="30"><b>Mur des stands</b></a>
     ${session}<div class="pw-status">${link}${rate}${full}</div></div>`;
 }
 
