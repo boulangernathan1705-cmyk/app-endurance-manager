@@ -31,6 +31,12 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  for (const sim of ['lmu','iracing']) {
   const card=page.locator('.week-block.is-'+sim);
   const art=card.locator('.endurance-card-head');
+  const caption=art.locator('.endurance-card-caption');
+  await expect(caption).toBeVisible();
+  const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
+  expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
+  expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+  expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+sim+'.webp');
   expect(await page.evaluate(async sim=>{
    const image=new Image();image.src='/images/endurance/'+sim+'.webp';
