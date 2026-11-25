@@ -152,7 +152,7 @@ test('weekly multi-start cards show only one schedule at mobile and desktop widt
   await page.evaluate(() => {
     const fixture=document.createElement('div');
     fixture.id='week-schedule-regression';
-    fixture.innerHTML='<button class="week-block is-endurance is-lmu"><span class="week-block-band is-many"><span><b>3h</b><small> → 7h30</small></span><span><b>8h</b><small> → 12h30</small></span></span><span class="week-block-body"><span class="week-block-title"><span class="week-block-name">Endurance</span></span><span class="week-block-plan"><span class="week-plan-row">Départ 1 · 3h → 7h30</span><span class="week-plan-row">Départ 2 · 8h → 12h30</span></span></span></button>';
+    fixture.innerHTML='<button class="week-block is-endurance is-lmu"><span class="week-block-band is-many"><span><b>3h</b><small> → 7h30</small></span><span><b>8h</b><small> → 12h30</small></span></span><span class="week-block-body"><span class="week-block-title"><span class="week-block-name">Endurance</span></span><span class="week-block-plan"><span class="week-plan-row"><span aria-label="Départ">🏁</span><span class="week-plan-time"><b>3h</b></span></span><span class="week-plan-row"><span aria-label="Départ">🏁</span><span class="week-plan-time"><b>8h</b></span></span></span></span></button>';
     document.body.append(fixture);
   });
   const card=page.locator('#week-schedule-regression .week-block');
@@ -161,5 +161,7 @@ test('weekly multi-start cards show only one schedule at mobile and desktop widt
     await expect(card.locator('.week-block-band')).toHaveCSS('display','none');
     await expect(card.locator('.week-block-plan')).toHaveCSS('display','grid');
     await expect(card.locator('.week-plan-row:visible')).toHaveCount(2);
+    await expect(card.locator('.week-block-plan')).not.toContainText('→');
+    await expect(card.locator('.week-block-plan')).not.toContainText(/Départ [12]/);
   }
 });
