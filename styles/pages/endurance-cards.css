@@ -302,23 +302,35 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
 }
 
 /* LMU Assister covers, optimized and served locally. */
-.endurance-card-head.endurance-track-bahrain { --endurance-photo: url('/images/endurance/lmu/bahrain.webp'); }
-.endurance-card-head.endurance-track-barcelona { --endurance-photo: url('/images/endurance/lmu/barcelona.webp'); }
-.endurance-card-head.endurance-track-cota { --endurance-photo: url('/images/endurance/lmu/cota.webp'); }
-.endurance-card-head.endurance-track-daytona { --endurance-photo: url('/images/endurance/lmu/daytona.webp'); }
-.endurance-card-head.endurance-track-fuji { --endurance-photo: url('/images/endurance/lmu/fuji.webp'); }
-.endurance-card-head.endurance-track-imola { --endurance-photo: url('/images/endurance/lmu/imola.webp'); }
-.endurance-card-head.endurance-track-interlagos { --endurance-photo: url('/images/endurance/lmu/interlagos.webp'); }
-.endurance-card-head.endurance-track-laguna-seca { --endurance-photo: url('/images/endurance/lmu/laguna-seca.webp'); }
-.endurance-card-head.endurance-track-le-mans { --endurance-photo: url('/images/endurance/lmu/le-mans.webp'); }
-.endurance-card-head.endurance-track-long-beach { --endurance-photo: url('/images/endurance/lmu/long-beach.webp'); }
-.endurance-card-head.endurance-track-lusail { --endurance-photo: url('/images/endurance/lmu/lusail.webp'); }
-.endurance-card-head.endurance-track-monza { --endurance-photo: url('/images/endurance/lmu/monza.webp'); }
-.endurance-card-head.endurance-track-paul-ricard { --endurance-photo: url('/images/endurance/lmu/paul-ricard.webp'); }
-.endurance-card-head.endurance-track-portimao { --endurance-photo: url('/images/endurance/lmu/portimao.webp'); }
-.endurance-card-head.endurance-track-road-atlanta { --endurance-photo: url('/images/endurance/lmu/road-atlanta.webp'); }
-.endurance-card-head.endurance-track-sebring { --endurance-photo: url('/images/endurance/lmu/sebring.webp'); }
-.endurance-card-head.endurance-track-silverstone { --endurance-photo: url('/images/endurance/lmu/silverstone.webp'); }
-.endurance-card-head.endurance-track-spa { --endurance-photo: url('/images/endurance/lmu/spa.webp'); }
+.endurance-card-head.endurance-track-bahrain { --endurance-photo: url('/images/endurance/lmu/bahrain.webp'); --track-focus-compact: 50% 35%; --track-focus-wide: 50% 29%; --track-focus-detail: 50% 30%; }
+.endurance-card-head.endurance-track-barcelona { --endurance-photo: url('/images/endurance/lmu/barcelona.webp'); --track-focus-compact: 50% 72%; --track-focus-wide: 50% 78%; --track-focus-detail: 50% 70%; }
+.endurance-card-head.endurance-track-cota { --endurance-photo: url('/images/endurance/lmu/cota.webp'); --track-focus-compact: 50% 30%; --track-focus-wide: 50% 73%; --track-focus-detail: 50% 67%; }
+.endurance-card-head.endurance-track-daytona { --endurance-photo: url('/images/endurance/lmu/daytona.webp'); --track-focus-compact: 50% 64%; --track-focus-wide: 50% 62%; --track-focus-detail: 50% 65%; }
+.endurance-card-head.endurance-track-fuji { --endurance-photo: url('/images/endurance/lmu/fuji.webp'); --track-focus-compact: 50% 78%; --track-focus-wide: 50% 70%; --track-focus-detail: 50% 76%; }
+.endurance-card-head.endurance-track-imola { --endurance-photo: url('/images/endurance/lmu/imola.webp'); --track-focus-compact: 50% 34%; --track-focus-wide: 50% 41%; --track-focus-detail: 50% 40%; }
+.endurance-card-head.endurance-track-interlagos { --endurance-photo: url('/images/endurance/lmu/interlagos.webp'); --track-focus-compact: 50% 52%; --track-focus-wide: 50% 37%; --track-focus-detail: 50% 45%; }
+.endurance-card-head.endurance-track-laguna-seca { --endurance-photo: url('/images/endurance/lmu/laguna-seca.webp'); --track-focus-compact: 50% 44%; --track-focus-wide: 50% 62%; --track-focus-detail: 50% 53%; }
+.endurance-card-head.endurance-track-le-mans { --endurance-photo: url('/images/endurance/lmu/le-mans.webp'); --track-focus-compact: 50% 34%; --track-focus-wide: 50% 45%; --track-focus-detail: 50% 40%; }
+.endurance-card-head.endurance-track-long-beach { --endurance-photo: url('/images/endurance/lmu/long-beach.webp'); --track-focus-compact: 50% 66%; --track-focus-wide: 50% 65%; --track-focus-detail: 50% 62%; }
+.endurance-card-head.endurance-track-lusail { --endurance-photo: url('/images/endurance/lmu/lusail.webp'); --track-focus-compact: 50% 63%; --track-focus-wide: 50% 58%; --track-focus-detail: 50% 63%; }
+.endurance-card-head.endurance-track-monza { --endurance-photo: url('/images/endurance/lmu/monza.webp'); --track-focus-compact: 50% 36%; --track-focus-wide: 50% 39%; --track-focus-detail: 50% 39%; }
+.endurance-card-head.endurance-track-paul-ricard { --endurance-photo: url('/images/endurance/lmu/paul-ricard.webp'); --track-focus-compact: 50% 49%; --track-focus-wide: 50% 55%; --track-focus-detail: 50% 48%; }
+.endurance-card-head.endurance-track-portimao { --endurance-photo: url('/images/endurance/lmu/portimao.webp'); --track-focus-compact: 50% 45%; --track-focus-wide: 50% 49%; --track-focus-detail: 50% 44%; }
+.endurance-card-head.endurance-track-road-atlanta { --endurance-photo: url('/images/endurance/lmu/road-atlanta.webp'); --track-focus-compact: 50% 57%; --track-focus-wide: 50% 57%; --track-focus-detail: 50% 55%; }
+.endurance-card-head.endurance-track-sebring { --endurance-photo: url('/images/endurance/lmu/sebring.webp'); --track-focus-compact: 50% 48%; --track-focus-wide: 50% 52%; --track-focus-detail: 50% 54%; }
+.endurance-card-head.endurance-track-silverstone { --endurance-photo: url('/images/endurance/lmu/silverstone.webp'); --track-focus-compact: 50% 23%; --track-focus-wide: 50% 18%; --track-focus-detail: 50% 27%; }
+.endurance-card-head.endurance-track-spa { --endurance-photo: url('/images/endurance/lmu/spa.webp'); --track-focus-compact: 50% 28%; --track-focus-wide: 50% 30%; --track-focus-detail: 50% 28%; }
 
-.endurance-card-head[class*="endurance-track-"]::before { background-position: center; }
+/* Portrait covers need different crops for the almost square cards and the
+   horizontal desktop banners. Each focus was chosen from the original cover:
+   track/kerb or recognisable landmark, above the caption. No image is stretched. */
+.endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-compact); }
+.week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before,
+.cal-side .endurance-card-head[class*="endurance-track-"]::before,
+.endurance-detail-hero > .endurance-card-head[class*="endurance-track-"]::before {
+  background-position: var(--track-focus-wide);
+}
+@media (max-width: 760px) {
+  .week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-compact); }
+  .endurance-detail-hero > .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-detail); }
+}
