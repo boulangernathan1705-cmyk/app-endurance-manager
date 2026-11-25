@@ -34,6 +34,11 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       await expect(img).toHaveCount(1);
       const art=card.locator('.race-card-top > .endurance-card-head'),head=card.locator('.race-head'),date=head.locator('.race-date'),times=card.locator('.race-starts');
       await expect(art).toBeVisible();await expect(date).toHaveCount(1);
+      const caption=art.locator('.endurance-card-caption');
+      const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
+      expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
+      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+      expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
       expect(h.width).toBeGreaterThan(a.width);

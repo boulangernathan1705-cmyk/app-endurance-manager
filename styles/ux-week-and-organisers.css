@@ -529,3 +529,56 @@ html[data-game] #app button.race-card.is-endurance .race-head > .race-date small
   html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 19px !important; }
   html[data-game] #app button.race-card.is-endurance .race-head .event-type-badge { max-width: 100%; white-space: normal; }
 }
+
+/* The artwork stays visible: a single small, dark caption at its lower edge.
+   Calendar cells remain text-only, and narrow artwork can wrap its label. */
+.endurance-card-head { padding: 0; align-items: stretch; justify-content: flex-end; flex-direction: column; flex-wrap: nowrap; }
+.endurance-card-head::before { background-image: linear-gradient(0deg, rgba(9,14,20,.12), transparent 55%), var(--endurance-photo); }
+.endurance-card-caption {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  gap: 3px; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 6px;
+  background: rgba(9,14,20,.91);
+}
+.endurance-card-caption .endurance-card-label {
+  display: flex; flex-direction: row; justify-content: flex-start; flex-wrap: wrap;
+  align-items: baseline; gap: 1px 3px; min-width: 0;
+}
+.endurance-card-caption .endurance-card-brand,
+.week-block.is-endurance .endurance-card-caption .endurance-card-brand,
+.race-card.is-endurance .endurance-card-caption .endurance-card-brand {
+  order: 0; font-size: 11px; font-style: normal; font-weight: 850; letter-spacing: 0; line-height: 1.1;
+}
+.endurance-card-caption .endurance-card-kind,
+.week-block.is-endurance .endurance-card-caption .endurance-card-kind,
+.race-card.is-endurance .endurance-card-caption .endurance-card-kind {
+  order: 1; font-size: 7px; letter-spacing: .02em; line-height: 1.1; white-space: nowrap;
+}
+.endurance-card-caption .endurance-card-duration {
+  padding: 0; border: 0; border-radius: 0; background: none; font-size: 10px; line-height: 1.1;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head,
+.race-card.is-endurance .endurance-card-aside > .endurance-card-head { padding: 0; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head { align-items: stretch; }
+html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 11px; }
+html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 7px; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption {
+  padding-right: 14%; background: transparent; isolation: isolate;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(9,14,20,.91);
+  clip-path: polygon(0 0,90% 0,89% 100%,0 100%);
+}
+@media (max-width: 760px) {
+  .week-block.is-endurance > .endurance-card-head { padding: 0; align-items: stretch; }
+  .week-block.is-endurance .endurance-card-caption { padding-right: 15%; background: transparent; isolation: isolate; }
+  .week-block.is-endurance .endurance-card-caption::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(9,14,20,.91);
+    clip-path: polygon(0 0,89% 0,88% 100%,0 100%);
+  }
+}
+.cal-cell.is-endurance .endurance-card-head { padding: 2px 4px; }
+.cal-cell.is-endurance .endurance-card-caption { padding: 0; background: none; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-label { color: var(--em-text-strong); }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 10px; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 9px; text-transform: none; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-duration { color: var(--em-text-strong); }
