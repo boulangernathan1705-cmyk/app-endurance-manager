@@ -772,7 +772,7 @@ async function load() {
       ${sections.map(([key]) => `<section class="adm-panel${key === 'platform' ? ' community-settings' : ''}" id="adm-panel-${key}" data-panel="${key}" role="tabpanel" aria-labelledby="adm-tab-${key}" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}`;
     openTab = current;
     for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
-    void fillTodo();
+    void fillTodo(session.community?.id);
     if (openModule === 'discord') openDiscordSheet(true);
     else if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';
@@ -782,12 +782,12 @@ async function load() {
 }
 // The endurances of both simulators: pilots without a crew, empty crews and times to confirm, one line each
 // in « À régler » (the details are on the « Équipages » page).
-async function fillTodo() {
+async function fillTodo(communityId) {
   const box = app.querySelector('[data-admin-todo]');
   if (!box) return;
   try {
     const lists = await Promise.all(['lmu', 'iracing'].map(game => api(`/api/races?game=${game}&scope=upcoming`)
-      .then(result => todoItems((result.events || []).filter(event => String(event.circuit || '').startsWith('iracing-') === (game === 'iracing')), game))));
+      .then(result => todoItems((result.events || []).filter(event => String(event.circuit || '').startsWith('iracing-') === (game === 'iracing')), game, Date.now(), undefined, communityId))));
     const items = lists.flat();
     const names = list => [...new Set(list.map(item => item.name))];
     const kinds = [['bad', 'sans équipage', 'Des pilotes inscrits attendent un équipage', 'Les responsables les placent depuis la page Équipages.'],

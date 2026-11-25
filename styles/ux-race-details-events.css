@@ -1,0 +1,536 @@
+/* =====================================================================
+   Équipage ouvert : la frise de chaque pilote, et un avertissement pour les heures sans pilote.
+   ===================================================================== */
+html[data-game] #app .crew-gap-warning {
+  margin: 4px 0 2px;
+  padding: 8px 12px;
+  border: 1px solid rgba(227, 76, 76, .55);
+  border-radius: 8px;
+  background: rgba(227, 76, 76, .1);
+  color: #ffb3b3;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+html[data-game] #app .crew-pilot-lines { display: grid; gap: 2px; margin-top: 6px; }
+html[data-game] #app .crew-pilot-line { display: grid !important; gap: 4px !important; padding: 6px 0 !important; border-top: 1px solid rgba(255, 255, 255, .06) !important; }
+html[data-game] #app .crew-pilot-line .crew-planning-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+html[data-game] #app .crew-pilot-line .pilot-name { font-size: 14.5px; font-weight: 700; }
+html[data-game] #app .crew-pilot-line .crew-planning-edit { min-height: 0 !important; margin-left: auto; font-size: 12.5px !important; padding: 0 !important; }
+html[data-game] #app .crew-pilot-line .presence-timeline { margin: 0 !important; }
+html[data-game] #app .crew-pilot-line .presence-edges { display: none !important; }
+html[data-game] #app .crew-pilot-line .presence-track,
+html[data-game] #app .crew-pilot-line .presence-segment { height: 12px !important; min-height: 0 !important; font-size: 0 !important; }
+
+/* =====================================================================
+   Mes inscriptions : même en-tête que la carte de course, frises d'équipage.
+   ===================================================================== */
+html[data-game] #app .my-entry-race > .native-my-entry-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 14px 16px !important;
+  grid-template-columns: none !important;
+  min-height: 0 !important;
+}
+html[data-game] #app .my-entry-race .race-card-top { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 14px; }
+html[data-game] #app .my-entry-race .race-head { justify-content: center; gap: 4px; }
+html[data-game] #app .my-entry-race .race-head h2.event-name { margin: 0 !important; }
+html[data-game] #app .my-entry-race .race-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] #app .my-entry-race .race-badges .event-category-badge { padding: 2px 8px !important; font-size: 12px !important; }
+html[data-game] #app .my-entry-race .race-badges .departure-mine-badge { margin-top: 0; }
+html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { position: static !important; width: 120px !important; height: 78px !important; margin: 0 !important; align-self: center; transform: none !important; }
+html[data-game] #app .my-entry-race .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+html[data-game] #app .my-entry-race .native-my-entry-open-event { flex: none; width: auto !important; }
+.departure-mine-badge.is-waiting { background: rgba(228, 195, 65, .1); }
+html[data-game] #app .my-entry-race .ux-my-own-crew .crew-pilot-lines,
+html[data-game] #app .my-entry-race .ux-my-awaiting-crew .crew-pilot-lines { margin-top: 8px; }
+@media (max-width: 760px) {
+  html[data-game] #app .my-entry-race > .native-my-entry-header { flex-wrap: wrap !important; }
+  html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
+  html[data-game] #app .my-entry-race .native-my-entry-open-event { flex: 1 1 100%; }
+}
+@media (max-width: 760px) {
+  html[data-game] #app .my-entry-race > .native-my-entry-header { position: relative; padding: 12px !important; }
+  html[data-game] #app .my-entry-race .native-my-entry-toggle { position: absolute; top: 10px; right: 10px; }
+  html[data-game] #app .my-entry-race .race-card-top { padding-right: 36px; gap: 12px; }
+  html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { display: none !important; }
+  html[data-game] #app .my-entry-race .race-date { width: 56px; }
+  html[data-game] #app .my-entry-race .race-head h2.event-name { font-size: 19px !important; }
+}
+
+/* Mes inscriptions dépliée : trois colonnes côte à côte, sans cadres dans les cadres. */
+html[data-game] #app .my-entry-race .my-entry-columns {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+html[data-game] #app .my-entry-column { min-width: 0; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+html[data-game] #app .my-entry-column + .my-entry-column { border-left: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-column-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #f2f5f4; }
+html[data-game] #app .my-entry-column-title span { min-width: 24px; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .18); font-size: 12px; text-align: center; color: #c7d0d4; }
+html[data-game] #app .my-entry-column .ux-my-own-crew,
+html[data-game] #app .my-entry-column .ux-my-awaiting-crew,
+html[data-game] #app .my-entry-column .ux-my-other-crew {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+html[data-game] #app .my-entry-column .ux-my-own-crew-head { padding: 0 0 6px !important; border: 0 !important; background: none !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crews-grid { display: flex !important; flex-direction: column; gap: 0 !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crew { padding: 8px 0 !important; border-top: 1px solid rgba(255, 255, 255, .06) !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crew:first-child { border-top: 0 !important; }
+html[data-game] #app .my-entry-column .ux-my-awaiting-copy { display: grid; gap: 2px; }
+html[data-game] #app .my-entry-column .ux-my-awaiting-copy span { color: #aab3b6; font-size: 13px; }
+html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !important; }
+/* Ma situation d'abord : mon équipage en pleine largeur, puis le reste du départ replié (audit R23). */
+html[data-game] #app .my-entry-race .my-entry-focus { display: block !important; padding: 0 !important; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+html[data-game] #app .my-entry-next { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 16px 0; padding: 10px 12px; border: 1px solid rgba(243, 179, 61, .5); border-left: 4px solid #f3b33d; border-radius: 10px; background: rgba(243, 179, 61, .08); color: #ffe2a8; font-size: 14px; }
+html[data-game] #app .my-entry-next .secondary-button { min-height: 32px; padding: 0 12px; font-size: 13px; }
+html[data-game] #app .my-entry-collective { border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-collective > summary { padding: 12px 16px; cursor: pointer; font-size: 14px; font-weight: 750; color: #c7d0d4; list-style-position: inside; }
+html[data-game] #app .my-entry-collective > summary:hover { color: #fff; }
+@media (max-width: 1000px) {
+  html[data-game] #app .my-entry-race .my-entry-columns, html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+}
+html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+
+/* ---------- Dates : un seul bloc de date partout (front/dates.mjs) ---------- */
+.race-date {
+  width: 62px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0 8px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  line-height: 1.15;
+  box-sizing: border-box;
+}
+.race-date small { font-size: 12px; color: #aab3b6; text-transform: lowercase; }
+.race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
+.race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
+.race-start {
+  display: inline-block;
+  min-width: 42px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e6ecea;
+  box-sizing: border-box;
+}
+/* Version compacte : titre de chaque départ d'une course. */
+.race-date.is-compact { width: 46px; padding: 3px 0 4px; border-radius: 8px; }
+.race-date.is-compact small { font-size: 10.5px; }
+.race-date.is-compact strong { font-size: 18px; }
+html[data-game] #app .departure-fold .fold-date { flex-direction: row !important; align-items: center !important; gap: 12px; }
+html[data-game] #app .departure-fold > summary > .fold-index { align-self: center !important; }
+html[data-game] #app .departure-fold .fold-date-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+
+/* Accueil : le prochain départ est présenté comme une carte de course. */
+html[data-game] #app .departure-fold .race-date.is-compact { align-items: center !important; text-align: center !important; }
+/* Un compte à rebours ne se coupe jamais en deux lignes. */
+[data-countdown] { white-space: nowrap; }
+
+/* Page course : actions de la course dans l'en-tête, sur la ligne des catégories. */
+html[data-game] #app .race-header-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+html[data-game] #app .race-header-footer > .event-category-badges { margin: 0 !important; }
+html[data-game] #app .race-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-left: auto; }
+html[data-game] #app .race-header-actions > .secondary-button { width: auto !important; min-height: 38px !important; padding: 0 14px !important; font-size: 14px !important; }
+html[data-game] #app .race-header-actions > .link-button { width: auto !important; min-height: 38px !important; box-shadow: none !important; }
+html[data-game] #app .race-header-actions > .danger-link { width: auto !important; margin-left: 0; box-shadow: none !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* ---------- Gestion des membres : recherche, rôle enregistré dès qu'il change ---------- */
+.members-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.members-search { flex: 1; min-width: 0; }
+.members-search input { width: 100%; min-height: 42px; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: rgba(0, 0, 0, .25); color: inherit; font: inherit; font-size: 15px; }
+.members-help { margin: 0 0 14px; color: var(--muted, #92979c); font-size: 14px; }
+.members-panel .members-row[hidden] { display: none !important; }
+.members-empty { margin: 12px 0 0; color: var(--muted, #92979c); }
+
+/* Accueil : équipages avec la même couleur et le même statut que sur la page course. */
+.crew-summary-card { grid-template-columns: auto minmax(120px, .8fr) minmax(0, 1.2fr) auto !important; }
+.crew-summary-card .crew-compact-status { justify-self: end; padding: 3px 8px; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 760px) {
+  .crew-summary-card { grid-template-columns: auto minmax(0, 1fr) auto !important; }
+  .crew-summary-card .crew-summary-pilots { grid-column: 2 / -1; }
+}
+.members-toolbar > .members-help { flex: 1; margin: 0; }
+/* Fenêtre « Créer un équipage » : libellés d'étape lisibles. */
+.crew-builder-step-label { font-size: 12.5px !important; }
+
+/* ---------- Événements (format solo) ---------- */
+.event-access-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; }
+.event-access-badge.is-open { color: #7fe3ea; border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .08); }
+.event-access-badge.is-safe { color: #f3b33d; border-color: rgba(243, 179, 61, .65); background: rgba(243, 179, 61, .08); }
+.event-type-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: #f2f4f7; background: rgba(255, 255, 255, .06); }
+/* Simulateur d'un événement : LMU, iRacing, AMS2, ACE. */
+.event-badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.event-sim-badge { --sim: #8a949a; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--sim); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }
+.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #e07a1f; } .sim-ace { --sim: #1f9d63; } .sim-acrally { --sim: #bf18ce; }
+.access-open { --sim: #52d3d8; } .access-safe { --sim: #f3b33d; }
+
+/* Création d'un événement : étapes courtes, choix en pastilles. */
+.solo-event-form .solo-form-step { display: grid; gap: 18px; }
+.solo-event-form .solo-form-step[hidden] { display: none; }
+.solo-event-form .solo-rounds { display: grid; gap: 12px; }
+.solo-weather-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.solo-weather-chip { position: relative; cursor: pointer; }
+.solo-weather-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-weather-chip span[aria-hidden] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 42px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); font-size: 22px; filter: grayscale(.7); opacity: .6; }
+.solo-weather-chip input:checked + span { filter: none; opacity: 1; border-color: #52d3d8; box-shadow: inset 0 -3px #52d3d8; }
+.solo-weather-chip input:focus-visible + span { outline: 2px solid #52d3d8; outline-offset: 2px; }
+.solo-event-form .solo-round { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border, #2b3236); border-radius: 10px; background: rgba(0, 0, 0, .18); }
+.solo-event-form .solo-round-head { display: flex; align-items: center; justify-content: space-between; }
+.solo-event-form .solo-round-title { color: #7fe3ea; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.solo-event-form .solo-round-head [data-remove-round][hidden] { display: none; }
+.solo-event-form .solo-round-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.solo-event-form fieldset.solo-weather { margin: 0; }
+.solo-event-form .solo-round-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.solo-category-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 56px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); cursor: pointer; opacity: .55; }
+.solo-category-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-category-chip .category-logo { width: 40px; height: 32px; object-fit: contain; }
+.solo-category-chip:has(input:checked) { opacity: 1; border-color: var(--category-color, #52d3d8); box-shadow: inset 0 -3px var(--category-color, #52d3d8); }
+.solo-category-chip:has(input:focus-visible) { outline: 2px solid #52d3d8; outline-offset: 2px; }
+.solo-event-form [data-add-round] { justify-self: start; }
+.solo-event-form [data-add-round][hidden] { display: none; }
+.solo-event-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.solo-event-form legend { padding: 0; margin-bottom: 8px; }
+.sim-option-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sim-option { position: relative; cursor: pointer; }
+.sim-option input { position: absolute; opacity: 0; pointer-events: none; }
+.sim-option span { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; min-height: 42px; padding: 0 16px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); color: #c7d0d4; font-weight: 800; letter-spacing: .04em; }
+.sim-option:hover span { border-color: var(--sim); }
+.sim-option input:checked + span { border-color: var(--sim); background: color-mix(in srgb, var(--sim) 28%, transparent); color: #fff; box-shadow: inset 0 -3px var(--sim); }
+.sim-option input:focus-visible + span { outline: 2px solid var(--sim); outline-offset: 2px; }
+.solo-form-start, .solo-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; align-items: start; }
+.solo-form-row > .form-label > input { margin-top: 8px; }
+.solo-form-start .departure-field { display: contents; }
+@media (max-width: 600px) { .sim-option { flex: 1 1 40%; } .sim-option span { width: 100%; } }
+/* Le liseré de couleur suit le simulateur : rouge LMU, bleu iRacing, orange AMS2, vert ACE. */
+.event-card[data-race-kind], .race-header[data-race-kind] { --event-accent: var(--race-kind, var(--em-kind-event)) !important; }
+[data-race-kind="open"] { --race-kind: var(--em-kind-open); }
+[data-race-kind="safe"] { --race-kind: var(--em-kind-safe); }
+[data-race-kind="bouloules"] { --race-kind: var(--em-kind-bouloules); }
+[data-race-kind="gridfest"] { --race-kind: var(--em-kind-gridfest); }
+[data-race-kind="training"] { --race-kind: var(--em-muted); }
+[data-race-kind="stream"] { --race-kind: var(--em-kind-stream); }
+[data-race-kind] .event-type-badge {
+  border-color: color-mix(in srgb, var(--race-kind, var(--em-kind-event)) 55%, transparent);
+  background: color-mix(in srgb, var(--race-kind, var(--em-kind-event)) 10%, var(--em-panel));
+}
+.solo-fill { display: flex; flex-direction: column; gap: 5px; min-width: 180px; }
+.solo-fill-copy { font-size: 13.5px; color: #c7d0d4; }
+.solo-fill-copy strong { color: #f4f6f5; font-size: 15px; }
+.solo-fill-copy em { font-style: normal; color: #f3b33d; font-weight: 700; }
+.solo-fill-bar { display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.solo-fill-bar > span { display: block; height: 100%; background: #52d3d8; }
+.solo-fill.is-full .solo-fill-bar > span { background: #f3b33d; }
+html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.departure-mine-badge.is-waiting { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; }
+.solo-blocked { font-size: 13.5px; font-weight: 700; color: #f3b33d; }
+.solo-participants { display: flex; flex-direction: column; gap: 8px; }
+.solo-subtitle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 16px; }
+.solo-entries { list-style: none; margin: 0; padding: 0; }
+.solo-entry { border: 1px solid rgba(255, 255, 255, .1); }
+.solo-entries.is-waiting .solo-entry { border-style: dashed; }
+.solo-entry-rank { font-weight: 800; text-align: center; }
+.solo-entries.is-waiting .solo-entry-rank { color: #f3b33d; }
+.solo-entry .solo-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.solo-entry .solo-category .category-logo { width: 24px; height: auto; }
+.solo-any-logo { display: inline-grid; place-items: center; width: 40px; height: 28px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 18px; color: #c7d0d4; flex: none; }
+.solo-wait-notice { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid #f3b33d; border-radius: 0 8px 8px 0; background: rgba(243, 179, 61, .08); color: #f1e3c4; font-size: 14px; }
+/* Formulaire : format, accès et manches */
+.format-contents { display: contents; }
+/* Gestion des membres : case « Pilote SAFE » */
+.members-panel .members-row { grid-template-columns: minmax(0, 1fr) auto minmax(160px, 220px) 150px !important; }
+@media (max-width: 760px) {
+  .solo-entries { grid-template-columns: minmax(0, 1fr); }
+  .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
+}
+/* Course solo à deux manches : catégorie et voiture de chaque manche. */
+.solo-round-heading { margin: 0 0 4px; font-weight: 800; color: #7fe3ea; font-size: 15px; }
+
+/* ---------- Accueil : présentation, choix de la simu, étapes ---------- */
+.hub-main .hub-welcome { max-width: 760px; margin: 28px auto 8px; text-align: center; }
+.hub-welcome h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 40px); line-height: 1.12; color: #f4f6f5; }
+.hub-welcome-lead { margin: 0 auto 18px; max-width: 620px; color: #c7d0d4; font-size: 17px; line-height: 1.5; }
+.hub-welcome-actions { display: flex; justify-content: center; }
+.hub-welcome-actions .hub-login-button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 26px; border-radius: 12px; font-size: 16px; font-weight: 800; text-decoration: none; }
+.hub-welcome-back { margin: 0; font-size: 16px; color: #c7d0d4; }
+.hub-trust { margin: 12px auto 0; max-width: 560px; font-size: 13.5px; color: var(--muted, #92979c); }
+.hub-trust a { color: #7fe3ea; }
+.hub-main .hub-intro { margin: 30px 0 14px; text-align: center; }
+.hub-main .hub-intro h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); }
+.hub-main .hub-intro p { margin: 6px 0 0; color: var(--muted, #92979c); font-size: 14px; }
+.hub-steps { max-width: 980px; margin: 34px auto 10px; }
+.hub-steps h2 { margin: 0 0 14px; text-align: center; font-size: clamp(20px, 2.6vw, 26px); }
+.hub-steps-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: hub-step; }
+.hub-steps-list li { counter-increment: hub-step; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel, #111315); }
+.hub-steps-list li::before { content: counter(hub-step); display: inline-grid; place-items: center; width: 30px; height: 30px; margin-bottom: 6px; border-radius: 50%; background: rgba(82, 211, 216, .14); color: #7fe3ea; font-weight: 800; }
+.hub-steps-list strong { font-size: 15.5px; color: #f4f6f5; }
+.hub-steps-list span { font-size: 13.5px; color: var(--muted, #92979c); }
+@media (max-width: 900px) { .hub-steps-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  .hub-main .hub-welcome { margin-top: 18px; padding: 0 4px; }
+  .hub-welcome-lead { font-size: 15.5px; }
+  .hub-welcome-actions .hub-login-button { width: 100%; }
+  .hub-steps-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .hub-steps-list li { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; padding: 12px 14px; }
+  .hub-steps-list li::before { grid-row: span 2; align-self: center; margin: 0; }
+}
+/* Accueil : la phrase de confiance est déjà dans la présentation, pas en double dans la barre. */
+.site-nav-shell:has(+ .hub-main) .account-oauth-trust { display: none !important; }
+
+/* Home: window to choose a simulator after the first Discord login. */
+.hub-sim-dialog {
+  width: min(520px, calc(100% - 32px));
+  padding: 26px 26px 22px;
+  border: 1px solid var(--border, #292d31);
+  border-top: 4px solid #52d3d8;
+  border-radius: 16px;
+  background: var(--panel, #111315);
+  color: #e6ecea;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+}
+.hub-sim-dialog::backdrop { background: rgba(3,5,7,.72); backdrop-filter: blur(3px); }
+.hub-sim-dialog h2 { margin: 0 0 8px; font-size: 24px; font-weight: 850; color: #f4f6f5; }
+.hub-sim-dialog p { margin: 0 0 18px; color: #c7d0d4; font-size: 15px; line-height: 1.55; }
+.hub-sim-choices { display: grid; gap: 10px; }
+.hub-sim-choice.game-lmu { --game-accent: #e30613; }
+.hub-sim-choice.game-iracing { --game-accent: #4f74d8; }
+.hub-sim-choice {
+  display: flex; align-items: center; gap: 14px;
+  min-height: 64px; padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--game-accent) 45%, var(--border, #292d31));
+  border-left: 4px solid var(--game-accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--game-accent) 8%, var(--panel2, #171a1d));
+  color: #f4f6f5; font-size: 17px; text-decoration: none;
+}
+.hub-sim-choice strong { flex: 1; }
+.hub-sim-choice:hover, .hub-sim-choice:focus-visible { background: color-mix(in srgb, var(--game-accent) 18%, var(--panel2, #171a1d)); outline: none; }
+
+/* "Je la fais tout seul" (endurances raced alone). */
+.special-availability:has(.solo-driver) { display: flex; flex-wrap: wrap; gap: 8px; }
+.special-button.solo-driver.active { border-color: rgba(243,179,61,.8); background: rgba(243,179,61,.16); color: #ffd98a; }
+.solo-driver-tag { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(243,179,61,.16); color: #ffd98a; font-size: .85em; font-weight: 800; }
+.solo-driver-warning, .solo-driver-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+.solo-driver-warning { border: 1px solid rgba(243,179,61,.55); border-left: 4px solid #f3b33d; background: rgba(243,179,61,.1); color: #ffe2a8; font-weight: 700; }
+.solo-driver-note { border: 1px solid rgba(82,211,216,.35); background: rgba(82,211,216,.07); color: #c7eef0; }
+.solo-driver-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(243,179,61,.6); border-radius: 6px; color: #ffd98a; font-size: 10px; font-weight: 900; letter-spacing: .04em; vertical-align: middle; }
+
+/* Common "Horaire à définir" start: notice and the choice of an official slot. */
+.tbd-notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid rgba(243,179,61,.45); border-left: 4px solid #f3b33d; border-radius: 10px; background: rgba(243,179,61,.08); color: #ffe2a8; font-size: 14px; line-height: 1.5; }
+.slot-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; color: #c7d0d4; font-size: 13px; font-weight: 700; }
+.slot-picker select { min-height: 34px; padding: 0 10px; border: 1px solid rgba(82,211,216,.5); border-radius: 8px; background: var(--panel2, #171a1d); color: #f4f6f5; font-weight: 700; }
+
+/* Event form: common start "à définir" (day only). */
+.departure-field.is-tbd { border-color: rgba(243,179,61,.45); }
+.departure-tbd-note { display: grid; gap: 2px; align-content: start; }
+.departure-tbd-note strong { color: #ffd98a; font-size: 15px; }
+.departure-tbd-note small { color: #c7d0d4; font-size: 12.5px; line-height: 1.45; }
+
+/* Community gate: not signed in, or not a member of the community's Discord server. */
+.community-gate { max-width: 620px; margin: 40px auto; padding: 28px 26px; border: 1px solid var(--border, #292d31); border-top: 4px solid #52d3d8; border-radius: 16px; background: var(--panel, #111315); text-align: center; }
+.community-gate h1 { margin: 0 0 12px; font-size: 28px; font-weight: 850; color: #f4f6f5; }
+.community-gate p { margin: 0 0 20px; color: #c7d0d4; font-size: 16px; line-height: 1.6; }
+/* Welcome screen for visitors (home of the main address and of each community). */
+.community-gate.welcome { max-width: 1080px; margin: 34px auto 20px; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
+/* The navigation bar is of no use before signing in: the welcome screen has the Discord button. */
+body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !important; }
+.welcome-hero { position: relative; overflow: hidden; padding: clamp(28px, 5vw, 56px); border: 1px solid var(--border, #292d31); border-radius: 20px; background: radial-gradient(circle at 100% 0%, rgba(82,211,216,.14), transparent 26rem), radial-gradient(circle at 0% 100%, rgba(227,6,19,.10), transparent 24rem), var(--panel, #111315); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+.welcome-hero::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, #52d3d8, #e30613 55%, #f3b33d); }
+.welcome-kicker { margin: 0 0 12px; color: var(--community-accent, #52d3d8); font-size: 12px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+.community-gate.welcome h1 { max-width: 720px; margin: 0 0 14px; font-size: clamp(28px, 4.2vw, 46px); line-height: 1.08; font-weight: 900; color: #f4f6f5; letter-spacing: -.01em; }
+.welcome-lead { max-width: 640px; margin: 0 0 26px; color: #c7d0d4; font-size: clamp(15px, 1.6vw, 18px); line-height: 1.6; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.welcome-discord { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border-radius: 12px; background: #5865f2; color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; box-shadow: 0 10px 26px rgba(88,101,242,.35); transition: transform .15s, box-shadow .15s, background .15s; }
+.welcome-discord:hover, .welcome-discord:focus-visible { background: #4752c4; transform: translateY(-1px); box-shadow: 0 14px 30px rgba(88,101,242,.45); }
+.welcome-invite { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; text-decoration: none; }
+.welcome-discord svg { width: 22px; height: 22px; flex: 0 0 22px; }
+.welcome-elsewhere { margin-top: 18px; }
+.welcome-elsewhere p { margin: 0 0 8px; color: #99a3a0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.welcome-elsewhere a { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.welcome-elsewhere img { border-radius: 50%; }
+.welcome-trust { margin: 16px 0 0; color: #99a3a0; font-size: 13px; }
+.welcome-trust a { color: #c7d0d4; }
+.welcome-features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
+.welcome-features li { display: grid; gap: 6px; align-content: start; padding: 18px; border: 1px solid var(--border, #292d31); border-radius: 14px; background: var(--panel, #111315); }
+.welcome-features svg { width: 26px; height: 26px; margin-bottom: 4px; fill: none; stroke: var(--community-accent, #52d3d8); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.welcome-features strong { color: #f4f6f5; font-size: 15px; }
+.welcome-features span { color: #99a3a0; font-size: 13.5px; line-height: 1.5; }
+@media (max-width: 900px) { .welcome-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .community-gate.welcome { margin-top: var(--em-space-3); }
+  .welcome-hero { padding: var(--em-space-4); }
+  .welcome-features { grid-template-columns: minmax(0, 1fr); }
+  .welcome-actions > a { width: 100%; justify-content: center; }
+}
+
+/* Presence timeline: a thin white separator between the hours inside the bar; a small tick rises only towards
+   the hours written above it (the labels shown depend on the width, timeline.css). */
+.presence-track > .presence-segment + .presence-segment { box-shadow: inset 2px 0 0 rgba(255, 255, 255, .35); }
+.presence-boundary::after { display: none; }
+.presence-boundary:has(> .presence-time.ticks-4)::after { display: block !important; }
+@container presence (min-width: 400px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none; }
+  .presence-boundary:has(> .presence-time.ticks-6)::after { display: block; }
+}
+@container presence (min-width: 640px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none; }
+  .presence-boundary:has(> .presence-time.ticks-10)::after { display: block; }
+}
+@container presence (min-width: 1000px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none; }
+  .presence-boundary:has(> .presence-time.ticks-16)::after { display: block; }
+}
+@container presence (min-width: 1500px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none; }
+  .presence-boundary:has(> .presence-time.ticks-24)::after { display: block; }
+}
+
+/* Pilots without a crew: cards in the style of the crew cards (frame, top stripe, category logo, name, car). */
+
+/* Members page: tabs, member cards, settings cards. */
+
+/* Community settings (members page, « Réglages » tab). */
+.community-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.community-settings[hidden] { display: none; }
+.settings-card { padding: 20px; border: 1px solid var(--border, #292d31); border-radius: 16px; background: var(--panel, #111315); }
+.settings-card h2 { margin: 0 0 12px; font-size: 17px; color: var(--community-accent, #52d3d8); }
+.settings-appearance { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.settings-appearance label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
+.settings-appearance label small { font-weight: 400; color: #99a3a0; }
+.settings-appearance input:not([type]) { min-height: 40px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; }
+.settings-appearance .members-help, .settings-actions { grid-column: 1 / -1; margin: 0; }
+.settings-accent { grid-column: 1 / -1; display: flex; align-items: flex-end; gap: 12px; }
+.settings-appearance input[type="color"] { width: 64px; height: 38px; padding: 0; border: 1px solid var(--border, #292d31); border-radius: 9px; background: none; cursor: pointer; }
+.settings-actions { display: flex; align-items: center; gap: 12px; }
+.settings-status { color: #7fe0a8; font-size: 13px; font-weight: 700; }
+.role-pill { position: relative; display: inline-flex; cursor: pointer; }
+.role-pill input { position: absolute; opacity: 0; pointer-events: none; }
+.role-pill span { padding: 5px 11px; border: 1px solid var(--border, #292d31); border-radius: 999px; color: #99a3a0; font-size: 12.5px; font-weight: 700; transition: background .12s, color .12s, border-color .12s; }
+.role-pill input:checked + span { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.14); color: #f4f6f5; }
+.role-pill input:checked + span::before { content: "✓ "; }
+.role-pill input:focus-visible + span { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
+.role-pill input:disabled + span { opacity: .6; cursor: default; }
+@media (max-width: 760px) {
+  .community-settings { grid-template-columns: minmax(0, 1fr); }
+  .settings-appearance { grid-template-columns: minmax(0, 1fr); }
+  .settings-card { padding: 14px; }
+}
+
+.settings-banner-card { grid-column: 1 / -1; }
+.settings-banner { display: grid; gap: 10px; }
+.settings-banner-preview { width: 100%; aspect-ratio: 4 / 1; object-fit: cover; border: 1px solid var(--border, #292d31); border-radius: 10px; }
+.settings-banner-pick { cursor: pointer; }
+.settings-banner .members-help { margin: 0; }
+
+.banner-cropper { display: grid; gap: 10px; }
+.banner-crop-frame { overflow: hidden; border: 2px solid var(--community-accent, #52d3d8); border-radius: 10px; }
+.banner-crop-frame canvas { display: block; width: 100%; aspect-ratio: 4 / 1; cursor: grab; touch-action: none; }
+.banner-crop-frame canvas:active { cursor: grabbing; }
+.settings-bot-current { display: flex; align-items: center; gap: 16px; }
+.settings-bot-current[hidden] { display: none; }
+.settings-bot-current .settings-banner-preview { width: 84px; height: 84px; aspect-ratio: 1; border-radius: 50%; flex: none; }
+.settings-bot-current small { display: block; color: var(--muted, #9aa4a8); margin-top: 4px; }
+.bot-cropper .banner-crop-frame { width: min(320px, 100%); border-radius: 50%; }
+.bot-cropper .banner-crop-frame canvas { aspect-ratio: 1; }
+.banner-crop-zoom { display: flex; align-items: center; gap: 10px; color: #c7d0d4; font-size: 13px; font-weight: 700; }
+.banner-crop-zoom input { flex: 1; accent-color: var(--community-accent, #52d3d8); }
+
+/* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
+.setup { max-width: 920px; }
+.setup-note { padding: 8px 12px; border-radius: 8px; background: rgba(243,179,61,.08); color: #e8d3a6; font-size: 13.5px; }
+.setup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.setup-actions .welcome-discord { min-height: 44px; font-size: 15px; }
+.crew-module-rights { display: grid; gap: 8px; margin: -4px 0 12px; }
+.setup-error { color: #ffb4a8; }
+.setup-form { display: grid; gap: 12px; }
+.setup-form label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
+.setup-form input:not([type=radio]), .setup-form select, .setup-inline input, .setup-created textarea, .platform-slug input { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }
+.setup-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.setup-inline input { flex: 1 1 260px; width: auto; }
+.setup-created textarea { resize: vertical; line-height: 1.5; }
+.setup-created { margin-top: 16px; padding: 14px; border: 1px solid rgba(127,224,168,.45); border-radius: 12px; background: rgba(127,224,168,.06); }
+.setup-created strong { color: #7fe0a8; }
+.platform-list { display: grid; gap: 8px; }
+.platform-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel2, #16191c); font-size: 13.5px; color: #c7d0d4; }
+.platform-row div { display: grid; min-width: 0; }
+.platform-row div a { overflow: hidden; color: #99a3a0; white-space: nowrap; text-overflow: ellipsis; }
+.community-settings[data-panel="platform"] { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
+.platform-ok { color: #7fe0a8; font-weight: 700; }
+.platform-ko, .platform-ko a { color: #f3b33d; font-weight: 700; }
+.platform-slug { display: flex; align-items: center; gap: 6px; }
+.platform-slug input { flex: 1 1 auto; min-width: 0; }
+.platform-slug span { color: #99a3a0; font-weight: 400; white-space: nowrap; }
+@media (max-width: 760px) {
+  .platform-row { grid-template-columns: minmax(0, 1fr); }
+  .platform-slug { flex-wrap: wrap; }
+}
+
+/* Recap step: example of the Discord message, switch, « Où le publier ? » cards. */
+.recap-preview { margin: 0; padding: 12px; border-radius: 10px; background: #313338; color: #dbdee1; font-size: 12.5px; }
+.recap-preview figcaption { margin-bottom: 8px; color: #949ba4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.recap-preview-embed { display: grid; gap: 3px; margin-left: 34px; padding: 8px 10px; border-left: 4px solid #2563eb; border-radius: 4px; background: #2b2d31; }
+.recap-preview-embed strong { color: #f2f3f5; }
+.recap-preview-embed b { margin-top: 4px; color: #f2f3f5; }
+.recap-preview-embed em { margin-top: 4px; color: #949ba4; font-size: 11px; font-style: normal; }
+.recap-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.recap-card { display: flex !important; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; cursor: pointer; }
+.recap-card:has(input:checked) { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.07); }
+.recap-card input { flex: 0 0 auto; width: auto; min-height: 0; margin: 3px 0 0; accent-color: var(--community-accent, #52d3d8); }
+.recap-card strong { display: block; color: #f4f6f5; font-size: 14.5px; }
+.recap-card small { display: block; margin-top: 2px; color: #99a3a0; font-weight: 400; }
+@media (max-width: 760px) { .recap-cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Showcase of the main address: banner on every page, reset card of the managers. */
+.showcase-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 18px 8px; padding: 10px 16px; border: 1px solid rgba(243,179,61,.45); border-radius: 12px; background: rgba(243,179,61,.08); color: #e8d3a6; font-size: 14px; }
+.showcase-banner strong { padding: 2px 10px; border-radius: 999px; background: #f3b33d; color: #1a1406; font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.showcase-banner a { margin-left: auto; color: #f4f6f5; font-weight: 800; }
+.showcase-reset { border-color: rgba(255,120,120,.4); }
+.showcase-danger { background: #d9534f !important; border-color: #d9534f !important; color: #fff !important; }
+@media (max-width: 760px) { .showcase-banner { margin: 0 10px 6px; } .showcase-banner a { margin-left: 0; } }
+
+:root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
+:root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
+
+/* Event form: several starts at once (days of a week and hours to tick). */
+.bulk-departures { margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--border, #3a4447); border-radius: 12px; }
+.bulk-departures > summary { cursor: pointer; color: var(--community-accent, #52d3d8); font-weight: 800; }
+.bulk-departures-body { display: grid; gap: 14px; margin-top: 10px; }
+.bulk-step { display: grid; gap: 8px; }
+.bulk-step-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bulk-week-nav { display: flex; gap: 6px; }
+.bulk-week-nav .secondary-button { min-height: 32px; min-width: 38px; padding: 0 10px; }
+.bulk-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.bulk-hours { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+.bulk-chip { position: relative; display: block; cursor: pointer; }
+.bulk-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.bulk-chip span { display: grid; place-items: center; min-height: 36px; padding: 4px 2px; border: 1px solid var(--border, #303638); border-radius: 9px; color: #c7d0d4; font-size: 13px; font-weight: 700; text-align: center; line-height: 1.15; }
+.bulk-day span { min-height: 58px; }
+.bulk-day small { color: #99a3a0; font-size: 11px; font-weight: 600; }
+.bulk-day strong { font-size: 17px; color: #f4f6f5; }
+.bulk-chip input:checked + span { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.16); color: #f4f6f5; box-shadow: inset 0 0 0 1px var(--community-accent, #52d3d8); }
+.bulk-chip input:disabled + span { opacity: .35; cursor: default; }
+.bulk-chip input:focus-visible + span { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
+.bulk-minute { display: flex; align-items: center; gap: 6px; color: #99a3a0; font-size: 13px; }
+.bulk-minute select { min-height: 32px; width: auto; min-width: 76px; flex: 0 0 auto; padding-right: 26px; }
+.bulk-departures-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.bulk-departures-actions strong { color: #f4f6f5; font-size: 14px; }
+@media (max-width: 760px) { .bulk-hours { grid-template-columns: repeat(6, minmax(0, 1fr)); } .bulk-day span { min-height: 52px; } }

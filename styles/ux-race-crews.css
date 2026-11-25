@@ -1,0 +1,512 @@
+/* =====================================================================
+   Lisibilité des équipages
+   - tuiles compactes, 2 à 3 par ligne, qui s'élargissent quand on les ouvre ;
+   - un seul niveau de cadre (le départ) : l'intérieur se lit en lignes ;
+   - la couleur d'un équipage sert à le reconnaître (même couleur partout),
+     « Ton équipage » est écrit, et l'orange ne signale que « Places libres ».
+   ===================================================================== */
+
+/* Page de course : grille de tuiles. */
+html[data-game] #app .ux-course-crews-block { border: 0; background: none; padding: 0; box-shadow: none; }
+html[data-game] #app .ux-course-crews-body {
+  display: grid;
+  gap: 10px;
+}
+html[data-game] #app .ux-course-crews-body > .empty { grid-column: 1 / -1; }
+html[data-game] #app .crew-card-shell { margin: 0 !important; border-left-width: 1px !important; border-top: 3px solid var(--crew-color) !important; box-shadow: none !important; }
+html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: 1 / -1; }
+html[data-game] #app .crew-card-shell.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
+
+html[data-game] #app .crew-tile-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 14px;
+  min-height: 0 !important;
+  grid-template-columns: none !important;
+}
+html[data-game] #app .crew-tile-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html[data-game] #app .crew-tile-head .crew-compact-team { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+html[data-game] #app .crew-tile-head .crew-compact-team strong { color: var(--crew-color); font-size: 17px !important; }
+html[data-game] #app .crew-card-shell details[open] .crew-compact-chevron { transform: rotate(90deg); }
+html[data-game] #app .crew-tile-summary .crew-compact-pilots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14.5px !important;
+  font-weight: 400;
+  color: #e6ecea !important;
+  white-space: normal;
+  text-align: left;
+}
+html[data-game] #app .crew-tile-summary .crew-compact-pilots .is-empty { color: var(--muted, #92979c); font-style: italic; }
+html[data-game] #app .crew-tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+html[data-game] #app .crew-tile-foot .crew-compact-car { color: var(--muted, #92979c) !important; font-size: 13px !important; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* « Ton équipage » and « Responsable » side by side, on one line under the crew's name. */
+.crew-tile-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+html[data-game] #app .crew-tile-badges .crew-owner-badge { margin: 0 !important; }
+.crew-mine-badge {
+  align-self: flex-start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f2f5f4;
+  color: #0b0d0e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+html[data-game] #app .crew-owner-badge { text-transform: none !important; letter-spacing: 0 !important; font-weight: 700 !important; }
+
+/* État : « Places libres » en orange (à compléter), « Complet » en gris neutre. */
+.crew-compact-status { text-transform: none; letter-spacing: 0; }
+.crew-compact-status.is-open { color: #f3b33d; border-color: rgba(243, 179, 61, .6); background: rgba(243, 179, 61, .1); }
+.crew-compact-status.is-complete { color: #b7bfbc; border-color: #3e4649; background: transparent; }
+
+/* Intérieur d'une tuile ouverte : des lignes, plus de cartes dans les cartes. */
+html[data-game] #app .crew-unified-body { border: 0; background: none; }
+html[data-game] #app .crew-unified-body .pilot-row {
+  border: 0 !important;
+  border-top: 1px solid var(--border, #292d31) !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+html[data-game] #app .crew-inline-management { border: 0 !important; background: none !important; padding: 6px 0 !important; }
+html[data-game] #app .ux-course-pilots-accordion { border: 0 !important; border-top: 1px solid var(--border, #292d31) !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; margin-top: 14px; }
+html[data-game] #app .ux-course-pilots-accordion > summary { padding-left: 2px !important; padding-right: 2px !important; }
+
+/* Actions d'une tuile : Rejoindre en bouton, Quitter / Gérer en liens, Supprimer isolé en rouge. */
+html[data-game] #app .crew-self-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px !important;
+  padding: 8px 14px 10px !important;
+  border-top: 1px solid var(--border, #292d31);
+  background: none !important;
+}
+.link-button {
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: #cfe9ec;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(207, 233, 236, .35);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-button:hover { color: #ffffff; text-decoration-color: currentColor; }
+.danger-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: #ff8a8a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.danger-link:hover { border-color: rgba(255, 119, 119, .5); background: rgba(255, 119, 119, .08); }
+
+/* Départ : un seul bouton principal, le reste en liens. */
+html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-button {
+  min-height: 40px !important;
+  width: auto !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #cfe9ec !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}
+html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-button:hover { color: #ffffff !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .departure-fold .ux-summary-registration-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center;
+    gap: 4px 14px !important;
+  }
+  html[data-game] #app .departure-fold .ux-summary-registration-actions > .primary-button { flex: 1 1 100% !important; }
+}
+
+/* En-tête de course : les chiffres sur une ligne. */
+
+/* Liste des courses : équipages en tuiles. */
+html[data-game] .event-card .crew-summary-list {
+  display: grid !important;
+  gap: 8px !important;
+}
+html[data-game] .event-card .crew-summary-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--border, #292d31) !important;
+  border-top: 3px solid var(--crew-color) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .02) !important;
+  min-width: 0;
+}
+html[data-game] .event-card .crew-summary-card.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
+html[data-game] .event-card .crew-summary-card .crew-summary-icon { display: none !important; }
+html[data-game] .event-card .crew-summary-title strong { color: var(--crew-color) !important; font-size: 15px; }
+html[data-game] .event-card .crew-summary-pilots {
+  display: flex !important;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 !important;
+  text-align: left !important;
+  font-size: 13.5px;
+  font-weight: 400 !important;
+  color: #e6ecea;
+}
+
+/* Moins de gras : le gras reste pour les titres et les noms. */
+html[data-game] #app .fold-meta,
+html[data-game] #app .pilot-car,
+html[data-game] #app .pilot-preference,
+html[data-game] #app .ux-departure-date,
+html[data-game] #app .event-category-copy small,
+html[data-game] #app .event-period-heading small { font-weight: 400 !important; }
+
+/* « Peu importe la voiture » : même bordure que les autres choix. */
+.car-any-option { border-style: solid !important; }
+html[data-game] #app .crew-self-actions > .link-button {
+  min-height: 32px !important;
+  width: auto !important;
+  padding: 0 2px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #cfe9ec !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+}
+html[data-game] #app .crew-self-actions > .link-button:hover { color: #ffffff !important; }
+html[data-game] #app .crew-self-actions > .danger-link { width: auto !important; box-shadow: none !important; font-size: 13px !important; }
+/* Le départ est le seul cadre : la zone Équipages / pilotes n'en ajoute pas un second. */
+html[data-game] #app .departure-participation-section { border: 0; background: none; box-shadow: none; padding: 8px 0 0 !important; }
+html[data-game] #app .crew-self-actions > .danger-link { margin-left: auto !important; }
+
+/* Tuiles d’équipage : jusqu’à quatre colonnes, avec des emplacements réservés même si la rangée est incomplète. */
+html[data-game] #app .ux-course-crews-body {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, calc((100% - 30px) / 4))), 1fr)) !important;
+  align-items: stretch;
+}
+@media (min-width: 761px) {
+  html[data-game] #app .ux-course-crews-body:has(> .crew-card-shell > .crew-self-actions) > .crew-card-shell:has(> details:not([open])):not(:has(> .crew-self-actions))::after {
+    content: "";
+    display: block;
+    min-height: 51px;
+  }
+  html[data-game] #app .crew-card-shell > details:not([open]) > .crew-tile-summary {
+    height: 100%;
+    box-sizing: border-box;
+  }
+}
+html[data-game] #app .crew-card-shell { grid-template-rows: 1fr auto; }
+html[data-game] #app .crew-card-shell > details { height: 100%; }
+html[data-game] #app .crew-card-shell.is-mine,
+html[data-game] .event-card .crew-summary-card.is-mine { outline: 2px solid rgba(255, 255, 255, .5) !important; outline-offset: -2px !important; }
+html[data-game] .event-card .crew-summary-list {
+  grid-template-columns: repeat(auto-fill, minmax(max(220px, calc((100% - 24px) / 4)), 1fr)) !important;
+  align-items: stretch !important;
+}
+html[data-game] #app .crew-card-shell > details:not([open]) { display: flex; flex-direction: column; }
+html[data-game] #app .crew-card-shell > details:not([open]) > .crew-tile-summary { flex: 1; }
+html[data-game] #app .crew-tile-foot { margin-top: auto; }
+
+/* ---------- Fenêtres en étapes : équipage et événement ---------- */
+body:has([data-crew-builder-overlay]) { overflow: hidden; }
+.crew-builder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 8, 10, .72);
+}
+.crew-builder-overlay .crew-builder-panel { margin: 0 !important; max-width: 680px; }
+.crew-builder-step[hidden] { display: none !important; }
+.crew-builder-step { display: flex; flex-direction: column; gap: 12px; }
+.crew-builder-overlay .crew-builder-fields { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.crew-builder-overlay .crew-builder-fields label { display: grid; gap: 6px; font-weight: 600; }
+.crew-builder-fields .category-area { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.crew-builder-overlay .crew-builder-fields .car-preference-option { display: flex; align-items: center; gap: 9px; }
+.crew-builder-fields .car-preference-option input { width: 17px; min-width: 17px; max-width: 17px; }
+.crew-builder-overlay .crew-builder-pilots { display: grid; gap: 8px; }
+@media (max-width: 760px) {
+  .crew-builder-overlay { align-items: flex-end; padding: 0; }
+  .crew-builder-overlay .crew-builder-panel { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0; padding: 14px 14px 0; }
+}
+
+.event-stepper .event-step[hidden] { display: none !important; }
+.event-stepper .registration-step-nav { margin: 8px 0 0; padding: 14px 0; background: var(--bg, #090a0b); }
+.event-stepper .registration-summary-row .category-logo { width: 26px; height: auto; vertical-align: middle; }
+.registration-summary-row > strong { display: flex; flex-wrap: wrap; gap: 4px 8px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .registration-summary-row { grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; padding: 8px 10px; }
+  .registration-summary-row > strong { font-size: 14px; }
+}
+
+/* ---------- Équipage ouvert : deux colonnes, heures lisibles ---------- */
+@media (min-width: 900px) {
+  html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: span 2 !important; }
+}
+@media (max-width: 899px) {
+  html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: 1 / -1 !important; }
+}
+html[data-game] #app .ux-course-crews-body:has(details[open]) { align-items: start !important; }
+/* Tuiles fermées : même hauteur (place pour trois pilotes), même quand une autre est ouverte. */
+html[data-game] #app .crew-tile-summary .crew-compact-pilots { min-height: calc(3 * 1.45em); }
+html[data-game] #app .crew-card-shell > details[open] .crew-tile-summary .crew-compact-pilots { display: none !important; }
+
+html[data-game] #app .crew-unified-body { display: flex; flex-direction: column; gap: 6px; padding: 2px 16px 12px !important; }
+html[data-game] #app .crew-unified-body .crew-inline-management { display: flex !important; align-items: center; gap: 8px; padding: 4px 0 !important; font-size: 13px; }
+html[data-game] #app .crew-unified-body .crew-state-select { min-height: 32px !important; padding: 0 26px 0 10px !important; font-size: 13px !important; }
+
+/* Une ligne par pilote : nom, puis sa frise avec les heures. */
+html[data-game] #app .crew-unified-body .pilot-row { display: grid !important; gap: 4px !important; padding: 8px 0 !important; grid-template-columns: minmax(0, 1fr) !important; }
+html[data-game] #app .crew-unified-body .pilot-main { display: flex !important; align-items: center; gap: 6px; min-width: 0; }
+html[data-game] #app .crew-unified-body .pilot-name { font-size: 14.5px !important; color: #e6ecea; }
+html[data-game] #app .crew-unified-body .pilot-category-logo { display: none !important; }
+html[data-game] #app .crew-unified-body .presence-timeline { margin: 0 !important; }
+html[data-game] #app .crew-unified-body .presence-edges { display: none !important; }
+html[data-game] #app .crew-unified-body .presence-track { height: 14px !important; min-height: 0 !important; border-radius: 4px !important; }
+html[data-game] #app .crew-unified-body .presence-timeline:not(.is-coverage) .presence-segment { min-height: 0 !important; height: 14px !important; font-size: 0 !important; }
+html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence-track,
+html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence-segment { height: 22px !important; min-height: 0 !important; font-size: 11px !important; }
+
+/* =====================================================================
+   Carte de course dans la liste : trois zones côte à côte
+   course (nom en valeur) | équipages | circuit
+   ===================================================================== */
+
+
+/* Le nom de la course en valeur. */
+
+html[data-game] .event-card .event-name {
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: .01em;
+  color: #f4f6f5;
+}
+
+/* Équipages : un petit titre, puis les tuiles. */
+
+
+@media (max-width: 900px) {
+  html[data-game] .event-card .event-name { font-size: 22px; }
+}
+/* L'ancienne carte réservait 292 px à droite pour le circuit : il fait maintenant partie de la grille. */
+html[data-game] .event-card.event-card-harmonized { padding: 0 !important; min-height: 0; }
+/* Les équipages ne figurent plus dans la liste : la course, puis le circuit. */
+
+
+/* =====================================================================
+   Carte de course (liste) : quand, quoi, ta situation, remplissage.
+   Deux cartes par ligne sur ordinateur (trois sur très grand écran).
+   ===================================================================== */
+html[data-game] .event-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(440px, calc((100% - 16px) / 2)), 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+html[data-game] .event-card.race-card { padding: 0 !important; min-height: 0; margin: 0; height: 100%; text-align: left; }
+html[data-game] .race-card .race-card-body {
+  display: flex !important;
+  height: 100%;
+  box-sizing: border-box;
+}
+html[data-game] .race-card .race-card-top { display: flex; }
+html[data-game] .race-card .race-date {
+  width: 62px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  line-height: 1.15;
+}
+html[data-game] .race-card .race-date small { font-size: 12px; color: #aab3b6; text-transform: lowercase; }
+html[data-game] .race-card .race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
+html[data-game] .race-card .race-date b { margin-top: 4px; font-size: 14px; color: #7fe3ea; }
+html[data-game] .race-card .race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
+html[data-game] .race-card .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+html[data-game] .race-card .event-name { font-size: 22px !important; line-height: 1.15 !important; font-weight: 800; color: #f4f6f5; }
+html[data-game] .race-card .race-meta { font-size: 14px; color: #c7d0d4; }
+html[data-game] .race-card .race-head .event-type-badge { font-size: 10.5px !important; padding: 2px 8px !important; margin-top: 2px; }
+html[data-game] .race-card .race-card-top > .circuit-visual {
+  position: static !important;
+  flex: none;
+  margin: 0 !important;
+  opacity: .85;
+  transform: none !important;
+}
+html[data-game] .race-card .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+
+/* Horaires par jour. */
+html[data-game] .race-card .race-starts { display: flex; flex-direction: column; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] .race-card .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] .race-card .race-day em { width: 64px; font-style: normal; font-size: 13px; color: #aab3b6; }
+html[data-game] .race-card .race-start {
+  min-width: 42px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e6ecea;
+}
+html[data-game] .race-card .race-more { font-size: 13px; color: #aab3b6; }
+
+/* Ta situation, puis le remplissage. */
+html[data-game] .race-card .race-situation { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-game] .race-card .race-situation .event-schedule-badge { margin: 0; }
+html[data-game] .race-card .race-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+html[data-game] .race-card .race-fill .event-category-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+html[data-game] .race-card .event-card-status { display: none !important; }
+
+@media (max-width: 600px) {
+  html[data-game] .event-list { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] .race-card .race-card-body { padding: 14px; }
+  html[data-game] .race-card .event-name { font-size: 19px !important; }
+  html[data-game] .race-card .race-day em { width: 56px; }
+}
+
+/* Création d'événement : calendrier visible, heure en deux listes. */
+.event-creation input[type="date"] { color-scheme: dark; cursor: pointer; }
+.event-creation input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 1; }
+.event-creation .time-picker { display: grid; gap: 6px; }
+.event-creation .time-picker-row { display: flex; align-items: center; gap: 6px; }
+.event-creation .time-picker-row select { flex: 1; color-scheme: dark; }
+.event-creation .departure-field { grid-template-columns: minmax(0, 1fr) minmax(190px, 220px) auto !important; align-items: end; }
+.event-creation .time-picker-row select { min-width: 84px !important; width: auto !important; padding-right: 26px !important; }
+@media (max-width: 600px) {
+  .event-creation .departure-field { grid-template-columns: minmax(0, 1fr) auto !important; }
+  .event-creation .departure-field > .time-picker { grid-column: 1 / 2; grid-row: 2; }
+}
+
+/* =====================================================================
+   Page de course : même logique que la carte de la liste, en plus grand.
+   ===================================================================== */
+html[data-game] #app .race-header {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+html[data-game] #app .race-header .race-date { flex: none; display: flex; flex-direction: column; align-items: center;
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 12px; background: rgba(255, 255, 255, .03); line-height: 1.15;
+}
+html[data-game] #app .race-header .race-date small { color: #aab3b6; }
+html[data-game] #app .race-header .race-date strong { font-weight: 800; color: #f4f6f5; }
+html[data-game] #app .race-header .race-date b { margin-top: 4px; font-size: 16px; color: #7fe3ea; }
+html[data-game] #app .race-header .race-head { flex: 1; min-width: 0; }
+html[data-game] #app .race-header .event-title { margin: 0; line-height: 1.08; }
+html[data-game] #app .race-header .race-meta { color: #c7d0d4; }
+html[data-game] #app .race-header .race-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual {
+  position: static; flex: none; margin: 0; transform: none;
+}
+html[data-game] #app .race-header .race-card-top > .circuit-visual img { width: 100%; height: 100%; object-fit: contain; transform: none; }
+html[data-game] #app .race-header .race-starts { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .race-header .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] #app .race-header .race-day em { width: 70px; font-style: normal; font-size: 14px; color: #aab3b6; }
+html[data-game] #app .race-header .race-start { min-width: 46px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 7px; text-align: center; font-size: 14px; font-weight: 600; color: #e6ecea; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header .race-date { width: 62px; }
+  html[data-game] #app .race-header .race-date strong { font-size: 26px; }
+  html[data-game] #app .race-header .race-meta { font-size: 14px; }
+  html[data-game] #app .race-header .race-day em { width: 56px; font-size: 13px; }
+}
+
+/* Départ où tu es inscrit : contour clair et étiquette dans sa ligne de titre. */
+html[data-game] #app .departure-fold.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: -2px; }
+.departure-mine-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 211, 216, .6);
+  background: rgba(82, 211, 216, .1);
+  color: #9eeef2;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.departure-mine-badge.is-crew { border-color: rgba(49, 184, 107, .7); background: rgba(49, 184, 107, .14); color: #8ff0b6; }
+html[data-game] #app .departure-fold .fold-date { display: flex !important; }
+
+/* Carte plus basse : carré de date à la hauteur du bloc nom / circuit / type, circuit calé dessus. */
+html[data-game] .race-card .race-card-top { align-items: stretch; gap: 14px; }
+html[data-game] .race-card .race-date { justify-content: center; padding: 4px 0; }
+html[data-game] .race-card .race-head { justify-content: center; gap: 3px; }
+html[data-game] .race-card .race-card-top > .circuit-visual { width: 130px !important; height: 78px !important; align-self: center; }
+html[data-game] .race-card .race-starts { padding-top: 8px; gap: 4px; }
+html[data-game] .race-card .race-fill { margin-top: 0; }
+
+html[data-game] #app .race-header .race-card-top { align-items: stretch !important; }
+html[data-game] #app .race-header .race-date { justify-content: center; padding: 6px 0 !important; }
+@media (max-width: 600px) {
+  html[data-game] .race-card .race-card-top > .circuit-visual { width: 80px !important; height: 60px !important; }
+}
+
+/* Circuit en panneau à droite, sur toute la hauteur de la carte. */
+html[data-game] .race-card .race-card-body { flex-direction: row; align-items: stretch; gap: 0 !important; padding: 0 !important; }
+html[data-game] .race-card .race-card-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+html[data-game] .race-card .race-card-circuit {
+  flex: none;
+  width: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  box-sizing: border-box;
+  background: none;
+}
+html[data-game] .race-card .race-card-circuit > .circuit-visual {
+  position: static !important;
+  width: 100%;
+  height: 100% !important;
+  min-height: 110px;
+  margin: 0;
+  opacity: .9;
+  transform: none !important;
+}
+html[data-game] .race-card .race-card-circuit > .circuit-visual img { width: 100%; height: 100%; object-fit: contain; transform: none !important; }
+/* Mobile : le circuit passe en bandeau en haut de la carte. */
+@media (max-width: 600px) {
+  html[data-game] .race-card .race-card-body { flex-direction: column !important; }
+  html[data-game] .race-card .race-card-circuit { order: -1; width: 100%; height: 96px; padding: 10px 12px 0; }
+  html[data-game] .race-card .race-card-circuit > .circuit-visual { min-height: 0; height: 100%; }
+  html[data-game] .race-card .race-card-content { padding: 10px 12px 12px; }
+}
+
+
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-0) .pilot-name { color: #8fb6c9 !important; }

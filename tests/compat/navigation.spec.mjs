@@ -122,7 +122,7 @@ test('iRacing space opens from home', async ({page}) => {
 });
 test('the public information menu fits and its destinations can be opened', async ({page}) => {
   const session = {access:'anonymous', discordReady:true, community:{slug:'tdz', shortName:'TDZ', name:'Tondeuz Agazon'}};
-  await page.route('**/api/session', route => route.fulfill({json:session}));
+  await page.route(url=>url.pathname==='/api/session', route => route.fulfill({json:session}));
   for (const width of [340, 454, 1366]) {
     await page.setViewportSize({width,height:900});
     await page.goto('/privacy.html');

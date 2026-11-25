@@ -11,7 +11,8 @@ let running=false;
 
 function pilotIsBusy(){
   if(state.busy||state.pendingCrewJoin||state.registrationOpen.size)return true;
-  if(!['home','event','my-entries','week'].includes(state.page))return true;
+  if(!['home','event','my-entries','week','crews'].includes(state.page))return true;
+  if(state.page==='crews'&&app.querySelector('[data-crews-pick]:checked'))return true;
   const active=document.activeElement;
   if(active?.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
   if(document.querySelector('[aria-modal="true"],dialog[open],[data-ux-error-modal]'))return true;
@@ -20,7 +21,10 @@ function pilotIsBusy(){
 }
 
 function openSections(){
-  return [...app.querySelectorAll('details[open]')].map(details=>details.id?`#${CSS.escape(details.id)}`:details.classList.contains('past-departures-fold')?'.past-departures-fold':null).filter(Boolean);
+  return [...app.querySelectorAll('details')].flatMap(details=>{
+    const selector=details.id?`#${CSS.escape(details.id)}`:details.classList.contains('past-departures-fold')?'.past-departures-fold':null;
+    return selector?[[selector,details.open]]:[];
+  });
 }
 
 // A newer version of the site is online: the page reloads itself (only when the pilot is not busy), so a
@@ -42,11 +46,12 @@ async function newVersionOnline(){
 async function refreshInBackground(refresh){
   if(running||document.hidden||isIdle()||pilotIsBusy())return;
   running=true;
-  if(await newVersionOnline()&&!pilotIsBusy()){location.reload();return;}
-  const sections=openSections(),scroll=scrollY;
   try{
+    if(await newVersionOnline()&&!pilotIsBusy()){location.reload();return;}
+    if(pilotIsBusy())return;
+    const sections=openSections(),scroll=scrollY;
     await refresh();
-    for(const selector of sections)app.querySelector(selector)?.setAttribute('open','');
+    for(const [selector,open] of sections)app.querySelector(selector)?.toggleAttribute('open',open);
     scrollTo(0,scroll);
     lastRefresh=Date.now();
   }catch{

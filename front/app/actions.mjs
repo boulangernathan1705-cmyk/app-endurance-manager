@@ -142,7 +142,12 @@ async function finishPendingCrewJoin(departureId,registrationId){
 async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
-    case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
+    case 'dismiss-error': {
+      const overlay = document.querySelector('[data-ux-error-modal]');
+      overlay?.remove();
+      if (overlay?.returnFocus?.isConnected) overlay.returnFocus.focus();
+      break;
+    }
     case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.

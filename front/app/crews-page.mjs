@@ -3,14 +3,14 @@
 // crews on one side, its pilots without a crew on the other, each with the bar of their hours. The organiser ticks
 // pilots and creates a crew (the usual crew window, filled in), puts a pilot in an open crew (« Ajouter à… »), or
 // checks a pilot's request (« Demander un équipage ») before creating it. Pilots only see their race pages.
-import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,communityTag,carLabel} from './core.mjs';
+import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,communityTag,carLabel,otherGameEndurances,invalidateOtherEndurances} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {raceDayGroups,LONG_RACE_HOURS} from '../timeline.mjs';
+import {waitingCrewEntries,belongsToCommunity} from '../admin-todo.mjs';
 
 const DAY=86400000,HORIZON=14*DAY;
 const SIM_NAME={lmu:'LMU',iracing:'iRacing'};
-const OTHER={lmu:'iracing',iracing:'lmu'};
 const SIMS_KEY='em-crews-sims',CATS_KEY='em-crews-categories';
 const dateFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'});
 const clock=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
@@ -21,20 +21,16 @@ const day=at=>dateFormat.format(at).replace(/\./g,'');
 // The clock at an hour of the race; hours of race (« 2 h ») while the start time is not known.
 const hourAt=(departure,offset)=>departure.tbd||departure.hideClock?`${offset} h`:hour(Number(departure.startsAt)+offset*3600000);
 
-// The endurances of the other simulator (the page loads only its own): read once a minute at most.
-let other={game:'',events:[],at:0,loading:null};
 function otherEndurances(){
-  const game=OTHER[activeGame];
-  if(other.game===game&&Date.now()-other.at<60000)return other.events;
-  other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
-    other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game),at:Date.now(),loading:null};
-    if(state.page==='crews')renderCrewsPage();
+  return otherGameEndurances('crews',()=>{
+    if(state.page==='crews' && !state.busy && !app.querySelector('[data-crews-pick]:checked,[data-crew-builder-panel]')) {
+      const folds = new Map([...app.querySelectorAll('.crews-start')].map(fold=>[fold.id,fold.open]));
+      renderCrewsPage(state.crewsFocus,{scroll:false});
+      for (const fold of app.querySelectorAll('.crews-start')) if (folds.has(fold.id)) fold.open=folds.get(fold.id);
+    }
     document.dispatchEvent(new CustomEvent('endurance:crews-count'));
-  }).catch(()=>{other={game,events:[],at:Date.now(),loading:null};});
-  return other.game===game?other.events:[];
+  });
 }
-// After a change on the other simulator's race: read again.
-export function forgetOtherEndurances(){other.at=0;}
 
 // Simulators shown, kept in the browser (« si on veut toujours voir qu'une simu »).
 function chosenSims(){
@@ -68,14 +64,12 @@ function inCategories(start,categories){
 
 // Entries and crews of this community only (an official race shows those of the viewer's other communities too).
 const ours=reg=>!reg.foreign&&reg.status!=='unavailable';
-const ourCrew=crew=>!crew.community||!state.community?.id||crew.community.id===state.community.id;
+const ourCrew=crew=>belongsToCommunity(crew,state.community?.id);
 const hoursOf=event=>Math.max(1,Math.ceil(eventMinutes(event)/60));
 // A pilot entered in several categories shows once, with all of them.
 function pilotsAlone(departure){
-  const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]).map(String));
   const byPilot=new Map();
-  for(const reg of (departure.availability||[]).filter(ours)){
-    if(assigned.has(String(reg.id)))continue;
+  for(const reg of waitingCrewEntries(departure)){
     const key=reg.participantId||`reg:${reg.id}`;
     if(!byPilot.has(key))byPilot.set(key,[]);
     byPilot.get(key).push(reg);
@@ -260,7 +254,7 @@ function startCard(start,focus){
   </details>`;
 }
 
-export function renderCrewsPage(focus=state.crewsFocus||''){
+export function renderCrewsPage(focus=state.crewsFocus||'',{scroll=true}={}){
   if(state.access!=='member'||!can('crews')){state.page='home';return false;}
   state.page='crews';state.currentEventId=null;state.crewsFocus=focus;
   const view=state.crewsView||'todo',sims=chosenSims(),all=crewStarts();
@@ -281,7 +275,7 @@ export function renderCrewsPage(focus=state.crewsFocus||''){
     <div id="crew-builder-root"></div>
   </div>`;
   notifyRender();
-  if(focus)requestAnimationFrame(()=>document.getElementById(`crews-${focus}`)?.scrollIntoView({block:'start',behavior:'smooth'}));
+  if(focus&&scroll)requestAnimationFrame(()=>document.getElementById(`crews-${focus}`)?.scrollIntoView({block:'start',behavior:'smooth'}));
   return true;
 }
 
@@ -293,7 +287,7 @@ export async function crewsAction(action,target){
     target.disabled=true;
     try{await api(`/api/crews/${target.dataset.id}`,'PATCH',{locked:target.dataset.locked!=='1',version:Number(target.dataset.version)});}
     catch(error){target.disabled=false;throw error;}
-    forgetOtherEndurances();
+    invalidateOtherEndurances();
     return 'refresh';
   }
   if(action==='crews-see'){renderCrewsPage(target.dataset.departure);requestAnimationFrame(()=>document.getElementById(`request-${target.dataset.request}`)?.scrollIntoView({block:'center',behavior:'smooth'}));return true;}
@@ -305,7 +299,7 @@ export async function crewsAction(action,target){
   if(action==='crews-delete'){
     if(!confirm(`Supprimer « ${target.dataset.name} » ? Les inscriptions des pilotes seront conservées.`))return true;
     await api(`/api/crews/${target.dataset.id}`,'DELETE',{version:Number(target.dataset.version)});
-    forgetOtherEndurances();
+    invalidateOtherEndurances();
     return 'refresh';
   }
   return false;
@@ -330,7 +324,7 @@ if(typeof document!=='undefined'){
       field.disabled=true;
       try{
         await api(`/api/crews/${crewId}/members`,'POST',{registrationId,version:Number(version)});
-        forgetOtherEndurances();
+        invalidateOtherEndurances();
         document.dispatchEvent(new CustomEvent('endurance:refresh'));
       }catch(error){field.disabled=false;field.value='';showError(error);}
     }
