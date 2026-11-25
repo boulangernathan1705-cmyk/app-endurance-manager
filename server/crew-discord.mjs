@@ -675,14 +675,17 @@ async function bellReminders(env, timestamp, communities) {
   if (!communities.length) return 0;
   let told = 0;
   // The starts of the coming 24 h with pilots of a community not reminded yet (a few per run), in one query.
+  // Apply the indexed lower bound before reading departures. The last start can be beyond 24 h
+  // while one of the earlier departures of the same race still needs a reminder.
   const starts = (await env.DB.prepare(`SELECT k.value AS community_id, e.id, e.name, e.circuit, e.community_id AS event_community,
       json_extract(j.value,'$.id') AS departure_id, json_extract(j.value,'$.startsAt') AS starts_at
     FROM json_each(?) k, events e, json_each(e.departures) j
-    WHERE (e.community_id=k.value OR e.community_id='official') AND e.schedule_pending=0 AND COALESCE(json_extract(j.value,'$.tbd'),0)=0
+    WHERE (e.community_id=k.value OR e.community_id='official') AND e.last_start > ?
+      AND e.schedule_pending=0 AND COALESCE(json_extract(j.value,'$.tbd'),0)=0
       AND json_extract(j.value,'$.startsAt') > ? AND json_extract(j.value,'$.startsAt') <= ?
       AND EXISTS(SELECT 1 FROM registrations g WHERE g.event_id=e.id AND g.departure_id=json_extract(j.value,'$.id') AND g.community_id=k.value)
       AND NOT EXISTS(SELECT 1 FROM race_reminders r WHERE r.event_id=e.id AND r.departure_id=json_extract(j.value,'$.id') AND r.community_id=k.value)
-    LIMIT 3`).bind(JSON.stringify(communities.map(item => item.id)), timestamp, timestamp + REMINDERS[0].before).all()).results || [];
+    LIMIT 3`).bind(JSON.stringify(communities.map(item => item.id)), timestamp, timestamp, timestamp + REMINDERS[0].before).all()).results || [];
   for (const start of starts) {
     // Marked first: a reminder is never sent twice, even if the run stops halfway.
     const mark = await env.DB.prepare('INSERT OR IGNORE INTO race_reminders(event_id,departure_id,community_id,sent_at) VALUES(?,?,?,?)').bind(start.id, start.departure_id, start.community_id, timestamp).run();
