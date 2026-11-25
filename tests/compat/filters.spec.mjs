@@ -24,7 +24,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
   const svgNamespace=['http:','','www.w3.org','2000','svg'].join('/');
   await page.route(url=>['commons.wikimedia.org','upload.wikimedia.org'].includes(url.hostname),route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="${svgNamespace}" viewBox="0 0 800 200"><path d="M1 1H799V199H1Z" fill="none" stroke="black"/></svg>`}));
   const circuits=game==='iracing'?['iracing-indianapolis','iracing-nurburgring-gp','iracing-montreal']:['spa','le-mans'];
-  await boot(page,game,circuits.map((circuit,index)=>race(game,{id:`mobile-${index}`,circuit})));
+  await boot(page,game,circuits.map((circuit,index)=>race(game,{id:`mobile-${index}`,circuit,name:'Production Endurance Challenge',departures:[start(),{...start('next'),date:'2090-10-17',startsAt:Date.parse('2090-10-17T12:00:00Z')}]})));
   for(const width of [320,390,430,760]){
     await page.setViewportSize({width,height:844});
     const cards=page.locator('.race-card');
@@ -32,6 +32,15 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
     for(const card of await cards.all()){
       const panel=card.locator('.race-card-circuit'),visual=panel.locator('.circuit-visual'),img=visual.locator('img');
       await expect(img).toHaveCount(1);
+      const art=card.locator('.race-card-top > .endurance-card-head'),head=card.locator('.race-head'),date=head.locator('.race-date'),times=card.locator('.race-starts');
+      await expect(art).toBeVisible();await expect(date).toHaveCount(1);
+      const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
+      expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
+      expect(h.width).toBeGreaterThan(a.width);
+      expect(d.height).toBeLessThanOrEqual(34);
+      expect(await head.evaluate(el=>getComputedStyle(el).paddingRight)).toBe('0px');
+      expect((await card.locator('.race-card-circuit').boundingBox()).x).toBeGreaterThanOrEqual(t.x+t.width-1);
+      expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
       for(const rect of [box,drawing,picture]){
         expect(rect.width).toBeGreaterThan(0);
