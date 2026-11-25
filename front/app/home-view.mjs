@@ -1,3 +1,4 @@
+import {soloEventCounts} from '../solo-card-counts.mjs';
 import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 import {raceFilterKey,mySituation,emptyRaceFilters,normalizeRaceFilters,filteredCalendarEvents} from '../race-filters.mjs';
 import {readFilterState,writeFilterState,setFilterDate} from '../filter-state.mjs';
@@ -84,7 +85,7 @@ function soloCardFoot(event,archived,situation){
   const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}</span>`:'';
   // A stream: its times are above, nobody enters.
   if(isStream(event))return situation?`<span class="solo-card-foot"><span class="race-situation">${situation}</span></span>`:'';
-  return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
+  return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${soloFill(event,shown,(event.departures||[]).length>1?soloEventCounts(event,{archived}):undefined)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
 // EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, BOULOULES…),
 // using the simulator-specific OPEN/SAFE artwork.
