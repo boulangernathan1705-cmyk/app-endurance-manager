@@ -41,7 +41,7 @@
 .cal-cell.is-endurance .endurance-card-duration { font-size: 10px; padding: 0 3px; }
 .cal-cell.is-endurance > b, .cal-cell.is-endurance > small { margin-inline: var(--em-space-1); }
 
-/* Endurance artwork: two local captures, no per-circuit mapping or network calls. */
+/* Local circuit images for LMU, simulator images as fallback. */
 .endurance-sim-lmu { --endurance-photo: url('/images/endurance/lmu.webp'); --endurance-focus: 49% center; }
 .endurance-sim-iracing { --endurance-photo: url('/images/endurance/iracing.webp'); --endurance-focus: 43% center; }
 .endurance-card-head {
@@ -300,3 +300,23 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
   }
   html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { padding: 7px; }
 }
+
+/* LMU Assister backgrounds, optimized and served locally. */
+.endurance-card-head.endurance-track-bahrain { --endurance-photo: url('/images/endurance/lmu/bahrain.webp'); }
+.endurance-card-head.endurance-track-barcelona { --endurance-photo: url('/images/endurance/lmu/barcelona.webp'); }
+.endurance-card-head.endurance-track-cota { --endurance-photo: url('/images/endurance/lmu/cota.webp'); }
+.endurance-card-head.endurance-track-daytona { --endurance-photo: url('/images/endurance/lmu/daytona.webp'); }
+.endurance-card-head.endurance-track-fuji { --endurance-photo: url('/images/endurance/lmu/fuji.webp'); }
+.endurance-card-head.endurance-track-imola { --endurance-photo: url('/images/endurance/lmu/imola.webp'); }
+.endurance-card-head.endurance-track-interlagos { --endurance-photo: url('/images/endurance/lmu/interlagos.webp'); }
+.endurance-card-head.endurance-track-laguna-seca { --endurance-photo: url('/images/endurance/lmu/laguna-seca.webp'); }
+.endurance-card-head.endurance-track-le-mans { --endurance-photo: url('/images/endurance/lmu/le-mans.webp'); }
+.endurance-card-head.endurance-track-long-beach { --endurance-photo: url('/images/endurance/lmu/long-beach.webp'); }
+.endurance-card-head.endurance-track-lusail { --endurance-photo: url('/images/endurance/lmu/lusail.webp'); }
+.endurance-card-head.endurance-track-monza { --endurance-photo: url('/images/endurance/lmu/monza.webp'); }
+.endurance-card-head.endurance-track-paul-ricard { --endurance-photo: url('/images/endurance/lmu/paul-ricard.webp'); }
+.endurance-card-head.endurance-track-portimao { --endurance-photo: url('/images/endurance/lmu/portimao.webp'); }
+.endurance-card-head.endurance-track-road-atlanta { --endurance-photo: url('/images/endurance/lmu/road-atlanta.webp'); }
+.endurance-card-head.endurance-track-sebring { --endurance-photo: url('/images/endurance/lmu/sebring.webp'); }
+.endurance-card-head.endurance-track-silverstone { --endurance-photo: url('/images/endurance/lmu/silverstone.webp'); }
+.endurance-card-head.endurance-track-spa { --endurance-photo: url('/images/endurance/lmu/spa.webp'); }

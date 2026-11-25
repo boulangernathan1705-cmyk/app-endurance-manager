@@ -37,11 +37,12 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
   expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
   expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
   expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+sim+'.webp');
-  expect(await page.evaluate(async sim=>{
-   const image=new Image();image.src='/images/endurance/'+sim+'.webp';
+  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
+  expect(await page.evaluate(async artwork=>{
+   const image=new Image();image.src=artwork;
    try {await image.decode();return image.naturalWidth>=400;} catch {return false;}
-  },sim)).toBe(true);
+  },artwork)).toBe(true);
   if(width===390){
    expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
    expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
