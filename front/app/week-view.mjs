@@ -78,7 +78,7 @@ function streamLine(event,starts=[]){
 }
 
 // The card's schedule on a phone (Nathan 2026-11-02, option G): one line per moment, start → end: the stream (with its
-// link), then the race, each round set or each start of an endurance. An endurance ends 30 min after its race time.
+// link), then the race, each round set or each start of an endurance (start time only).
 const parisMinutes=timestamp=>{const [h,m]=clock.format(timestamp).split(':').map(Number);return h*60+m;};
 const clockMinutes=time=>{const [h,m]=String(time||'').split(':').map(Number);return Number.isFinite(h)?h*60+(m||0):0;};
 const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
@@ -94,18 +94,18 @@ function planOf(item){
   }
   if(stream){if(info.raceTime)rows.push({key:clockMinutes(info.raceTime),icon:'🏁',label:'Course',from:shortClock(info.raceTime),to:''});}
   else{
-    const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
+    const solo=isSolo(event),rounds=(event.rounds||[]).length,name=/training/i.test(String(kind.label))?'Training':'Course';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
-      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:`${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
-        from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:solo?(starts.length>1?`Course ${index+1}`:name):'',
+        from:pending?'à définir':hour(start.startsAt),to:!solo||pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
   if(!rows.length)return {plan:'',band:'',live:''};
   rows.sort((a,b)=>a.key-b.key);
   const time=row=>`<span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>`;
   // On a phone: one line per moment, the stream's link at the end of its own line (Nathan 2026-11-02).
-  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.icon)}<em> ${esc(row.label)}</em></span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
+  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span${row.label?'':' aria-label="Départ"'}>${esc(row.icon)}${row.label?`<em> ${esc(row.label)}</em>`:''}</span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
   // On a computer (option P1): the race's times in the coloured band on top, the start big; the stream in its own
   // purple line with its link on the same line.
   const live=rows.find(row=>row.cls==='is-stream'),races=rows.filter(row=>row!==live),shown=races.length?races:[live];
