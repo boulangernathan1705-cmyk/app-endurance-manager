@@ -2,11 +2,11 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS} from '../shared/combos.mjs';
+import {known, paceStats, tyreStats, bestOf, isBest} from './combos-stats.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const known = value => value !== null && value !== undefined && Number.isFinite(Number(value));
 const fr = (value, digits = 2) => known(value) ? Number(value).toLocaleString('fr-FR', {minimumFractionDigits:digits, maximumFractionDigits:digits}) : '—';
 const lapTime = seconds => known(seconds) ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(3).padStart(6, '0').replace('.', ',')}` : '—';
 const day = ms => new Date(ms).toLocaleDateString('fr-FR', {day:'numeric', month:'short', year:'numeric'});
@@ -15,7 +15,6 @@ const seconds = value => value * 1000;
 const dayTime = ms => new Date(ms).toLocaleString('fr-FR', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
 const COND = {dry:['Sec', ''], damp:['Humide', 'damp'], rain:['Pluie', 'rain']};
 const WHEELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
-const CREW = {id:'crew', name:'Équipage', color:'#f0f3f2', crew:true};
 const STORE = 'em-combos-hidden';
 
 const view = {
@@ -237,41 +236,16 @@ function people() {
 
 // ---------- The crew row ----------
 
-const mean = values => { const list = values.filter(known).map(Number); return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null; };
-const meanOf = (rows, key) => mean(rows.map(row => row[key]));
-const meanFour = (rows, key) => [0, 1, 2, 3].map(index => mean(rows.map(row => row[key]?.[index])));
-const minOf = values => { const list = values.filter(known).map(Number); return list.length ? Math.min(...list) : null; };
-
 function paceRows(condition, sheet = view.sheet) {
-  const who = people();
-  const rows = (sheet?.conditions[condition]?.drivers || []).filter(row => !view.hidden.has(row.id) && who.has(row.id))
-    .map(row => ({...row, ...who.get(row.id), laps:row.laps}));
-  if (rows.length < 2) return rows;
-  const sectors = rows.filter(row => row.sectors);
-  return [{...CREW, laps:rows.reduce((sum, row) => sum + row.laps, 0), ve:meanOf(rows, 've'), fuel:meanOf(rows, 'fuel'), avg:meanOf(rows, 'avg'),
-    best:minOf(rows.map(row => row.best)), slope:meanOf(rows, 'slope'),
-    sectors:sectors.length ? {laps:sectors.reduce((sum, row) => sum + row.sectors.laps, 0), avg:[0, 1, 2].map(index => mean(sectors.map(row => row.sectors.avg[index]))),
-      best:[0, 1, 2].map(index => minOf(sectors.map(row => row.sectors.best[index])))} : null}, ...rows];
+  return paceStats(sheet?.conditions[condition]?.drivers || [], people(), view.hidden);
 }
 
 function tyreRows(condition, compound) {
-  const who = people();
-  const rows = (view.sheet.conditions[condition]?.compounds[compound]?.drivers || []).filter(row => !view.hidden.has(row.id) && who.has(row.id))
-    .map(row => ({...row, ...who.get(row.id), laps:row.laps}));
-  if (rows.length < 2) return rows;
-  return [{...CREW, laps:rows.reduce((sum, row) => sum + row.laps, 0), wear:meanFour(rows, 'wear'), temp:meanFour(rows, 'temp'), kpa:meanFour(rows, 'kpa'), brake:meanFour(rows, 'brake')}, ...rows];
+  return tyreStats(view.sheet.conditions[condition]?.compounds[compound]?.drivers || [], people(), view.hidden);
 }
 
 const nameCell = (row, dot = false) => `<td class="cb-name" style="--dc:${esc(row.color)}">${dot ? '<span class="cb-dot"></span>' : ''}${esc(row.name)}${row.me ? ' (moi)' : ''}</td>`;
 const rowClass = row => row.crew ? ' class="cb-crew"' : '';
-// The best pilot of a column, in violet as on a timing screen: the lowest (or highest) value among the pilots shown,
-// two pilots at least and not all level; the crew row is never marked.
-function bestOf(rows, get, lower = true) {
-  const values = rows.filter(row => !row.crew).map(get).filter(known).map(Number);
-  if (values.length < 2 || Math.min(...values) === Math.max(...values)) return null;
-  return lower ? Math.min(...values) : Math.max(...values);
-}
-const isBest = (row, value, best) => !row.crew && known(value) && known(best) && Math.abs(Number(value) - best) < 1e-9;
 const cell = (row, value, best, html) => `<td${isBest(row, value, best) ? ' class="cb-best"' : ''}>${html}</td>`;
 const none = columns => `<tr><td colspan="${columns}" class="cb-empty">Aucun pilote affiché dans cette condition.</td></tr>`;
 const compareName = () => view.sheet.periods.events.find(item => item.id === view.compareEvent)?.name || '';
