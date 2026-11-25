@@ -683,17 +683,41 @@ function glide() {
 // ---------- The page ----------
 
 const PANELS = {board, chrono, car, tele, map};
+let previousSections = null;
+
+// Keep unchanged sections mounted, including buttons a pilot may be using.
+function renderSections(sections) {
+  if (!previousSections) {
+    app.innerHTML = sections.map(section => section.html).join('');
+  } else {
+    for (const [index, {selector, html}] of sections.entries()) {
+      if (html === previousSections[index].html) continue;
+      const element = app.querySelector(`:scope > ${selector}`);
+      if (!html) element.remove();
+      else if (element) element.outerHTML = html;
+      else app.querySelector(`:scope > ${sections[index + 1].selector}`).insertAdjacentHTML('beforebegin', html);
+    }
+  }
+  previousSections = sections;
+}
 function render() {
   if (!view.started) return;
   frame = null;
   const feed = current();
   if (!feed) {
+    previousSections = null;
     app.innerHTML = `${header(null)}<div class="pw-card pw-empty"><h1>Personne ne roule en ce moment</h1>
       <p>Le mur s’allume dès qu’un pilote de l’équipe roule avec le plugin SimHub, « Partager ma voiture en direct » coché. Cette page se met à jour toute seule.</p></div>`;
     return;
   }
   const scroll = window.scrollY;
-  app.innerHTML = `${header(feed)}${driverCard(feed)}${carsStrip()}${tabs()}<div class="pw-panel-wrap pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</div>`;
+  renderSections([
+    {selector:'.pw-top', html:header(feed)},
+    {selector:'.pw-driver', html:driverCard(feed)},
+    {selector:'.pw-cars', html:carsStrip()},
+    {selector:'.pw-tabs', html:tabs()},
+    {selector:'.pw-panel-wrap', html:`<div class="pw-panel-wrap pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</div>`}
+  ]);
   if (frame) bindMapMarkers(frame, app.querySelector('.pw-map'));
   if (scroll) window.scrollTo(0, scroll);
   if (view.tab === 'tele') drawCurves(feed);
