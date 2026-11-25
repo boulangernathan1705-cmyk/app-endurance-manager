@@ -170,3 +170,74 @@ for(const game of ['lmu','iracing'])test('endurance-circuit-catalog-'+game,async
   console.log(game+' : '+count+' circuits chargés et cadrés ('+testInfo.project.name+')');
   await expect(page.locator('#circuit-audit-sheet')).toHaveScreenshot('endurance-circuit-catalog-'+game+'.png',{timeout:20000});
 });
+
+/* Review all 18 real covers in all three card contexts at each viewport.
+   Use the actual header dimensions measured on the application, and the same
+   production selectors. Scale only the review cells, not the source artwork. */
+test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
+  test.setTimeout(120000);
+  await mockSite(page);
+  await page.goto('/lmu/#accueil');
+  const home=page.locator('.week-block.is-lmu .endurance-card-head').first();
+  await expect(home).toBeVisible();
+  const homeSize=await home.boundingBox();
+  await page.goto('/lmu/');
+  const list=page.locator('button.race-card.is-endurance .endurance-card-head').first();
+  await expect(list).toBeVisible();
+  const listSize=await list.boundingBox();
+  await page.goto('/lmu/#event='+SPA.id);
+  const detail=page.locator('.endurance-detail-hero .endurance-card-head');
+  await expect(detail).toBeVisible();
+  const detailSize=await detail.boundingBox();
+  const result=await page.evaluate(async({sizes})=>{
+    const {GAME_CATALOGS}=await import('/shared/catalog.mjs');
+    const {enduranceHeader}=await import('/front/endurance-card.mjs');
+    const circuits=GAME_CATALOGS.lmu.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd'));
+    const app=document.querySelector('#app'),sheet=document.createElement('div');
+    sheet.id='lmu-artwork-audit';
+    sheet.style.cssText='display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;background:#101619;padding:4px;box-sizing:border-box;width:100%;align-items:start';
+    const cellWidth=(app.clientWidth-24)/3;
+    for(const title of ['Accueil','Liste','Fiche']){
+      const h=document.createElement('strong');h.textContent=title;h.style.cssText='color:#fff;text-align:center;font-size:12px';sheet.append(h);
+    }
+    const checks=[];
+    for(const circuit of circuits){
+      for(const [index,context] of ['home','list','detail'].entries()){
+        const cell=document.createElement('div');cell.style.cssText='min-width:0;overflow:hidden;color:#fff;text-align:center;font-size:10px';
+        const label=document.createElement('div');label.textContent=circuit.id;cell.append(label);
+        const frame=document.createElement('div');frame.style.cssText='display:block;margin:auto;width:max-content';
+        const html=enduranceHeader({circuit:circuit.id,name:'Test',durationMinutes:360},'lmu');
+        if(context==='home')frame.innerHTML='<div class="week-block is-endurance is-lmu">'+html+'</div>';
+        else if(context==='list')frame.innerHTML='<button class="race-card is-endurance" type="button"><span class="race-card-top">'+html+'</span></button>';
+        else frame.innerHTML='<div class="endurance-detail-hero">'+html+'<span class="circuit-visual" style="display:none"></span></div>';
+        const art=frame.querySelector('.endurance-card-head'),size=sizes[index];
+        for(const wrapper of frame.querySelectorAll('.week-block,.race-card,.race-card-top,.endurance-detail-hero')){
+          wrapper.style.setProperty('display','block','important');wrapper.style.setProperty('padding','0','important');wrapper.style.setProperty('margin','0','important');wrapper.style.setProperty('border','0','important');wrapper.style.setProperty('width',size.width+'px','important');wrapper.style.setProperty('height',size.height+'px','important');wrapper.style.setProperty('min-width','0','important');
+        }
+        for(const [key,value] of Object.entries({width:size.width+'px',height:size.height+'px','min-height':size.height+'px','max-height':size.height+'px',margin:'0'}))art.style.setProperty(key,value,'important');
+        frame.style.zoom=String(Math.min(1,cellWidth/size.width));
+        cell.append(frame);sheet.append(cell);
+        checks.push({art,id:circuit.id,context});
+      }
+    }
+    app.replaceChildren(sheet);
+    for(let node=app;node.parentElement&&node!==document.body;node=node.parentElement){
+      for(const sibling of node.parentElement.children)if(sibling!==node)sibling.style.setProperty('display','none','important');
+    }
+    for(const node of document.querySelectorAll('body *'))if(!sheet.contains(node)&&!sheet.contains(node.parentElement)&&!node.contains(sheet)&&getComputedStyle(node).position==='fixed')node.style.setProperty('display','none','important');
+    const audit=await Promise.all(checks.map(async({art,id,context})=>{
+      const style=getComputedStyle(art,'::before'),mobile=innerWidth<=760;
+      const prop=context==='list'||(context==='home'&&mobile)?'--track-focus-compact':context==='detail'&&mobile?'--track-focus-detail':'--track-focus-wide';
+      const image=new Image();image.src='/images/endurance/lmu/'+id+'.webp';
+      let loaded=true;try{await image.decode();}catch{loaded=false;}
+      return {id,context,loaded,position:style.backgroundPosition,expected:style.getPropertyValue(prop).trim(),size:style.backgroundSize,correct:style.backgroundPosition.split(',').every(p=>p.trim()===style.getPropertyValue(prop).trim())&&style.backgroundImage.includes('/images/endurance/lmu/'+id+'.webp')&&style.backgroundSize.split(',').every(s=>s.trim()==='cover')};
+    }));
+    return {count:circuits.length,audit};
+  },{sizes:[homeSize,listSize,detailSize]});
+  expect(result.count).toBe(18);
+  expect(result.audit).toHaveLength(54);
+  expect(result.audit.filter(a=>!a.loaded||!a.correct)).toEqual([]);
+  console.log('18 covers, 54 framings verified ('+testInfo.project.name+')');
+  await page.evaluate(()=>document.fonts.ready);
+  await expect(page.locator('#lmu-artwork-audit')).toHaveScreenshot('endurance-lmu-artwork-catalog.png',{timeout:20000});
+});
