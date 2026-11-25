@@ -78,7 +78,7 @@ test('a race over several days is a table: one row per start time, one button on
   assert.match(planning,/--rows:\$\{times\.length\}/);
   assert.match(planning,/table\?dayFree\(event,day\):''/);
   assert.match(read('front/app/event-view.mjs'),/absence:absenceButton\(event,'Absent pour cette course'\)/);
-  const css=read('styles/ux-mobile-navigation-controls.css');
+  const css=read('styles/pages/race-planning-extensions.css');
   assert.match(css,/\.departure-planning\.is-table \.planning-day \{[^}]*grid-template-rows: subgrid/);
   assert.match(css,/\.planning-quick > :not\(\.is-primary\) \{ display: none; \}/);
   assert.match(css,/\.is-table \.planning-day-free \{ grid-row: calc\(var\(--rows, 1\) \+ 2\)/);
