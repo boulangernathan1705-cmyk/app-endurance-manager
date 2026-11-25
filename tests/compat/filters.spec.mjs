@@ -38,42 +38,19 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       const caption=art.locator('.endurance-card-caption');
       const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
       expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
-      if(game==='iracing'){
-        expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
-        expect(artBox.width).toBeGreaterThanOrEqual(89);
-        expect(artBox.height).toBeCloseTo(Math.min(150,Math.max(126,width*.37)),0);
-        artworkSizes.push([Math.round(artBox.width),Math.round(artBox.height)]);
-      }else{
-        await expect(card).toHaveClass(/endurance-pano/);
-        expect(artBox.height).toBeLessThanOrEqual(60);
-        expect(artBox.width).toBeGreaterThanOrEqual(120);
-        expect(captionBox.height).toBeLessThanOrEqual(artBox.height+1);
-        const body=card.locator('.race-card-body');
-        const track=await card.evaluate(el=>[...el.classList].find(c=>c.startsWith('endurance-track-')).slice(16));
-        expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/lmu-pano/'+track+'.webp');
-        expect(await body.evaluate(el=>getComputedStyle(el).backgroundSize.split(',').every(v=>v.trim()==='cover'))).toBe(true);
-        expect(await art.evaluate(el=>getComputedStyle(el,'::before').display)).toBe('none');
-        expect(await img.evaluate(el=>getComputedStyle(el).filter)).toContain('invert(1)');
-      }
+      await expect(card).toHaveClass(/endurance-preview/);
+      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+      expect(artBox.width).toBeGreaterThanOrEqual(89);
+      expect(artBox.height).toBeCloseTo(Math.min(150,Math.max(126,width*.37)),0);
+      artworkSizes.push([Math.round(artBox.width),Math.round(artBox.height)]);
       expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
-      if(game==='iracing'){
-        expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
-        expect(h.width).toBeGreaterThan(a.width);
-      }else{
-        expect(a.y+a.height).toBeLessThanOrEqual(h.y+1);
-        expect(Math.abs(a.x-h.x)).toBeLessThanOrEqual(2);
-        expect(Math.abs(a.width-h.width)).toBeLessThanOrEqual(2);
-      }
+      expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
+      expect(h.width).toBeGreaterThan(a.width);
       expect(d.height).toBeLessThanOrEqual(34);
       expect(await head.evaluate(el=>getComputedStyle(el).paddingRight)).toBe('0px');
       const mapPanel=await panel.boundingBox();
-      if(game==='iracing')expect(mapPanel.x).toBeGreaterThanOrEqual(t.x+t.width-1);
-      else{
-        expect(mapPanel.x).toBeGreaterThanOrEqual(h.x+h.width-1);
-        expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(t.y+1);
-        expect(t.y).toBeGreaterThanOrEqual(h.y+h.height-1);
-      }
+      expect(mapPanel.x).toBeGreaterThanOrEqual(t.x+t.width-1);
       expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
       for(const rect of [box,drawing,picture]){
@@ -86,7 +63,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(picture.width).toBeLessThanOrEqual(drawing.width+1);
       expect(await img.evaluate(node=>getComputedStyle(node).transform)).toBe('none');
     }
-    if(game==='iracing')expect(new Set(artworkSizes.map(size=>size.join('x'))).size).toBe(1);
+    expect(new Set(artworkSizes.map(size=>size.join('x'))).size).toBe(1);
   }
 });
 
@@ -156,4 +133,31 @@ test('community choices update the whole race view and never hide a private even
   await expect(page.locator('.event-absences')).not.toContainText('Absent Alpha');
   await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.events[0].official=false;const {renderEvent}=await import('/front/app/event-view.mjs');renderEvent();});
   await expect(page.locator('.race-community-filter')).toHaveCount(0);await expect(page.locator('.ce-board-name')).toHaveCount(2);
+});
+
+for (const game of ['lmu','iracing']) test(`${game}: preview preserves card size and touch navigation`,async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await boot(page,game,[race(game),race(game,{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',name:'Second race'})]);
+  const cards=page.locator('button.race-card.is-endurance'),card=cards.first(),body=card.locator('.race-card-body');
+  await expect(cards).toHaveCount(2);
+  await page.mouse.move(0,0);
+  const before=await card.boundingBox();
+  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).not.toContain('lmu-pano/');
+  const touch=async locator=>{
+    await locator.dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+    await locator.dispatchEvent('click',{detail:1,bubbles:true,cancelable:true});
+  };
+  await touch(card);
+  await expect(card).toHaveClass(/is-panorama-preview/);
+  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/lmu-pano/spa.webp');
+  const after=await card.boundingBox();
+  expect(after.width).toBeCloseTo(before.width,0);expect(after.height).toBeCloseTo(before.height,0);
+  await touch(cards.nth(1));
+  await expect(card).not.toHaveClass(/is-panorama-preview/);
+  await expect(cards.nth(1)).toHaveClass(/is-panorama-preview/);
+  await page.keyboard.press('Escape');
+  await expect(cards.nth(1)).not.toHaveClass(/is-panorama-preview/);
+  await touch(card);
+  await touch(card);
+  await expect(page.locator('.race-header.is-endurance-detail')).toBeVisible();
 });
