@@ -30,7 +30,7 @@ async function mockSite(page){
   });
   await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');document.cookie='em_sim=lmu; Path=/';});
 }
-const settle=page=>page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].map(image=>image.complete?null:new Promise(done=>{image.onload=image.onerror=done;})));});
+const settle=page=>page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(image=>image.getClientRects().length).map(image=>image.complete?null:new Promise(done=>{image.onload=image.onerror=done;})));});
 
 test('charte',async({page})=>{
   await page.goto('/charte');
