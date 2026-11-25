@@ -18,6 +18,8 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 
 ## Charte et tests visuels
 
+La [charte et les règles de cascade](docs/DESIGN_SYSTEM.md) décrivent les fichiers de référence et les états à vérifier.
+
 Le style du site a des valeurs de référence (couleurs, tailles, arrondis, espacements) dans `styles/tokens.css`.
 Les nouveaux styles utilisent ces variables (`var(--em-…)`), jamais une valeur brute. La page `/charte` montre les
 composants avec ces valeurs.
