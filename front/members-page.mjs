@@ -1,3 +1,4 @@
+import {bannerImage, botImage, closeCropper, cropCanvas, openCropper, resetCropper, setZoom} from './admin/image-cropper.mjs';
 import {SUPERVISION_PANEL,installDiscordSupervision} from './admin/discord-supervision.mjs';
 import {helpContext} from './context-help.mjs';
 import {todoItems} from './admin-todo.mjs';
@@ -779,83 +780,6 @@ function selectTab(key, focus = false) {
   history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
 }
 
-// Banner: cropped to 2048 × 512 in the browser (centre) and compressed, WebP (JPEG where WebP is not available).
-// Framing of a new banner by the admin: the image is dragged in a 2048 × 512 frame and zoomed with a slider
-// (or the mouse wheel); it always covers the whole frame.
-let cropper = null;
-function drawCropper() {
-  const {canvas, bitmap, zoom} = cropper, W = canvas.width, H = canvas.height;
-  const scale = Math.max(W / bitmap.width, H / bitmap.height) * zoom, w = bitmap.width * scale, h = bitmap.height * scale;
-  cropper.x = Math.min(0, Math.max(W - w, cropper.x ?? (W - w) / 2));
-  cropper.y = Math.min(0, Math.max(H - h, cropper.y ?? (H - h) / 2));
-  const context = canvas.getContext('2d');
-  context.clearRect(0, 0, W, H);
-  context.drawImage(bitmap, cropper.x, cropper.y, w, h);
-}
-function setZoom(zoom) {
-  const W = cropper.canvas.width, H = cropper.canvas.height;
-  // Zoom around the centre of the frame.
-  const ratio = zoom / cropper.zoom;
-  cropper.x = W / 2 - (W / 2 - cropper.x) * ratio;
-  cropper.y = H / 2 - (H / 2 - cropper.y) * ratio;
-  cropper.zoom = zoom;
-  drawCropper();
-}
-async function openCropper(file, container) {
-  const bitmap = await createImageBitmap(file);
-  const bot = container.dataset.imageKind === 'bot';
-  container.querySelector('.banner-cropper')?.remove();
-  const box = document.createElement('div');
-  box.className = `banner-cropper${bot ? ' bot-cropper' : ''}`;
-  box.innerHTML = `<div class="banner-crop-frame"><canvas width="${bot ? 512 : 2048}" height="512" aria-label="${bot ? 'Cadrage du logo' : 'Cadrage de la bannière'}"></canvas></div>
-    <label class="banner-crop-zoom">Zoom<input type="range" min="1" max="4" step="0.01" value="1" data-banner-zoom></label>
-    <p class="members-help">Fais glisser l’image pour choisir la partie visible, et zoome si besoin.</p>
-    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>${bot ? 'Enregistrer le logo' : 'Enregistrer la bannière'}</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
-  const shown = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
-  shown.after(box);
-  shown.hidden = true;
-  const canvas = box.querySelector('canvas');
-  cropper = {canvas, bitmap, zoom:1, x:null, y:null};
-  drawCropper();
-  let drag = null;
-  canvas.addEventListener('pointerdown', event => { drag = {x:event.clientX, y:event.clientY}; canvas.setPointerCapture(event.pointerId); });
-  canvas.addEventListener('pointermove', event => {
-    if (!drag) return;
-    const ratio = canvas.width / canvas.getBoundingClientRect().width;
-    cropper.x += (event.clientX - drag.x) * ratio; cropper.y += (event.clientY - drag.y) * ratio;
-    drag = {x:event.clientX, y:event.clientY};
-    drawCropper();
-  });
-  canvas.addEventListener('pointerup', () => { drag = null; });
-  canvas.addEventListener('wheel', event => {
-    event.preventDefault();
-    const slider = box.querySelector('[data-banner-zoom]');
-    slider.value = Math.min(4, Math.max(1, cropper.zoom * (event.deltaY < 0 ? 1.08 : 1 / 1.08)));
-    setZoom(Number(slider.value));
-  }, {passive:false});
-}
-function closeCropper(container) {
-  container.querySelector('.banner-cropper')?.remove();
-  const preview = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
-  if (preview) preview.hidden = false;
-  cropper = null;
-}
-async function bannerImage(canvas) {
-  for (const quality of [.85, .75, .62, .5]) {
-    let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
-    if (blob?.type !== 'image/webp') blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-    if (blob && blob.size <= 600000) return blob;
-  }
-  throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
-}
-// Logo of the bot: Discord takes PNG or JPEG only (PNG keeps the transparency).
-async function botImage(canvas) {
-  for (const [type, quality] of [['image/png'], ['image/jpeg', .9], ['image/jpeg', .75]]) {
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, type, quality));
-    if (blob && blob.size <= 1000000) return blob;
-  }
-  throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
-}
 // Reloads the page content and comes back to the same tab.
 async function reload(tab, {view = '', module = ''} = {}) { openTab = tab; openView = view; openModule = module; await load(); }
 
@@ -962,27 +886,28 @@ app.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-banner-cancel]')) { closeCropper(event.target.closest('.settings-banner')); return; }
-  if (event.target.closest('[data-banner-save]') && cropper) {
+  const canvas = cropCanvas();
+  if (event.target.closest('[data-banner-save]') && canvas) {
     const container = event.target.closest('.settings-banner'), status = container.querySelector('.settings-status');
     status.textContent = 'Envoi…';
     if (container.dataset.imageKind === 'bot') {
       try {
-        const image = await botImage(cropper.canvas);
+        const image = await botImage(canvas);
         const response = await fetch('/api/community/bot-avatar', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
-        cropper = null;
+        resetCropper();
         await reload('look');
       } catch (error) { status.textContent = error.message; }
       return;
     }
     try {
-      const image = await bannerImage(cropper.canvas);
+      const image = await bannerImage(canvas);
       const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
       for (const img of document.querySelectorAll('.hero-banner, .settings-banner-preview')) { img.removeAttribute('srcset'); img.src = result.bannerUrl; }
-      cropper = null;
+      resetCropper();
       await reload('look');
     } catch (error) { status.textContent = error.message; }
     return;
@@ -1049,7 +974,7 @@ app.addEventListener('click', async event => {
 });
 
 app.addEventListener('input', event => {
-  if (event.target.matches?.('[data-banner-zoom]') && cropper) { setZoom(Number(event.target.value)); return; }
+  if (event.target.matches?.('[data-banner-zoom]') && cropCanvas()) { setZoom(Number(event.target.value)); return; }
   const look = event.target.closest?.('form[data-appearance]');
   if (look) { updatePreview(look); return; }
   if (event.target.name === 'memberSearch') filterMembers();
@@ -1174,7 +1099,7 @@ app.addEventListener('change', async event => {
     box.value = '';
     return;
   }
-  if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
+  if (box.matches('[data-banner-zoom]') && cropCanvas()) { setZoom(Number(box.value)); return; }
   // Discord: the rows and the sketch follow the choices; nothing is saved before « Activer ».
   const discord = box.closest('form[data-discord-form]');
   if (discord) { discord.querySelector('[data-recap-preview]').innerHTML = ''; discordRefresh(discord); return; }
