@@ -421,7 +421,7 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
 .endurance-preview-track-silverstone { --endurance-panorama: url('/images/endurance/lmu-pano/silverstone.webp'); --panorama-focus: 50% 50%; }
 .endurance-preview-track-spa { --endurance-panorama: url('/images/endurance/lmu-pano/spa.webp'); --panorama-focus: 49% 50%; }
 .endurance-preview {
-  --preview-shade: linear-gradient(90deg,rgba(7,12,17,.78),rgba(7,12,17,.88) 55%,rgba(7,12,17,.91));
+  --preview-shade: linear-gradient(90deg,rgba(7,12,17,.22),rgba(7,12,17,.78) 40%,rgba(7,12,17,.88));
 }
 .endurance-preview .week-pano-map {
   display: none; position: absolute; inset: 5px 8px auto auto;
@@ -439,7 +439,7 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
 }
 
 .week-block.is-endurance.endurance-preview.is-panorama-preview, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview > .race-card-body {
-  background-image: var(--preview-shade), var(--endurance-panorama);
+  background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);
   background-size: cover; background-position: var(--panorama-focus,center); background-repeat: no-repeat;
   color: #fff;
 }
@@ -459,7 +459,7 @@ html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama
 @media (hover:hover) and (pointer:fine) {
 
 .week-block.is-endurance.endurance-preview:hover, html[data-game] #app button.race-card.is-endurance.endurance-preview:hover > .race-card-body {
-  background-image: var(--preview-shade), var(--endurance-panorama);
+  background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);
   background-size: cover; background-position: var(--panorama-focus,center); background-repeat: no-repeat;
   color: #fff;
 }
