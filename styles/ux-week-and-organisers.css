@@ -582,3 +582,36 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
 .cal-cell.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 10px; }
 .cal-cell.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 9px; text-transform: none; }
 .cal-cell.is-endurance .endurance-card-caption .endurance-card-duration { color: var(--em-text-strong); }
+
+/* Keep the LMU home caption over the actual capture rather than a solid footer.
+   iRacing's approved home artwork remains untouched. */
+.week-block.is-endurance.is-lmu > .endurance-card-head {
+  --endurance-focus: 49% 58%;
+}
+.week-block.is-endurance.is-lmu .endurance-card-caption {
+  background: rgba(9,14,20,.62);
+}
+@media (max-width: 760px) {
+  .week-block.is-endurance.is-lmu .endurance-card-caption { background: transparent; }
+  .week-block.is-endurance.is-lmu .endurance-card-caption::before {
+    background: linear-gradient(0deg,rgba(9,14,20,.85),rgba(9,14,20,.44));
+  }
+}
+
+/* The list has one common artwork size per viewport, regardless of simulator,
+   title length, badges or number of starts. Keep the caption at its bottom. */
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+  flex-basis: clamp(90px,32%,138px);
+  height: 150px; min-height: 150px; max-height: 150px; align-self: flex-start;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-lmu {
+  --endurance-focus: 49% 56%;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-iracing {
+  --endurance-focus: 46% 50%;
+}
+@media (max-width: 760px) {
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+    height: clamp(126px,37vw,150px); min-height: 0; max-height: none;
+  }
+}
