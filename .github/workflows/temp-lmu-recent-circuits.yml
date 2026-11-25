@@ -1,0 +1,47 @@
+name: LMU recent circuits public assets
+on:
+  push:
+    branches: [temp/lmu-thumbnail-recovery]
+    paths: [.github/workflows/temp-lmu-recent-circuits.yml]
+permissions: {}
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check public image names for recent circuits
+        run: |
+          mkdir -p review
+          python3 - <<'PY'
+          import urllib.request, urllib.error, pathlib, time, concurrent.futures, hashlib
+          candidates={"barcelona":["4-hours-of-barcelona-circuit-de-barcelona","4-hours-of-barcelona-circuit-de-barcelone-catalogne","4-hours-of-barcelona-circuit-de-barcelona-cataluna","4-hours-of-barcelona-barcelona","circuit-de-barcelona-circuit-de-barcelona","barcelona-circuit-de-barcelona","4-hours-of-barcelona-circuit-de-barcelona-catalunya-national"],"daytona":["daytona-daytona-international-speedway","daytona-international-speedway-road-course","daytona-international-speedway","daytona-24-hours-daytona-international-speedway","24-hours-of-daytona-daytona"],"laguna-seca":["laguna-seca-weathertech-raceway","weathertech-raceway-laguna-seca","weathertech-raceway-laguna-seca-weathertech-raceway-laguna-seca","laguna-seca-raceway-laguna-seca","laguna-seca-weathertech-raceway-laguna-seca-circuit"],"road-atlanta":["michelin-raceway-road-atlanta","michelin-raceway-road-atlanta-michelin-raceway-road-atlanta","road-atlanta-michelin-raceway","motul-petit-le-mans-road-atlanta"],"long-beach":["long-beach-street-circuit","long-beach-streets-of-long-beach","long-beach-long-beach","long-beach-grand-prix-streets-of-long-beach","acura-grand-prix-of-long-beach-long-beach-street-circuit"]}
+          def check(item):
+              name,slugs=item
+              lines=[]
+              for slug in slugs:
+                  url='https://assets.lmu-assister.com/tracks/backgrounds/'+slug+'.webp'
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}),timeout=5) as r:
+                          data=r.read(20_000_001)
+                      if len(data)>20_000_000 or data[:4]!=b'RIFF' or data[8:12]!=b'WEBP': raise ValueError('not a WebP')
+                      pathlib.Path('review',name+'.webp').write_bytes(data)
+                      lines.append('OK '+name+' '+str(len(data))+' '+hashlib.sha256(data).hexdigest()+' '+url)
+                      return lines
+                  except urllib.error.HTTPError as e:
+                      lines.append('MISS '+name+' '+str(e.code)+' '+url)
+                      if e.code in (401,403,429): break
+                  except Exception as e: lines.append('MISS '+name+' '+str(e)+' '+url)
+                  time.sleep(0.5)
+              lines.append('NOT FOUND '+name)
+              return lines
+          with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+              lines=[l for result in pool.map(check,candidates.items()) for l in result]
+          report='\n'.join(lines)
+          pathlib.Path('review/report.txt').write_text(report)
+          print(report)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lmu-recent-circuits
+          path: review/
+          retention-days: 1
