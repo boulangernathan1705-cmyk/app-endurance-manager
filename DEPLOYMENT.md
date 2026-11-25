@@ -39,6 +39,22 @@ machine à l'autre) :
 2. le workflow refait les captures et les ajoute à la branche (commit « Références visuelles mises à jour ») ;
 3. pousser ensuite un commit sur la branche pour relancer les contrôles de la PR (un commit du bot ne les relance pas).
 
+### Comparaison locale de la cascade
+
+Le script `scripts/css-compare.mjs` utilise la base de démonstration locale (voir `CLAUDE.md`).
+Capturer le même scénario et la même base avant et après. Par exemple, dupliquer la commande avec
+`APRES.json` et un autre répertoire de captures après avoir reconstruit et redémarré le Worker local.
+
+```sh
+CSS_COMPARE_BROWSER=chromium CSS_COMPARE_VIEWPORTS=320x844,390x844,760x900,761x900,1366x900,3440x1440 \
+CSS_COMPARE_SCREENSHOTS=/tmp/em-css-avant node scripts/css-compare.mjs snap AVANT.json
+node scripts/css-compare.mjs diff AVANT.json APRES.json
+```
+
+On peut aussi utiliser `firefox` ou `webkit` après installation du navigateur Playwright correspondant.
+Comparer chaque moteur à lui-même, avec les mêmes options. Les captures locales et les fichiers JSON
+restent hors du dépôt. Un parcours manquant ou un écart de style ou de dimensions fait échouer le diff.
+
 ## Configurations Cloudflare
 
 ### DEV
