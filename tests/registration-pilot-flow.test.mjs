@@ -9,12 +9,14 @@ const eventView=fs.readFileSync('front/app/event-view.mjs','utf8');
 const crews=fs.readFileSync('front/app/crews.mjs','utf8');
 const core=fs.readFileSync('server/core.mjs','utf8');
 const worker=fs.readFileSync('server/worker.mjs','utf8');
+const eventList=fs.readFileSync('server/event-list.mjs','utf8');
+const apiShared=fs.readFileSync('server/api-shared.mjs','utf8');
 const game=fs.readFileSync('game.html','utf8');
 
 test('all logged in pilots can use the Discord pilot picker',()=>{
   assert.match(worker,/if \(!actor\.user\) fail\(401,'Connecte-toi avec Discord pour choisir un pilote\.'/);
   // Only the members of the community (its Discord server) can be picked.
-  assert.match(worker,/FROM memberships m JOIN users u ON u\.id=m\.user_id/);
+  assert.match(eventList,/FROM memberships m JOIN users u ON u\.id=m\.user_id/);
   assert.doesNotMatch(core,/if \(!manager\) fail\(403,'Seuls les organisateurs peuvent inscrire un autre pilote\.'/);
   assert.match(clientCore,/state\.participants=state\.user && member \? \(await api\('\/api\/participants'\)\)\.participants : \[\]/);
   assert.match(eventView,/Inscrire un autre pilote/);
@@ -61,19 +63,19 @@ test('personal registration and crew creation stay contextualized in the same de
 test('Discord registrations are editable by both creator and participant',()=>{
   assert.match(core,/reg\.participant_user_id === actor\.user\.id/);
   assert.match(core,/reg\.owner_user_id === actor\.user\.id/);
-  assert.match(worker,/function canManageRegistration\(reg, actor\)/);
-  assert.match(worker,/owned\(reg, actor\) \|\| isRegistrationManager\(actor\)/);
-  assert.match(worker,/canManageRegistration\(reg, actor\)/);
+  assert.match(apiShared,/function canManageRegistration\(reg, actor\)/);
+  assert.match(apiShared,/owned\(reg, actor\) \|\| isRegistrationManager\(actor\)/);
+  assert.match(eventList,/canManageRegistration\(reg, actor\)/);
 });
 
 test('organizers and admins can edit every registration without owning it',()=>{
-  assert.match(worker,/return can\(actor, 'manage_registrations'\);/);
+  assert.match(apiShared,/return can\(actor, 'manage_registrations'\);/);
   assert.match(worker,/if \(!canManageRegistration\(reg,(actor|who)\)\) fail\(403/);
 });
 
 test('creator metadata is only exposed to creator participant or managers',()=>{
-  assert.match(worker,/actor\.user\.id === creatorId \|\| actor\.user\.id === participantUserId \|\| isRegistrationManager\(actor\)/);
-  assert.match(worker,/addedByName:canSeeCreator \? \(userNames\.get\(creatorId\) \|\| ''\) : ''/);
+  assert.match(eventList,/actor\.user\.id === creatorId \|\| actor\.user\.id === participantUserId \|\| isRegistrationManager\(actor\)/);
+  assert.match(eventList,/addedByName:canSeeCreator \? \(userNames\.get\(creatorId\) \|\| ''\) : ''/);
   assert.match(registration,/registration-origin-info/);
   assert.match(registration,/Inscription ajoutée par/);
 });
