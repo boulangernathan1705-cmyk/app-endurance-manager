@@ -15,8 +15,12 @@ export function enduranceDuration(event) {
 }
 
 export const enduranceSim = (event, game = event?.otherGame || gameForEvent(event)) => game === 'iracing' ? 'iracing' : 'lmu';
+const LMU_ARTWORK = new Set(['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']);
+export function enduranceArtworkClass(event, game) {
+  return enduranceSim(event, game) === 'lmu' && LMU_ARTWORK.has(event?.circuit) ? ' endurance-track-'+event.circuit : '';
+}
 export function enduranceHeader(event, game) {
   const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
   const duration = enduranceDuration(event);
-  return `<span class="endurance-card-head endurance-sim-${sim}"><span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
+  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}"><span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
 }
