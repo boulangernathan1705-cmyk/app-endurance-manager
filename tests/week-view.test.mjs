@@ -85,7 +85,7 @@ test('community cards retain logos while endurances share a compact header', () 
   const view = read('front/app/week-view.mjs');
   const css = read('styles/pages/weekly-calendar.css') + read('styles/pages/endurance-cards.css');
   assert.match(view, /<span class="week-block-body">/);
-  assert.match(view, /enduranceHeader\(event,enduSim\)/);
+  assert.match(view, /enduranceHeader\(event,enduSim,`<span class="week-pano-map" aria-hidden="true">\$\{circuitVisual\(event\.circuit,true\)\}/);
   assert.doesNotMatch(view, /\/images\/event-access\/endurance-/);
   assert.match(css, /\.week-block\.is-endurance::before \{ display: none; \}/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
