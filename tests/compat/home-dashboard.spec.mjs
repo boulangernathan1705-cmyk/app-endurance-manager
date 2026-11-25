@@ -27,6 +27,21 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await expect(page.locator('.home-card')).toHaveCount(0);
  await expect(page.locator('.week-block')).toHaveCount(2);
  await expect(page.locator('.week-block.is-endurance .endurance-card-head')).toHaveCount(2);
+ // Both static photos must load from our own site and the mobile card must leave room for its body.
+ for (const sim of ['lmu','iracing']) {
+  const card=page.locator('.week-block.is-'+sim);
+  const art=card.locator('.endurance-card-head');
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+sim+'.webp');
+  expect(await page.evaluate(async sim=>{
+   const image=new Image();image.src='/images/endurance/'+sim+'.webp';
+   try {await image.decode();return image.naturalWidth>=400;} catch {return false;}
+  },sim)).toBe(true);
+  if(width===390){
+   const a=await art.boundingBox(),b=await card.locator('.week-block-body').boundingBox();
+   expect(a.x+a.width).toBeLessThanOrEqual(b.x+1);
+   expect(b.width).toBeGreaterThan(150);
+  }
+ }
  await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveCount(0);
  await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6H');
  await expect(page.locator('.week-block.is-endurance .week-block-logo')).toHaveCount(0);
