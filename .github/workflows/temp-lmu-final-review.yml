@@ -1,0 +1,49 @@
+name: Final LMU public thumbnail review
+on:
+  push:
+    branches: [temp/lmu-thumbnail-recovery]
+    paths: [.github/workflows/temp-lmu-final-review.yml]
+permissions: {}
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check remaining public asset filenames
+        run: |
+          mkdir -p review
+          python3 - <<'PY'
+          import urllib.request, urllib.error, pathlib, time, concurrent.futures, hashlib
+          candidates={"le-mans":["24-heures-du-mans-circuit-de-la-sarthe","24-hours-of-le-mans-circuit-24-heures-du-mans","24-heures-du-mans-circuit-des-24-heures-du-mans","24-hours-of-le-mans-circuit-de-la-sarthe-le-mans","24-hours-of-le-mans-circuit-de-la-sarthe-24h","24-hours-of-le-mans-circuit-des-24-heures","24-hours-of-le-mans-le-mans-24h"],"interlagos":["rolex-6-hours-of-sao-paulo-autodromo-jose-carlos-pace","6-hours-of-sao-paulo-interlagos","6-hours-of-sao-paulo-autodromo-jose-carlos-pace-interlagos","6-hours-of-sao-paulo-autodromo-jose-carlos-pace-interlagos-circuit","6-hours-of-sao-paulo-autodromo-jos-carlos-pace","6-hours-of-sao-paulo-autodromo-de-interlagos-jose-carlos-pace"],"barcelona":["4-hours-of-barcelona-circuit-de-barcelona-catalunya-spain","4-hours-of-barcelona-circuit-barcelona-catalunya","4-hours-of-barcelona-circuit-de-barcelona-catalunya-gp","barcelona-circuit-de-barcelona-catalunya","barcelona-grand-prix-circuit-de-barcelona-catalunya"],"daytona":["daytona-road-course-daytona-international-speedway","daytona-international-speedway-daytona-international-speedway","daytona-road-course-daytona-international-speedway-road-course","rolex-24-at-daytona-daytona-international-speedway-road-course"],"laguna-seca":["laguna-seca-laguna-seca","laguna-seca-raceway-weathertech-raceway-laguna-seca","monterey-sports-car-championship-laguna-seca","laguna-seca-mazda-raceway-laguna-seca"],"road-atlanta":["road-atlanta-road-atlanta","road-atlanta-michelin-raceway-road-atlanta","motul-petit-le-mans-michelin-raceway-road-atlanta"],"long-beach":["long-beach-long-beach-street-circuit","long-beach-street-circuit-long-beach-street-circuit","acura-grand-prix-of-long-beach-streets-of-long-beach"]}
+          def check(item):
+              name,slugs=item
+              lines=[]
+              for slug in slugs:
+                  url='https://assets.lmu-assister.com/tracks/backgrounds/'+slug+'.webp'
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}),timeout=5) as r:
+                          data=r.read(20_000_001)
+                      if len(data)>20_000_000 or data[:4]!=b'RIFF' or data[8:12]!=b'WEBP':
+                          raise ValueError('not a valid WebP')
+                      pathlib.Path('review',name+'.webp').write_bytes(data)
+                      lines.append('OK '+name+' '+str(len(data))+' '+hashlib.sha256(data).hexdigest()+' '+url)
+                      return lines
+                  except urllib.error.HTTPError as e:
+                      lines.append('MISS '+name+' '+str(e.code)+' '+url)
+                      if e.code in (401,403,429): break
+                  except Exception as e:
+                      lines.append('MISS '+name+' '+str(e)+' '+url)
+                  time.sleep(0.5)
+              lines.append('NOT FOUND '+name)
+              return lines
+          with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+              lines=[l for result in pool.map(check,candidates.items()) for l in result]
+          report='\n'.join(lines)
+          pathlib.Path('review/report.txt').write_text(report)
+          print(report)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lmu-assister-final-review
+          path: review/
+          retention-days: 1
