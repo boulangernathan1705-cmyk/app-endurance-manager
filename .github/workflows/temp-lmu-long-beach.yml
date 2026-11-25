@@ -1,0 +1,39 @@
+name: Long Beach public image check
+on:
+  push:
+    branches: [temp/lmu-thumbnail-recovery]
+    paths: [.github/workflows/temp-lmu-long-beach.yml]
+permissions: {}
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check public image filenames
+        run: |
+          mkdir -p review
+          python3 - <<'PY'
+          import urllib.request, urllib.error, pathlib, time, hashlib
+          lines=[]
+          for slug in ["long-beach","streets-of-long-beach","street-circuit-of-long-beach","long-beach-circuit","long-beach-street-course","long-beach-grand-prix","acura-grand-prix-of-long-beach","grand-prix-of-long-beach","long-beach-city-circuit","long-beach-street-circuit-california","long-beach-street-course-long-beach","long-beach-grand-prix-circuit","long-beach-gp"]:
+              url='https://assets.lmu-assister.com/tracks/backgrounds/'+slug+'.webp'
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}),timeout=5) as r:
+                      data=r.read(20_000_001)
+                  if len(data)>20_000_000 or data[:4]!=b'RIFF' or data[8:12]!=b'WEBP': raise ValueError('not WebP')
+                  pathlib.Path('review/long-beach.webp').write_bytes(data)
+                  lines.append('OK '+str(len(data))+' '+hashlib.sha256(data).hexdigest()+' '+url)
+                  break
+              except urllib.error.HTTPError as e:
+                  lines.append('MISS '+str(e.code)+' '+url)
+                  if e.code in (401,403,429): break
+              except Exception as e: lines.append('MISS '+str(e)+' '+url)
+              time.sleep(0.5)
+          pathlib.Path('review/report.txt').write_text('\n'.join(lines))
+          print('\n'.join(lines))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lmu-long-beach
+          path: review/
+          retention-days: 1
