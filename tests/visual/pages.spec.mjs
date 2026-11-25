@@ -102,7 +102,12 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   if(game==='iracing')expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
   expect(m.width).toBeGreaterThan(70);
   if(game==='iracing')expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
-  expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
+  if(game==='iracing')expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
+  else {
+    expect(c.y).toBeGreaterThanOrEqual(a.y);
+    expect(c.y+c.height).toBeLessThanOrEqual(a.y+a.height+1);
+    expect(m.y).toBeGreaterThanOrEqual(a.y+a.height-1);
+  }
   if(game==='iracing'){
     expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
     expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
