@@ -99,8 +99,15 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   await expect(map).toBeVisible();
   expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+game+'.webp');
   const [a,m,c]=await Promise.all([art.boundingBox(),map.boundingBox(),caption.boundingBox()]);
-  expect(m.x).toBeGreaterThan(a.x+a.width/2);
-  expect(m.y+m.height).toBeLessThanOrEqual(c.y+1);
+  expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
+  expect(m.width).toBeGreaterThan(70);
+  expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
+  expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
+  expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
+  const [date,title]=await Promise.all([header.locator('.endurance-detail-meta').boundingBox(),header.locator('.event-title').boundingBox()]);
+  expect(Math.abs(date.x-title.x)).toBeLessThanOrEqual(2);
+  expect(title.y).toBeGreaterThanOrEqual(date.y+date.height-1);
+  expect(await header.locator('.event-title').evaluate(el=>getComputedStyle(el).color)).toBe(await header.evaluate(el=>{const sample=document.createElement('span');sample.style.color='var(--em-text-strong, #f4f6f5)';el.append(sample);const color=getComputedStyle(sample).color;sample.remove();return color;}));
   expect(await header.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   // Only the hero's map needs to settle here. Lazy crew images further down
   // the page are outside this snapshot and may never start loading.
