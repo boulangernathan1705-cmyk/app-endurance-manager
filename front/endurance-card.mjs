@@ -18,5 +18,5 @@ export const enduranceSim = (event, game = event?.otherGame || gameForEvent(even
 export function enduranceHeader(event, game) {
   const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
   const duration = enduranceDuration(event);
-  return `<span class="endurance-card-head endurance-sim-${sim}"><span class="endurance-card-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22V3m0 1c5-4 10 4 16 0v11c-6 4-11-4-16 0" /></svg><span>Endurance ${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span>`;
+  return `<span class="endurance-card-head endurance-sim-${sim}"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span>`;
 }
