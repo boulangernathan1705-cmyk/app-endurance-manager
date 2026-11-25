@@ -15,7 +15,7 @@ const SPA=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',SATURDAY
    {id:'c2',name:'Team Dune #92',category:'GT3',car:'',locked:false,version:1,canManage:true,registrationIds:['r5','r6'],pilots:['Sara Lopes','Nico Varga']}]);
 // A pilot's « Demander un équipage », checked on the organisers' « Équipages » page.
 const REQUEST={id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',eventId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',departureId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-d',game:'lmu',name:'Les Tortues',category:'GT3',car:'',registrationIds:['r7'],requester:'Jules Martin',mine:false,createdAt:NOW/1000-1200};
-const SEBRING=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','12h de Sebring','iracing-sebring',SUNDAY);
+const SEBRING=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',SUNDAY);
 
 async function mockSite(page){
   await page.clock.setFixedTime(NOW);

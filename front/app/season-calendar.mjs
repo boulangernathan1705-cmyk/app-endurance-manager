@@ -1,3 +1,4 @@
+import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 // EVENT TDZ calendar (Nathan, 2026-11-07): the season's months as tabs (with their number of events), then the month
 // as a grid. Each event sits in its day: logo, name, time, entries, ✓ when you are in, the stream in violet. The frame
 // colour follows the type (OPEN, SAFE, BOULOULES, Training, stream, Gridfest). On a phone a day shows its logos and its
@@ -9,8 +10,6 @@ import {normalizeTdzEventType} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {isStream,streamDetails,streamSpan,hourLabel} from '../../shared/stream.mjs';
 import {eventAccessLogo,soloCounts,isSolo} from './solo.mjs';
-import {gameForEvent} from '../../shared/catalog.mjs';
-import {eventMinutes} from '../../shared/duration.mjs';
 import {parisMonth,seasonMonths} from '../../shared/season.mjs';
 
 const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
@@ -66,29 +65,28 @@ const opener = (event, departure, cls, inner) => event.otherGame
   ? `<a class="${cls}" href="/${esc(event.otherGame)}/#event=${esc(event.id)}">${inner}</a>`
   : `<button type="button" class="${cls}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${inner}</button>`;
 function entryHtml({event, departure, more}) {
-  if (event.streamedBy) return opener(event, departure, 'cal-ev t-stream', `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async"><b>📺 ${esc(event.name)}</b><small><strong>Stream ${esc(streamed(event))}</strong> · départ ${esc(timeOf(departure))} · ${esc(streamCrew({event, departure}))}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small><span class="cal-go" aria-hidden="true">›</span>`);
+  if (event.streamedBy) return opener(event, departure, `cal-ev t-stream is-endurance endurance-sim-${enduranceSim(event)}`, `${enduranceHeader(event)}<b>📺 ${esc(event.name)}</b><small><strong>Stream ${esc(streamed(event))}</strong> · départ ${esc(timeOf(departure))} · ${esc(streamCrew({event, departure}))}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small><span class="cal-go" aria-hidden="true">›</span>`);
   const type = calendarType(event), stream = streamDetails(event);
   const {confirmed} = isStream(event) ? {confirmed:0} : soloCounts(event, departure);
   const training = type === 'training';
   const end = training && departure.endsAt ? new Date(departure.endsAt).toLocaleTimeString('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit'}).replace(':00', 'h').replace(':', 'h') : '';
-  const endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
-  const info = endurance ? (hours ? ` · ${hours}h` : '') : isStream(event) ? 'Stream' : training ? (end ? `–${end}` : '') : ` · ${confirmed} inscrit${confirmed > 1 ? 's' : ''}`;
+  const endurance = !isSolo(event);
+  const info = endurance ? '' : isStream(event) ? 'Stream' : training ? (end ? `–${end}` : '') : ` · ${confirmed} inscrit${confirmed > 1 ? 's' : ''}`;
   const time = undated(event) ? 'Date à confirmer' : isStream(event) ? hourLabel(stream.streamTime || stream.raceTime || departure.time) : timeOf(departure);
   const live = !isStream(event) && event.details?.streamTime ? `<span class="cal-live">● Stream ${esc(streamSpan(event.details.streamTime, event.details.streamEnd))}</span>` : '';
-  const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type"> · ${esc(typeLabel(type))}</em>` : ''}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
+  const logo = endurance ? enduranceHeader(event) : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
+  return `<button type="button" class="cal-ev t-${type}${endurance?` is-endurance endurance-sim-${enduranceSim(event)}`:''}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type"> · ${esc(typeLabel(type))}</em>` : ''}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
 // In a day of the month on a computer: the logo on a band tinted with the type's colour, the race's name, then its time,
 // sim and length (Nathan 2026-11-07, mockup B: a bigger month, the colour visible, the event, the sim and the time).
 function cellHtml({event, departure}) {
-  const type = calendarType(event), endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
+  const type = calendarType(event), endurance = !isSolo(event);
   const time = event.streamedBy ? `Stream ${streamed(event)}` : isStream(event) ? hourLabel(streamDetails(event).streamTime || departure.time) : timeOf(departure);
   // The sim only where both can mix: endurances (Events are all LMU, Nathan 2026-11-07).
-  const sim = !endurance ? '' : gameForEvent(event) === 'iracing' ? 'iRacing' : 'LMU';
   const confirmed = endurance || isStream(event) || type === 'training' ? 0 : soloCounts(event, departure).confirmed;
-  const info = [sim, endurance && hours ? `${hours}h` : '', confirmed ? `${confirmed} inscrit${confirmed > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
-  const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return opener(event, departure, `cal-cell t-${type}`, `${logo}<b>${event.streamedBy ? '📺 ' : ''}${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>`);
+  const info = [confirmed ? `${confirmed} inscrit${confirmed > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+  const logo = endurance ? enduranceHeader(event) : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
+  return opener(event, departure, `cal-cell t-${type}${endurance?` is-endurance endurance-sim-${enduranceSim(event)}`:''}`, `${logo}<b>${event.streamedBy ? '📺 ' : ''}${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>`);
 }
 // On a phone every day is the same size: each race on one line, its time and the start of its name beside the type's
 // colour (Nathan 2026-11-07, mockup B); one line and « +N » when a day has more than two.

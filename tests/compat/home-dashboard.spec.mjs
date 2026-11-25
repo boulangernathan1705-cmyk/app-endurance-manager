@@ -9,7 +9,7 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'special',capacity:30,categories:['Hypercar'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:'15:00',startsAt,availability,crews}]});
  const lmu=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',soon,[reg],[{id:'crew',name:'Apex Racing',category:'Hypercar',registrationIds:['reg-1']}]);
- const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','12h de Sebring','iracing-sebring',soon+60000);
+ const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+60000);
  await page.route('**/api/**',route=>{
   const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
   if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance'],community:{id:'test',slug:'test',name:'Test',appearance:{}},communities:[]};
@@ -26,14 +26,19 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  // No cards repeating the navigation bar.
  await expect(page.locator('.home-card')).toHaveCount(0);
  await expect(page.locator('.week-block')).toHaveCount(2);
+ await expect(page.locator('.week-block.is-endurance .endurance-card-head')).toHaveCount(2);
+ await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveCount(0);
+ await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6H');
+ await expect(page.locator('.week-block.is-endurance .week-block-logo')).toHaveCount(0);
+ await expect(page.locator('.week-block.is-endurance .week-block-plan:visible')).toHaveCount(2);
  await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');
- await expect(page.locator('.week-block').filter({hasText:'12h de Sebring'})).toContainText(/iRacing[\s\S]*Sebring International Raceway/);
+ await expect(page.locator('.week-block').filter({hasText:'Production Endurance Challenge'})).toContainText(/iRacing[\s\S]*Sebring International Raceway/);
  // No end time on the cards (Nathan 2026-11-01): the circuit instead.
  await expect(page.locator('.week-grid')).not.toContainText('fin ');
  await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
- await expect(page.locator('.week-block')).toContainText('12h de Sebring');
+ await expect(page.locator('.week-block')).toContainText('Production Endurance Challenge');
  // Several filters at once (Nathan 2026-11-02), kept after a reload; « Tout » clears them.
  await page.locator('[data-action="week-filter"][data-filter="lmu"]').click();
  await expect(page.locator('.week-block')).toHaveCount(2);
