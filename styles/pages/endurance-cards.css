@@ -11,7 +11,7 @@
 .endurance-card-label { display: flex; align-items: center; gap: var(--em-space-1); min-width: 0; font-size: var(--em-text-xs); font-weight: 850; line-height: 1.2; }
 .endurance-card-label svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .endurance-card-duration { flex: none; color: var(--em-text-strong); border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); padding: 2px 5px; background: var(--em-panel-2); font-size: var(--em-text-sm); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.week-block.is-endurance { display: grid; grid-template-columns: minmax(68px,29%) minmax(0,1fr); align-items: stretch; gap: 0; padding: 0; background: var(--em-panel-2); border-color: color-mix(in srgb, var(--endurance-color, var(--kind)) 40%, var(--em-border)); }
+.week-block.is-endurance { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; background: var(--em-panel-2); border-color: color-mix(in srgb, var(--endurance-color, var(--kind)) 40%, var(--em-border)); }
 .week-block.is-endurance.is-lmu { --endurance-color: var(--em-kind-lmu); }
 .week-block.is-endurance.is-iracing { --endurance-color: var(--em-kind-iracing); }
 .week-block.is-endurance::before { display: none; }
@@ -26,7 +26,6 @@
 .week-block.is-endurance .week-plan-row b { font-size: var(--em-text-sm); }
 .week-block.is-endurance .week-plan-row i { font-style: normal; opacity: .65; }
 .week-block.is-endurance .week-block-facts { grid-column: auto; }
-.week-block.is-endurance .week-plan-row:not(.is-stream) { justify-content: flex-start; gap: 6px; }
 .week-block.is-endurance .week-plan-row.is-stream > span:first-child { color: var(--em-kind-stream); }
 .week-block.is-endurance .week-plan-row .week-stream-link { font-size: inherit; }
 .race-card.is-endurance .endurance-card-head { width: 100%; margin-bottom: var(--em-space-1); border-radius: var(--em-radius-sm) var(--em-radius-sm) 0 0; }
@@ -61,18 +60,17 @@
 .endurance-card-kind { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .endurance-card-duration { color: #fff; background: #1a2028; border-color: #737b84; font-size: 11px; }
 .week-block.is-endurance .week-block-body { min-width: 0; }
-.week-block.is-endurance > .endurance-card-head {
-  grid-column: 1; grid-row: 1; align-self: stretch; justify-content: flex-end; flex-direction: column; align-items: stretch;
-  min-height: 104px; padding: 0; border: 0;
-  --endurance-cut: 10%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
-}
-.week-block.is-endurance .week-block-body { grid-column: 2; grid-row: 1; align-content: center; padding: 7px 7px 7px 3px; }
-.week-block.is-endurance .week-block-name { font-size: 13.5px; line-height: 1.2; }
-.week-block.is-endurance .week-block-circuit { font-size: 12px; }
 @media (max-width: 760px) {
-  .week-block.is-endurance { grid-template-columns: minmax(76px,29%) minmax(0,1fr); }
-  .week-block.is-endurance .week-block-name { font-size: 15.5px; }
-  .week-block.is-endurance .week-block-circuit { font-size: 12.5px; }
+  .week-block.is-endurance { display: grid; grid-template-columns: minmax(76px, 29%) minmax(0,1fr); align-items: stretch; }
+  .week-block.is-endurance > .endurance-card-head {
+    grid-column: 1; grid-row: 1; align-self: stretch; justify-content: flex-end; flex-direction: column; align-items: flex-start;
+    min-height: 92px; padding: 8px 12px 9px 7px; border: 0;
+    --endurance-cut: 10%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
+  }
+
+  .week-block.is-endurance .week-block-body { grid-column: 2; grid-row: 1; align-content: center; padding: 8px 8px 8px 3px; }
+  .week-block.is-endurance .endurance-card-brand { font-size: clamp(15px, 5vw, 23px); }
+  .week-block.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
 }
 .endurance-card-aside { flex: 0 0 auto; width: clamp(72px, 21%, 104px); min-width: 0; display: grid; align-content: start; gap: 4px; }
 .race-card.is-endurance .endurance-card-aside > .race-date { width: 100%; max-width: 100%; box-sizing: border-box; }
@@ -139,7 +137,7 @@ html[data-game] #app button.race-card.is-endurance .race-head > .race-date small
   }
   html[data-game] #app button.race-card.is-endurance .race-situation,
   html[data-game] #app button.race-card.is-endurance .race-fill { grid-column: 1/-1; }
-  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 15.5px !important; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 19px !important; }
   html[data-game] #app button.race-card.is-endurance .race-head .event-type-badge { max-width: 100%; white-space: normal; }
 }
 
@@ -177,11 +175,9 @@ html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endu
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption {
   padding-right: 14%;
 }
-.week-block.is-endurance > .endurance-card-head { padding: 0; align-items: stretch; }
-.week-block.is-endurance .endurance-card-caption { padding-block: 2px; padding-right: 15%; flex-wrap: wrap; gap: 1px; }
-.week-block.is-endurance .endurance-card-caption .endurance-card-label { min-width: min-content; }
-@container (max-width: 260px) {
-  .week-block.is-endurance > .endurance-card-head .endurance-card-caption { align-items: flex-start; padding-left: 4px; }
+@media (max-width: 760px) {
+  .week-block.is-endurance > .endurance-card-head { padding: 0; align-items: stretch; }
+  .week-block.is-endurance .endurance-card-caption { padding-right: 15%; }
 }
 .cal-cell.is-endurance .endurance-card-head { padding: 2px 4px; }
 .cal-cell.is-endurance .endurance-card-caption { padding: 0; background: none; }
@@ -200,7 +196,7 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
    title length, badges or number of starts. Keep the caption at its bottom. */
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
   flex-basis: clamp(90px,32%,138px);
-  height: 100px; min-height: 100px; max-height: 100px; align-self: stretch;
+  height: 150px; min-height: 150px; max-height: 150px; align-self: flex-start;
 }
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-lmu {
   --endurance-focus: 49% 56%;
@@ -210,28 +206,8 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-s
 }
 @media (max-width: 760px) {
   html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
-    flex-basis: clamp(89px,29%,120px); height: 100px; min-height: 100px; max-height: 100px;
+    height: clamp(126px,37vw,150px); min-height: 0; max-height: none;
   }
-}
-
-/* The mobile weekly agenda is the reference on both desktop and mobile:
-   a compact picture on the left, diagonal divider and the same information density. */
-.week-block.is-endurance .endurance-card-caption .endurance-card-duration,
-html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-duration {
-  font-size: 13px; font-weight: 900; padding: 0 3px; border-radius: 4px;
-  background: rgba(255,255,255,.12); color: #fff;
-}
-html[data-game] #app button.race-card.is-endurance .race-card-top { gap: 6px; }
-html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 15.5px; line-height: 1.25; }
-html[data-game] #app button.race-card.is-endurance .race-head .race-meta { font-size: 12.5px; line-height: 1.25; }
-html[data-game] #app button.race-card.is-endurance .race-start { white-space: nowrap; }
-html[data-game] #app button.race-card.is-endurance .endurance-start-flag { font-size: 11px; }
-html[data-game] #app button.race-card.is-endurance .race-card-top { flex-direction: row; }
-html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head { --endurance-cut: 10%; }
-html[data-game] #app button.race-card.is-endurance .endurance-card-caption { padding-block: 2px; flex-wrap: wrap; gap: 1px; }
-html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-label { min-width: min-content; }
-@media (max-width:760px) {
-  html[data-game] #app button.race-card.is-endurance > .race-card-body { gap: 5px !important; padding: 7px 8px 8px !important; }
 }
 
 /* Detailed endurance: a diagonal separates the local photo from the existing
@@ -316,12 +292,12 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
   background: var(--endurance-color);
   clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
 }
-.week-block.is-endurance > .endurance-card-head::after {
+@media (max-width:760px) {
+  .week-block.is-endurance > .endurance-card-head::after {
     content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: var(--endurance-color);
     clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
   }
-@media (max-width:760px) {
   html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { padding: 7px; }
 }
 
@@ -349,6 +325,7 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
    horizontal desktop banners. Each focus was chosen from the original cover:
    track/kerb or recognisable landmark, above the caption. No image is stretched. */
 .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-compact); }
+.week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before,
 .cal-side .endurance-card-head[class*="endurance-track-"]::before,
 .endurance-detail-hero > .endurance-card-head[class*="endurance-track-"]::before {
   background-position: var(--track-focus-wide);
@@ -457,7 +434,9 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
   position: static; width: 100%; height: 100%; object-fit: contain; margin: 0;
   filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14) drop-shadow(0 1px 3px #000);
 }
-.endurance-preview .week-pano-map { inset: 5px auto auto 6px; width: 38px; height: 30px; }
+@media (max-width:760px) {
+  .endurance-preview .week-pano-map { inset: 5px auto auto 6px; width: 38px; height: 30px; }
+}
 
 .week-block.is-endurance.endurance-preview.is-panorama-preview, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview > .race-card-body {
   background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);

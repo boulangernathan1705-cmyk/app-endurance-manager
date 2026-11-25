@@ -35,7 +35,7 @@ export function raceStarts(event,archived){
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
   const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
-  const time=departure=>`<span class="race-start">${isSolo(event)?'':'<span class="endurance-start-flag" aria-hidden="true">🏁</span> '}${esc(timeLabel(departure.time))}</span>`;
+  const time=departure=>`<span class="race-start">${esc(timeLabel(departure.time))}</span>`;
   return `<span class="race-starts">${visible.map(list=>`<span class="race-day"><em>${esc(dayLabel(list[0].startsAt))}</em>${list.map(time).join('')}</span>`).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
 // Where the current pilot stands on a race: their next start with a registration, and their crew if any.

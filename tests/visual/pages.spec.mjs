@@ -237,7 +237,7 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
     for(const node of document.querySelectorAll('body *'))if(!sheet.contains(node)&&!sheet.contains(node.parentElement)&&!node.contains(sheet)&&getComputedStyle(node).position==='fixed')node.style.setProperty('display','none','important');
     const audit=await Promise.all(checks.map(async({art,id,context})=>{
       const style=getComputedStyle(art,'::before'),mobile=innerWidth<=760;
-      const prop=(context==='list'||context==='home')?'--track-focus-compact':context==='detail'&&mobile?'--track-focus-detail':'--track-focus-wide';
+      const prop=context==='list'||(context==='home'&&mobile)?'--track-focus-compact':context==='detail'&&mobile?'--track-focus-detail':'--track-focus-wide';
       const image=new Image();image.src='/images/endurance/lmu/'+id+'.webp';
       let loaded=true;try{await image.decode();}catch{loaded=false;}
       return {id,context,loaded,position:style.backgroundPosition,expected:style.getPropertyValue(prop).trim(),size:style.backgroundSize,correct:style.backgroundPosition.split(',').every(p=>p.trim()===style.getPropertyValue(prop).trim())&&style.backgroundImage.includes('/images/endurance/lmu/'+id+'.webp')&&style.backgroundSize.split(',').every(s=>s.trim()==='cover')};

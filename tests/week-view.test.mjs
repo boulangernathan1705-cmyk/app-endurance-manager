@@ -105,13 +105,12 @@ test('the week is short: finished races fold per day, busy days are wider, the h
   assert.match(css, /\.week-day-list \{ max-height: 452px; overflow-y: auto; overscroll-behavior: contain;/);
 });
 
-test('a week card shows endurance start only, with solo and stream ranges preserved (Nathan 2026-11-02, option G)', () => {
+test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
   const view = read('front/app/week-view.mjs'), css = read('styles/pages/weekly-calendar.css');
-  // One line per moment: the stream with its link, then the race, each start of an endurance without its end.
+  // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
   assert.match(view, /function planOf\(item\)/);
   assert.match(view, /icon:'📺',label:'Stream'/);
-  assert.match(view, /label:solo\?\(starts\.length>1\?`Course \$\{index\+1\}`:name\):''/);
-  assert.match(view, /to:!solo\|\|pending\|\|!start\.endsAt\?'':hour\(start\.endsAt\)/);
+  assert.match(view, /`\$\{solo\?'Course':'Départ'\} \$\{index\+1\}`/);
   assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
   // On a computer (option P1): the times in a coloured band, the stream on its own line with its link.
   assert.match(view, /class="week-block-band/);
