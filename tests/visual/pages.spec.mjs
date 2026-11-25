@@ -230,7 +230,7 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
       const prop=context==='list'||(context==='home'&&mobile)?'--track-focus-compact':context==='detail'&&mobile?'--track-focus-detail':'--track-focus-wide';
       const image=new Image();image.src='/images/endurance/lmu/'+id+'.webp';
       let loaded=true;try{await image.decode();}catch{loaded=false;}
-      return {id,context,loaded,correct:style.backgroundPosition===style.getPropertyValue(prop).trim()&&style.backgroundImage.includes('/images/endurance/lmu/'+id+'.webp')&&style.backgroundSize.split(',').every(s=>s.trim()==='cover')};
+      return {id,context,loaded,position:style.backgroundPosition,expected:style.getPropertyValue(prop).trim(),size:style.backgroundSize,correct:style.backgroundPosition.split(',').every(p=>p.trim()===style.getPropertyValue(prop).trim())&&style.backgroundImage.includes('/images/endurance/lmu/'+id+'.webp')&&style.backgroundSize.split(',').every(s=>s.trim()==='cover')};
     }));
     return {count:circuits.length,audit};
   },{sizes:[homeSize,listSize,detailSize]});
