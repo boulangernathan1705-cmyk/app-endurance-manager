@@ -71,9 +71,7 @@ if(typeof document!=='undefined'){
     }
     if(field.matches?.('[name="bulkDay"]')){const panel=field.closest('[data-bulk-departures]'),days=new Set(JSON.parse(panel.dataset.days||'[]'));field.checked?days.add(field.value):days.delete(field.value);panel.dataset.days=JSON.stringify([...days]);bulkPreview(field.form);return;}
     if(field.matches?.('[name="bulkHour"],[name="bulkMinute"]')){bulkPreview(field.form);return;}
-    if(!field.matches?.('[name="timeHour"],[name="timeMinute"]'))return;
-    const row=field.closest('.departure-field');
-    row.querySelector('[name="time"]').value=`${row.querySelector('[name="timeHour"]').value}:${row.querySelector('[name="timeMinute"]').value}`;
+
   });
   document.addEventListener('click',event=>{
     const input=event.target.closest?.('input[data-date-picker]');
