@@ -750,8 +750,8 @@ async function start() {
   view.started = true;
   render();
   connect();
-  // Clocks and ages move between two messages; the curves scroll.
-  setInterval(() => { if (shown()) render(); }, 1000);
+  // Only a selected feed has clocks, ages and curves to refresh.
+  setInterval(() => { if (current() && shown()) render(); }, 1000);
   requestAnimationFrame(glide);
 }
 start();

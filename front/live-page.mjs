@@ -563,8 +563,8 @@ async function start() {
   view.started = true;
   render();
   connect();
-  // Clocks and ages move between two messages too.
-  setInterval(render, 1000);
+  // Connection events already render the empty state; only a selected feed needs periodic updates.
+  setInterval(() => { if (current()) render(); }, 1000);
   requestAnimationFrame(glide);
 }
 start();
