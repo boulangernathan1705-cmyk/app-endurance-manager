@@ -383,3 +383,46 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 /* Creation forms: a part hidden by the form (training window, stream times, sessions of a training) stays hidden. */
 .solo-event-form [hidden] { display: none !important; }
 .stream-choice-link a { color: inherit; text-decoration: underline; font-weight: 700; }
+
+/* Shared endurance identity: community cards keep their original bands and logos. */
+.endurance-sim-lmu { --endurance-color: var(--em-kind-lmu); }
+.endurance-sim-iracing { --endurance-color: var(--em-kind-iracing); }
+.endurance-card-head {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: var(--em-space-1); min-width: 0; min-height: 30px; box-sizing: border-box;
+  padding: var(--em-space-1) var(--em-space-2);
+  background: var(--em-panel); border-bottom: 2px solid var(--endurance-color);
+  color: color-mix(in srgb, var(--endurance-color) 65%, var(--em-text-strong));
+}
+.endurance-card-label { display: flex; align-items: center; gap: var(--em-space-1); min-width: 0; font-size: var(--em-text-xs); font-weight: 850; line-height: 1.2; }
+.endurance-card-label svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.endurance-card-duration { flex: none; color: var(--em-text-strong); border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); padding: 2px 5px; background: var(--em-panel-2); font-size: var(--em-text-sm); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.week-block.is-endurance { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; background: var(--em-panel-2); border-color: color-mix(in srgb, var(--endurance-color, var(--kind)) 40%, var(--em-border)); }
+.week-block.is-endurance.is-lmu { --endurance-color: var(--em-kind-lmu); }
+.week-block.is-endurance.is-iracing { --endurance-color: var(--em-kind-iracing); }
+.week-block.is-endurance::before { display: none; }
+.week-block.is-endurance .week-block-band { display: none; }
+.week-block.is-endurance:hover { background: color-mix(in srgb, var(--endurance-color) 6%, var(--em-panel-2)); }
+.week-block.is-endurance .week-block-body { display: grid; gap: var(--em-space-1); padding: var(--em-space-2); }
+.week-block.is-endurance .week-block-title { display: grid; grid-column: auto; grid-row: auto; gap: 2px; }
+.week-block.is-endurance .week-block-plan { display: grid; grid-column: auto; gap: 3px; margin: 0; padding: var(--em-space-1) 0 0; border-top: 1px solid var(--em-border); background: none; }
+.week-block.is-endurance .week-plan-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 6px; min-width: 0; color: var(--em-muted); font-size: var(--em-text-xs); font-weight: 700; }
+.week-block.is-endurance .week-plan-row em { display: inline; font-style: normal; }
+.week-block.is-endurance .week-plan-time { white-space: nowrap; color: var(--em-text-strong); font-variant-numeric: tabular-nums; }
+.week-block.is-endurance .week-plan-row b { font-size: var(--em-text-sm); }
+.week-block.is-endurance .week-plan-row i { font-style: normal; opacity: .65; }
+.week-block.is-endurance .week-block-facts { grid-column: auto; }
+.week-block.is-endurance .week-plan-row.is-stream > span:first-child { color: var(--em-kind-stream); }
+.week-block.is-endurance .week-plan-row .week-stream-link { font-size: inherit; }
+.race-card.is-endurance .endurance-card-head { width: 100%; margin-bottom: var(--em-space-1); border-radius: var(--em-radius-sm) var(--em-radius-sm) 0 0; }
+.cal-side .cal-ev.is-endurance { grid-template-columns: minmax(0,1fr) auto; padding: 0 0 var(--em-space-2); border: 1px solid var(--em-border); overflow: hidden; }
+.cal-side .cal-ev.is-endurance .endurance-card-head { grid-column: 1/-1; }
+.cal-side .cal-ev.is-endurance > b, .cal-side .cal-ev.is-endurance > small { grid-column: 1; margin-inline: var(--em-space-2); white-space: normal; overflow-wrap: anywhere; }
+.cal-side .cal-ev.is-endurance .cal-go { grid-column: 2; grid-row: 2/4; margin-right: var(--em-space-2); }
+.cal-side .cal-ev.is-endurance .cal-live { grid-column: 1/-1; margin-inline: var(--em-space-2); }
+.cal-cell.is-endurance { grid-template-columns: minmax(0,1fr); padding: 0 0 var(--em-space-1); background: var(--em-panel-2); border: 1px solid var(--em-border); overflow: hidden; }
+.cal-cell.is-endurance .endurance-card-head { min-height: 0; padding: 2px 4px; }
+.cal-cell.is-endurance .endurance-card-label { font-size: 10px; }
+.cal-cell.is-endurance .endurance-card-label svg { display: none; }
+.cal-cell.is-endurance .endurance-card-duration { font-size: 10px; padding: 0 3px; }
+.cal-cell.is-endurance > b, .cal-cell.is-endurance > small { margin-inline: var(--em-space-1); }

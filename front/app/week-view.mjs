@@ -1,3 +1,4 @@
+import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
@@ -133,9 +134,9 @@ function block(item,now){
   // many endurances apart (Nathan 2026-11-01).
   const circuit=stream?'':solo?soloCardMeta(event).replace('Circuit à préciser',''):esc(simCatalog(event.otherGame||activeGame)?.circuits.find(item=>item.id===event.circuit)?.name||'');
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
-  // An endurance shows the Endurance Manager endurance logo of its simulator, without its length (Nathan 2026-11-02).
+  // Endurances share the compact simulator/duration header; community logos stay unchanged.
   const enduSim=event.otherGame||activeGame;
-  const badge=solo?kind.label:'',logo=solo?logoOf(event):`<img class="event-access-logo" src="/images/event-access/endurance-${esc(enduSim)}.png" alt="Endurance · ${esc(SIM_NAME[enduSim]||'')}" width="300" height="300" loading="lazy" decoding="async">`;
+  const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
   // Who is there: the crews of an endurance, else its pilots (Nathan 2026-11-01, option B).
   const crews=solo?0:starts.reduce((sum,start)=>sum+(start.departure.crews||[]).length,0);
   const count=stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
@@ -165,19 +166,19 @@ function block(item,now){
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceHeader(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
-    ${plan.band}
+    ${solo?plan.band:''}
     <span class="week-block-body">
     <span class="week-block-title">
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
-    <span class="week-block-kind">${esc(kindLine)}</span>
+    ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:''}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
-    ${streamLine(event,starts)}
-    ${plan.plan}${plan.live}
+    ${solo?streamLine(event,starts):''}
+    ${plan.plan}${solo?plan.live:''}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

@@ -81,12 +81,12 @@ test('a week card shows its simulator on top, its start time(s), the name and it
   assert.match(view, /join\('<i> · <\/i>'\)/);
 });
 
-test('on a phone a week card has its logo or length on the left of its name, crews or pilots shown (option G)', () => {
+test('community cards retain logos while endurances share a compact header', () => {
   const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css');
   assert.match(view, /<span class="week-block-body">/);
-  // An endurance: the Endurance Manager endurance logo of its simulator, no length (Nathan 2026-11-02).
-  assert.match(view, /\/images\/event-access\/endurance-\$\{esc\(enduSim\)\}\.png/);
-  assert.doesNotMatch(view, /week-block-length/);
+  assert.match(view, /enduranceHeader\(event,enduSim\)/);
+  assert.doesNotMatch(view, /\/images\/event-access\/endurance-/);
+  assert.match(css, /\.week-block\.is-endurance::before \{ display: none; \}/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
   assert.match(css, /\.week-block-body \{ display: contents; \}/);
   assert.match(css, /\.week-block \{ display: grid; grid-template-columns: 76px minmax\(0, 1fr\);/);
