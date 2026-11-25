@@ -1,4 +1,6 @@
-# Instructions pour Claude
+# Guide de développement
+
+Les règles communes aux agents sont dans [AGENTS.md](AGENTS.md).
 
 Site Endurance Manager (endurances LMU et iRacing, communautés Discord). Réponses à Nathan en français, courtes.
 Devise : « La simplicité, c'est la sophistication suprême » : interface la plus simple, textes courts.
@@ -37,15 +39,8 @@ Devise : « La simplicité, c'est la sophistication suprême » : interface la p
 
 ## Règles de travail
 
-- Source de vérité : ce dépôt GitHub (`dev` pour travailler, `main` = production). Jamais travailler dans une copie du
-  PC de Nathan ni dans l'ancien dépôt `fmt-managment/fmt-endurance-manager` (version de septembre 2026).
-- Branche de travail → PR vers `dev` (Claude fusionne ses PR vertes dans `dev`). Production = PR `dev → main`
-  seulement après le « go prod » de Nathan ; dire alors tout ce qui part avec.
-- `CHANGELOG.md` s'écrit à la release (`## vX.Y — date`), pas dans chaque PR. Il alimente la page Nouveautés.
-- Correctif urgent : branche `hotfix/*` vers `main`, puis `main` refusionné dans `dev`.
-- Nouvelle idée de fonctionnalité ou d'interface : proposer d'abord, construire après l'OK de Nathan.
-  Correctif de bug : directement vers `dev`.
-- Jamais de migration destructive ; ne jamais activer les modules Discord sur le dev (liés au serveur FMT réel).
+- `CHANGELOG.md` s’écrit à la publication, dans une section `## vX.Y — date`. Il alimente la page Nouveautés.
+- Un correctif urgent autorisé en production passe par une branche `hotfix/*` depuis `main`, puis `main` est resynchronisée vers `dev`.
 - Nouveau style : variables `var(--em-…)` de `styles/tokens.css`, pas de valeur brute.
 - Bannière : une bande fine sur toutes les pages, ordinateur et téléphone (`styles/banner-media.css`).
 - Un oubli dans un formulaire à étapes se dit sous le titre de l'étape, pas dans une fenêtre.
