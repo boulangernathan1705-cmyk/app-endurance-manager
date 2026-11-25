@@ -361,7 +361,7 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
 }
 .week-block.is-endurance.endurance-pano,
 .week-block.is-endurance.endurance-pano:hover {
-  background-image: linear-gradient(0deg,rgba(7,12,17,.96),rgba(7,12,17,.34) 65%,rgba(7,12,17,.30)), var(--endurance-panorama);
+  background-image: linear-gradient(90deg,rgba(7,12,17,.72),transparent 75%), linear-gradient(0deg,rgba(7,12,17,.96),rgba(7,12,17,.34) 65%,rgba(7,12,17,.30)), var(--endurance-panorama);
   background-size: cover; background-position: var(--panorama-focus); background-repeat: no-repeat;
   display: flex; flex-direction: column; align-items: stretch; overflow: hidden;
 }
@@ -393,7 +393,7 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
 .week-block.is-endurance.endurance-pano .week-block-title > :not(.week-pano-map) { grid-column: 1; }
 .week-pano-map { grid-column: 2; grid-row: 1/span 3; display: flex; align-items: center; justify-content: center; width: 100%; height: 46px; }
 .week-pano-map .circuit-visual { display: flex; position: static; width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; padding: 2px; background: none; border: 0; }
-.week-pano-map .circuit-visual img { position: static; width: 100%; height: 100%; object-fit: contain; margin: 0; filter: drop-shadow(0 1px 3px #000); }
+.week-pano-map .circuit-visual img { position: static; width: 100%; height: 100%; object-fit: contain; margin: 0; filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14) drop-shadow(0 1px 3px #000); }
 .week-block.is-endurance.endurance-pano .week-block-name,
 .week-block.is-endurance.endurance-pano .week-block-circuit { color: #fff; text-shadow: 0 1px 4px #000; }
 .week-block.is-endurance.endurance-pano .week-block-plan { border-color: rgba(255,255,255,.25); }
@@ -411,7 +411,7 @@ html[data-game] #app button.race-card.is-endurance.endurance-pano .race-head { p
 html[data-game] #app button.race-card.is-endurance.endurance-pano .race-head .event-name,
 html[data-game] #app button.race-card.is-endurance.endurance-pano .race-head .race-meta { color: #fff; text-shadow: 0 1px 4px #000; }
 html[data-game] #app button.race-card.is-endurance.endurance-pano .race-card-circuit { background: none; border: 0; }
-html[data-game] #app button.race-card.is-endurance.endurance-pano .race-card-circuit img { filter: drop-shadow(0 1px 3px #000); }
+html[data-game] #app button.race-card.is-endurance.endurance-pano .race-card-circuit img { filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14) drop-shadow(0 1px 3px #000); }
 html[data-game] #app .race-header.endurance-pano .endurance-detail-hero {
   grid-template-columns: minmax(0,7fr) minmax(0,3fr); grid-template-rows: auto minmax(0,1fr);
   min-height: 0; height: clamp(220px,23vw,280px); align-items: stretch;
@@ -431,7 +431,7 @@ html[data-game] #app .race-header.endurance-pano .race-info-chips { border-top-c
 html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual {
   grid-column: 2; grid-row: 2; align-self: stretch; background: none; min-height: 0 !important; height: auto !important; overflow: hidden;
 }
-html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual img { filter: drop-shadow(0 1px 3px #000); }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual img { filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14) drop-shadow(0 1px 3px #000); }
 @media (max-width:760px) {
   .week-block.is-endurance.endurance-pano .week-block-title { min-height: 50px; }
   .week-block.is-endurance.endurance-pano .week-block-body { padding-top: 8px; }
