@@ -107,10 +107,11 @@ test('the week is short: finished races fold per day, busy days are wider, the h
 
 test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
   const view = read('front/app/week-view.mjs'), css = read('styles/pages/weekly-calendar.css');
-  // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
+  // One line per moment: the stream with its link, then the race, each start of an endurance without its end.
   assert.match(view, /function planOf\(item\)/);
   assert.match(view, /icon:'📺',label:'Stream'/);
-  assert.match(view, /`\$\{solo\?'Course':'Départ'\} \$\{index\+1\}`/);
+  assert.match(view, /label:solo\?\(starts\.length>1\?`Course \$\{index\+1\}`:name\):''/);
+  assert.match(view, /to:!solo\|\|pending\|\|!start\.endsAt\?'':hour\(start\.endsAt\)/);
   assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
   // On a computer (option P1): the times in a coloured band, the stream on its own line with its link.
   assert.match(view, /class="week-block-band/);

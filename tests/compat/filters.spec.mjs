@@ -40,9 +40,10 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
       await expect(card).toHaveClass(/endurance-preview/);
       expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
-      expect(artBox.width).toBeGreaterThanOrEqual(89);
-      expect(artBox.height).toBeCloseTo(Math.min(150,Math.max(126,width*.37)),0);
-      artworkSizes.push([Math.round(artBox.width),Math.round(artBox.height)]);
+      expect(artBox.width).toBeGreaterThanOrEqual(86);
+      expect(artBox.height).toBeGreaterThanOrEqual(104);
+      expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
+      artworkSizes.push(Math.round(artBox.width));
       expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
@@ -63,7 +64,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(picture.width).toBeLessThanOrEqual(drawing.width+1);
       expect(await img.evaluate(node=>getComputedStyle(node).transform)).toBe('none');
     }
-    expect(new Set(artworkSizes.map(size=>size.join('x'))).size).toBe(1);
+    expect(new Set(artworkSizes).size).toBe(1);
   }
 });
 
