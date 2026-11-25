@@ -7,7 +7,7 @@ import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
 import {isAdmin,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
-import {timeInput,endBefore} from './solo-form.mjs';
+import {timeInput,endBefore} from './solo-form-fields.mjs';
 import {streamSpan,streamUrl} from '../../shared/stream.mjs';
 import {raceFinishAt} from '../../shared/duration.mjs';
 import {hoursAxis,hoursBar,hoursText} from './crews-page.mjs';

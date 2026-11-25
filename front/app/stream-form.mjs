@@ -1,5 +1,6 @@
 // A stream is a free-form community event. The native card also serves as its live preview.
-import {formSheet,parisToday} from './event-form.mjs';
+import {formSheet} from './event-form-shell.mjs';
+import {parisToday} from './event-departure-fields.mjs';
 import {state,esc,api,notifyRender} from './core.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {streamEventCard} from './home-view.mjs';
