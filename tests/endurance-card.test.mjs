@@ -9,5 +9,5 @@ test('the endurance header only shows a real duration absent from the title',()=
  assert.equal(enduranceDuration({name:'Race',durationHours:4}),'4H');
  assert.equal(enduranceDuration({name:'Race'}),'');
  assert.equal(enduranceDuration({name:'Race',durationMinutes:0}),'');
- assert.match(enduranceHeader({name:'Race',durationMinutes:150},'iracing'),/Endurance iRacing[\s\S]*2H30/);
+ assert.match(enduranceHeader({name:'Race',durationMinutes:150},'iracing'),/Endurance<\/span><span class="endurance-card-brand">iRacing[\s\S]*2H30/);
 });

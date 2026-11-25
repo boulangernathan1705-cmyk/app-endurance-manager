@@ -66,7 +66,7 @@ function soloCard({event,departure,reg}, grouped=false) {
   return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+      <span class="race-card-top"><span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span><span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
@@ -125,9 +125,9 @@ function card({event,departure,reg}, grouped=false) {
   return `<details class="native-my-entry-card race-card my-entry-race is-endurance endurance-sim-${enduranceSim(event)} event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+      <span class="race-card-top"><span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span><span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
-        ${enduranceHeader(event)}<h2 class="event-name">${esc(event.name)}</h2>
+        <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${esc(circuitLabel(event.circuit))}</span>
         <span class="race-badges">${eventTypeBadge(event.eventType)}${(reg.groupCategories||[reg.category]).map(badge).join('')}<span class="race-start">${esc(departureLabel(departure))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
@@ -163,9 +163,9 @@ function raceCards(list){
     const starts=[...new Map(items.map(item=>[item.departure.id,item.departure])).values()];
     return `<details class="native-my-entry-card race-card my-entry-race my-entry-grouped ${solo?`is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}` :`is-endurance endurance-sim-${enduranceSim(event)} event-type-${event.eventType||'private'}`}" data-entry-event="${event.id}">
       <summary class="native-my-entry-header"><span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-        <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+        <span class="race-card-top">${solo?departureDateBlock(departure):`<span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span>`}<span class="race-head">
           ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
-          ${solo?'':enduranceHeader(event)}<h2 class="event-name">${esc(event.name)}</h2>
+          <h2 class="event-name">${esc(event.name)}</h2>
           <span class="race-meta">${solo?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>
           <span class="race-badges">${solo?accessBadge(event):eventTypeBadge(event.eventType)}${[...new Set(items.flatMap(item=>item.reg.groupCategories||[item.reg.category]))].filter(Boolean).map(badge).join('')}<span class="race-start">${starts.length} créneau${starts.length>1?'x':''}</span>${starts.map(start=>`<span class="race-start">${esc(new Date(start.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',day:'numeric',month:'short'}))} · ${esc(departureLabel(start))}</span>`).join('')}</span>
         </span>${solo?eventAccessLogo(event)||circuitVisual(event.circuit,true):circuitVisual(event.circuit,true)}</span>
