@@ -18,6 +18,13 @@ test('« À traiter » lists, start by start, the pilots without a crew, the emp
   assert.deepEqual(todoItems([{...spa, departures:[{...spa.departures[0], startsAt:NOW - DAY}]}], 'lmu', NOW), []);
 });
 
+test('the administration excludes foreign registrations and foreign empty crews', () => {
+  const event = {id:'race',name:'Course officielle',departures:[{id:'start',startsAt:NOW+DAY,
+    availability:[{id:'visitor',foreign:true,status:'whole'}],
+    crews:[{id:'foreign-crew',community:{id:'other'},registrationIds:[]}]}]};
+  assert.deepEqual(todoItems([event],'lmu',NOW,undefined,'current'),[]);
+});
+
 test('a line says the day and the time as on the rest of the site', async () => {
   const {todoWhen} = await import('../front/admin-todo.mjs');
   assert.equal(todoWhen({startsAt:Date.parse('2026-11-07T14:00:00Z')}), 'sam. 7 nov. à 15h');

@@ -4,7 +4,7 @@
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
 import {calendarType} from './season-calendar.mjs';
-import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta,streamedStarts,mergedStream} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -17,20 +17,9 @@ import {crewStarts} from './crews-page.mjs';
 
 const DAY=86400000;
 const dateOf=day=>new Date(day*DAY);
-const OTHER={lmu:'iracing',iracing:'lmu'};
-// The endurances of the other simulator (the page only loads those of its own): read once a minute at most.
-let other={game:'',events:[],at:0,loading:null};
-// The endurance of the other sim with this id, if loaded (it opens on that sim's site).
-export const otherGameEvent=id=>other.events?.find(event=>event.id===id)||null;
-// The endurances of the other sim (loaded once a minute); onLoad: what to draw again once they come.
+export {otherGameEvent} from './core.mjs';
 export function otherEndurances(onLoad=()=>{if(state.page==='week')renderWeek();}){
-  const game=OTHER[activeGame];
-  if(other.game===game&&Date.now()-other.at<60000)return other.events;
-  other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
-    other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game).map(event=>({...event,otherGame:game})),at:Date.now(),loading:null};
-    onLoad();
-  }).catch(()=>{other.loading=null;other.at=Date.now();other.game=game;});
-  return other.game===game?other.events:[];
+  return otherGameEndurances('calendar',onLoad);
 }
 const dayName=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'long'});
 const dayShort=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'short',day:'numeric'});

@@ -25,7 +25,7 @@ import {communityAccess, requirePermission, displayRole, ALL_PERMISSIONS, member
 import {iracingSoloEnabled, iracingSoloSql} from './iracing-visibility.mjs';
 import {communityApi} from './api-community.mjs';
 import {platformApi} from './api-platform.mjs';
-import {crewsApi, canManageCrew} from './api-crews.mjs';
+import {crewsApi, canManageCrew, listCrewRequests} from './api-crews.mjs';
 import {OFFICIAL, eventById, actingCommunity, departureById, slotFor, can} from './api-shared.mjs';
 // « EVENT SOLO » (every community but the TDZ): no type, no SAFE access.
 const plainSoloInput = (env, community, input) => {
@@ -442,7 +442,7 @@ async function api(request, env) {
   // Once the official Discord server is linked to it, it is the official community, like any other.
   const mainAddress = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
   const openSite = mainAddress && !community.discordGuildId;
-  const access = await communityAccess(env, actor, community, {open:openSite});
+  const access = await communityAccess(env, actor, community, {open:openSite, write:!['GET','HEAD'].includes(method)});
   actor.permissions = access.permissions;
   actor.manager = access.manager;
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
@@ -459,6 +459,7 @@ async function api(request, env) {
     communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
+    ...(url.searchParams.has('crewRequests') && access.status === 'member' && actor.user ? {crewRequests:await listCrewRequests(env, actor, community).catch(() => null)} : {}),
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null}, 200, actor.user && actor.renew ? await actor.renew().catch(() => []) : []);

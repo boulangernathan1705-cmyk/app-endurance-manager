@@ -22,7 +22,7 @@ async function boot(page,game,events){
 for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit inside their cards`,async({page})=>{
   // Use a deterministic wide SVG; remote availability must not affect layout checks.
   const svgNamespace=['http:','','www.w3.org','2000','svg'].join('/');
-  await page.route('https://upload.wikimedia.org/**',route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="${svgNamespace}" viewBox="0 0 800 200"><path d="M1 1H799V199H1Z" fill="none" stroke="black"/></svg>`}));
+  await page.route(url=>['commons.wikimedia.org','upload.wikimedia.org'].includes(url.hostname),route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="${svgNamespace}" viewBox="0 0 800 200"><path d="M1 1H799V199H1Z" fill="none" stroke="black"/></svg>`}));
   const circuits=game==='iracing'?['iracing-indianapolis','iracing-nurburgring-gp','iracing-montreal']:['spa','le-mans'];
   await boot(page,game,circuits.map((circuit,index)=>race(game,{id:`mobile-${index}`,circuit})));
   for(const width of [320,390,430,760]){

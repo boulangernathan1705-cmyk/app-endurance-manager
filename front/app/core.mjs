@@ -223,6 +223,35 @@ async function fetchEvents(scope) {
   const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`,'GET',undefined,eventResponses.get(scope));
   return (Array.isArray(result.events)?result.events:[]).filter(event => event.format === 'solo' || gameForEvent(event) === activeGame);
 }
+// One in-memory list for the calendar and the organisers. In-flight reads belong to this session only.
+const otherGame = activeGame === 'lmu' ? 'iracing' : 'lmu';
+let otherEndurancesCache = {events:[], at:0, pending:null, response:{}, listeners:new Map()};
+export const otherGameEvent = id => otherEndurancesCache.events.find(event => event.id === id) || null;
+
+export function invalidateOtherEndurances() {
+  otherEndurancesCache = {...otherEndurancesCache, at:0, pending:null, response:{}, listeners:new Map()};
+}
+
+export function otherGameEndurances(view, onLoad) {
+  const cache = otherEndurancesCache;
+  if (Date.now() - cache.at < 60000) return cache.events;
+  cache.listeners.set(view,onLoad);
+  cache.pending ??= api(`/api/races?game=${otherGame}&scope=upcoming`,'GET',undefined,cache.response).then(result => {
+    if (cache !== otherEndurancesCache) return;
+    cache.events = (Array.isArray(result.events) ? result.events : [])
+      .filter(event => event.format !== 'solo' && gameForEvent(event) === otherGame)
+      .map(event => ({...event,otherGame}));
+    cache.at = Date.now();
+    const listeners = [...cache.listeners.values()];
+    cache.listeners.clear();
+    for (const listener of listeners) listener();
+  }).catch(() => {
+    cache.at = Date.now();
+    cache.listeners.clear();
+  }).finally(() => { cache.pending = null; });
+  return cache.events;
+}
+
 // Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
 // everywhere; the stored time stays in departure.clock (event form).
 function markUndefinedStarts(events) {
@@ -246,10 +275,15 @@ function mergeEvents(...lists) {
 // the first time it is needed (Archivés filter, link to a past race) and then kept fresh.
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
-  const session = await api('/api/session');
+  const session = await api('/api/session?crewRequests=1');
   // Account, community settings or permissions changed: discard both private representations.
-  const sessionKey=JSON.stringify(session);
-  if (sessionKey!==eventSession) { eventResponses.clear(); eventSession=sessionKey; }
+  const {crewRequests,...accessSession}=session;
+  const sessionKey=JSON.stringify(accessSession);
+  if (sessionKey!==eventSession) {
+    eventResponses.clear();
+    otherEndurancesCache = {events:[], at:0, pending:null, response:{}, listeners:new Map()};
+    eventSession=sessionKey;
+  }
   const accessChanged = state.access !== session.access;
   state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null; state.elsewhere=Array.isArray(session.elsewhere)?session.elsewhere:[];
   const member = session.access === 'member';
@@ -282,7 +316,7 @@ export async function load() {
     state.participantsLoaded=true;
   }
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);
-  state.crewRequests = member && state.user ? ((await api('/api/crew-requests').catch(() => null))?.requests || []) : [];
+  state.crewRequests = member && state.user ? (crewRequests ?? ((await api('/api/crew-requests').catch(() => null))?.requests || [])) : [];
 }
 export async function loadArchive() {
   if (state.archiveLoaded) return;
@@ -293,11 +327,23 @@ export async function loadArchive() {
 
 export function showError(error) {
   const message = error?.message || String(error || 'Action impossible.');
-  document.querySelector('[data-ux-error-modal]')?.remove();
+  const previous = document.querySelector('[data-ux-error-modal]');
+  const returnFocus = previous?.returnFocus || document.activeElement;
+  previous?.remove();
   const overlay=document.createElement('div');
   overlay.className='ux-error-overlay'; overlay.dataset.uxErrorModal='true';
   overlay.innerHTML=`<section class="ux-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ux-error-title" aria-describedby="ux-error-message"><span class="ux-error-icon" aria-hidden="true">!</span><h2 id="ux-error-title">Action impossible</h2><p id="ux-error-message">${esc(message)}</p><button type="button" class="primary-button" data-action="dismiss-error">OK, j’ai compris</button></section>`;
-  document.body.append(overlay); overlay.querySelector('button')?.focus();
+  const closeButton = overlay.querySelector('button');
+  overlay.returnFocus = returnFocus;
+  overlay.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' && event.key !== 'Tab') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Escape') closeButton.click();
+    else closeButton.focus();
+  });
+  document.body.append(overlay);
+  closeButton.focus();
 }
 
 addEventListener('error',event=>{if(event.error||event.message)reportClientError({kind:'javascript',message:event.message||event.error?.message||'Erreur JavaScript',detail:event.error?.stack||`${event.filename||''}:${event.lineno||0}:${event.colno||0}`});});

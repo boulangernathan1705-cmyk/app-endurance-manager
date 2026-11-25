@@ -246,6 +246,30 @@ test('Discord not answering: a member already checked keeps the roles known last
   assert.equal((await accessOf(env,community,PILOT)).status,'unavailable');
 });
 
+test('administrative writes require recent roles without blocking a normal pilot during a Discord outage', async t => {
+  const {DB,env,community}=setup();
+  const members={[PILOT]:[ORGA_ROLE],[BOSS]:[ADMIN_ROLE]};
+  const calls=fakeDiscord(t,members);
+  const write=id=>communityAccess(env,{user:{id}},community,{write:true});
+  const age=id=>DB.db.prepare('UPDATE memberships SET checked_at=checked_at-61 WHERE user_id=?').run(id);
+  assert.ok((await write(PILOT)).permissions.has('admin'));
+  assert.ok((await write(BOSS)).permissions.has('admin'));
+  const first=calls.length;
+  assert.ok((await write(PILOT)).permissions.has('admin'));
+  assert.equal(calls.length,first,'reuse a recent verification');
+  age(BOSS);
+  members[BOSS]=[];
+  assert.ok(!(await write(BOSS)).permissions.has('admin'),'a removed native Discord role is detected');
+  age(PILOT);
+  globalThis.fetch=async()=>new Response('{}',{status:500});
+  const duringOutage=await write(PILOT);
+  assert.equal(duringOutage.status,'member');
+  assert.ok(duringOutage.permissions.has('endurance'));
+  assert.ok(!duringOutage.permissions.has('admin'));
+  assert.ok(!duringOutage.permissions.has('manage_registrations'));
+  assert.ok((await write(MANAGER)).manager,'the platform manager does not depend on Discord roles');
+});
+
 test('site access is explicit, cumulative and separate from action permissions; role settings revoke it immediately', async t => {
   const {DB,env,community}=setup();
   fakeDiscord(t,{[PILOT]:[SAFE_ROLE],[BOSS]:[SAFE_ROLE,ORGA_ROLE]});

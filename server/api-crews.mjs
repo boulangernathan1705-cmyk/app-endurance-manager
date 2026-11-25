@@ -50,28 +50,30 @@ async function acceptCrewRequests(env, community, registrationId, crewId, actor)
   return answered;
 }
 
+export async function listCrewRequests(env, actor, community) {
+  if (!actor.user) return [];
+  const organiser = can(actor,'crews');
+  const rows = (await env.DB.prepare(`SELECT q.*, COALESCE(NULLIF(m.nickname,''),u.name) AS requester, e.name AS event_name, e.circuit AS event_circuit, e.sim AS event_sim, e.departures AS event_departures
+    FROM crew_requests q JOIN events e ON e.id=q.event_id JOIN users u ON u.id=q.user_id
+    LEFT JOIN memberships m ON m.community_id=q.community_id AND m.user_id=q.user_id
+    WHERE q.community_id=? AND q.status='pending' AND (?=1 OR q.user_id=?)
+      AND EXISTS (SELECT 1 FROM registrations r WHERE r.id=json_extract(q.registration_ids,'$[0]') AND r.status!='unavailable'
+        AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id))
+    ORDER BY q.created_at`).bind(community.id, organiser?1:0, actor.user.id).all()).results || [];
+  // Still useful: its start is to come and its pilot is still entered without a crew.
+  const open = rows.filter(row => Number(JSON.parse(row.event_departures || '[]').find(item => item.id===row.departure_id)?.startsAt) > Date.now());
+  return open.map(row => ({id:row.id, eventId:row.event_id, departureId:row.departure_id, eventName:row.event_name,
+    game:gameForEvent({circuit:row.event_circuit, sim:row.event_sim}), name:row.name, category:row.category, car:row.car || '',
+    registrationIds:JSON.parse(row.registration_ids || '[]'), requester:row.requester, mine:row.user_id===actor.user.id, createdAt:row.created_at}));
+}
+
 // Answers the request when it is about a crew or a crew request, else null.
 export async function crewsApi({path, method, request, env, actor, community}) {
   // « Demander un équipage » (migration 0091): a pilot without « Équipages » proposes a crew on his start; the
   // organisers see the requests on the « Équipages » page, create the crew or refuse it.
   const requestCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crew-requests$/);
   const requestRoute = path.match(/^\/api\/crew-requests\/([a-f0-9-]{36})\/(accept|refuse|cancel)$/);
-  if (path === '/api/crew-requests' && method === 'GET') {
-    if (!actor.user) return json({requests:[]});
-    const organiser = can(actor,'crews');
-    const rows = (await env.DB.prepare(`SELECT q.*, COALESCE(NULLIF(m.nickname,''),u.name) AS requester, e.name AS event_name, e.circuit AS event_circuit, e.sim AS event_sim, e.departures AS event_departures
-      FROM crew_requests q JOIN events e ON e.id=q.event_id JOIN users u ON u.id=q.user_id
-      LEFT JOIN memberships m ON m.community_id=q.community_id AND m.user_id=q.user_id
-      WHERE q.community_id=? AND q.status='pending' AND (?=1 OR q.user_id=?)
-        AND EXISTS (SELECT 1 FROM registrations r WHERE r.id=json_extract(q.registration_ids,'$[0]') AND r.status!='unavailable'
-          AND NOT EXISTS (SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id))
-      ORDER BY q.created_at`).bind(community.id, organiser?1:0, actor.user.id).all()).results || [];
-    // Still useful: its start is to come and its pilot is still entered without a crew.
-    const open = rows.filter(row => Number(JSON.parse(row.event_departures || '[]').find(item => item.id===row.departure_id)?.startsAt) > Date.now());
-    return json({requests:open.map(row => ({id:row.id, eventId:row.event_id, departureId:row.departure_id, eventName:row.event_name,
-      game:gameForEvent({circuit:row.event_circuit, sim:row.event_sim}), name:row.name, category:row.category, car:row.car || '',
-      registrationIds:JSON.parse(row.registration_ids || '[]'), requester:row.requester, mine:row.user_id===actor.user.id, createdAt:row.created_at}))});
-  }
+  if (path === '/api/crew-requests' && method === 'GET') return json({requests:await listCrewRequests(env, actor, community)});
   if (requestCreate && method === 'POST') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour demander un équipage.');
     const input = await body(request);

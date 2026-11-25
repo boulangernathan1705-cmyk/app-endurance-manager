@@ -205,7 +205,7 @@ test('Mes inscriptions reprend la carte de course et les frises d’équipage',(
 
 test('les blocs dépliables ont un identifiant pour que le rafraîchissement automatique les garde ouverts',()=>{
   const refresh=read('front/app/auto-refresh.mjs');
-  assert.match(refresh,/details\[open\]/);
+  assert.match(refresh,/\[selector,details\.open\]/);
   assert.match(read('front/app/entries-view.mjs'),/<details class="native-my-entry-card[^>]*id="entry-\$\{reg\.id\}"/);
   assert.match(read('front/app/crews.mjs'),/<details class="ux-course-pilots-accordion" id="pilots-\$\{departure\.id\}"/);
   assert.match(read('front/app/event-view.mjs'),/<details class="departure-fold[^>]*id="departure-\$\{departure\.id\}"/);

@@ -6,18 +6,22 @@ const clock = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', hour:'2
 
 // [{eventId, game, name, startsAt, text, tone}] sorted by start: pilots waiting for a crew, empty crews, times
 // still to confirm.
-export function todoItems(events, game, now = Date.now(), horizon = 14 * DAY) {
+export function waitingCrewEntries(departure) {
+  const assigned = new Set((departure.crews || []).flatMap(crew => (crew.registrationIds || []).map(String)));
+  return (departure.availability || []).filter(reg => !reg.foreign && reg.status !== 'unavailable' && !assigned.has(String(reg.id)));
+}
+export const belongsToCommunity = (crew, communityId) => !crew.foreign && (!crew.community || !communityId || crew.community.id === communityId);
+
+export function todoItems(events, game, now = Date.now(), horizon = 14 * DAY, communityId) {
   const items = [];
   for (const event of events || []) {
     if (event.format === 'solo' || event.archived) continue;
-    const starts = (event.departures || []).filter(item => Number(item.startsAt) > now && Number(item.startsAt) < now + horizon);
+    const starts = (event.departures || []).filter(item => Number(item.startsAt) > now && Number(item.startsAt) <= now + horizon);
     if (!starts.length) continue;
     if (event.schedulePending) items.push({eventId:event.id, game, name:event.name, startsAt:Number(starts[0].startsAt), tone:'warn', text:'Horaires à confirmer'});
     for (const departure of starts) {
-      const crews = departure.crews || [];
-      const assigned = new Set(crews.flatMap(crew => (crew.registrationIds || []).map(String)));
-      const waiting = new Set((departure.availability || []).filter(reg => reg.status !== 'unavailable' && !assigned.has(String(reg.id)))
-        .map(reg => reg.participantId || reg.id)).size;
+      const crews = (departure.crews || []).filter(crew => belongsToCommunity(crew, communityId));
+      const waiting = new Set(waitingCrewEntries(departure).map(reg => reg.participantId || reg.id)).size;
       const empty = crews.filter(crew => !(crew.registrationIds || []).length).length;
       const base = {eventId:event.id, game, name:event.name, startsAt:Number(departure.startsAt)};
       if (waiting) items.push({...base, tone:'bad', text:`${waiting} pilote${waiting > 1 ? 's' : ''} sans équipage`});

@@ -21,6 +21,9 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 Le style du site a des valeurs de référence (couleurs, tailles, arrondis, espacements) dans `styles/tokens.css`.
 Les nouveaux styles utilisent ces variables (`var(--em-…)`), jamais une valeur brute. La page `/charte` montre les
 composants avec ces valeurs.
+La cascade finale est assemblée par `styles/ux-refresh.css` dans l'ordre de ses imports. Pour une retouche,
+modifier la règle dans la feuille du composant et vérifier le rendu avant/après. Les feuilles sont toujours
+assemblées dans `app.css` au build, sans requêtes CSS supplémentaires.
 La bannière a la même taille sur toutes les pages : une bande fine, sur ordinateur (`--em-banner-height-thin`)
 comme sur téléphone (`--em-banner-height-phone`) ; seul le mur des stands garde sa bande extra-fine.
 

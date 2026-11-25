@@ -57,7 +57,7 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(view, /home-layout\$\{box\?'':' is-full'\}/);
   // An event block takes its simulator's colour, like its card.
   assert.match(view, /kind\.key==='event'\?` sim-\$\{simForEvent\(event\)\}`/);
-  assert.match(read('styles/ux-refresh.css'), /\.week-block\.is-event \{ --kind: var\(--sim, var\(--em-kind-event\)\); \}/);
+  assert.match(read('styles/ux-week-and-organisers.css'), /\.week-block\.is-event \{ --kind: var\(--sim, var\(--em-kind-event\)\); \}/);
   // Those who may create races add an event or announce a stream from here.
   assert.match(view, /can\('create_race'\)&&state\.soloRaces/);
   // Behind one small « ＋ Ajouter » menu (core.mjs addMenu, 2026-11-03).
@@ -65,7 +65,7 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.doesNotMatch(view, /départ\$\{count/);
   assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.
-  assert.match(view, /\/api\/races\?game=\$\{game\}&scope=upcoming/);
+  assert.match(read('front/app/core.mjs'), /\/api\/races\?game=\$\{otherGame\}&scope=upcoming/);
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
 });
 
@@ -82,7 +82,7 @@ test('a week card shows its simulator on top, its start time(s), the name and it
 });
 
 test('on a phone a week card has its logo or length on the left of its name, crews or pilots shown (option G)', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css');
   assert.match(view, /<span class="week-block-body">/);
   // An endurance: the Endurance Manager endurance logo of its simulator, no length (Nathan 2026-11-02).
   assert.match(view, /\/images\/event-access\/endurance-\$\{esc\(enduSim\)\}\.png/);
@@ -94,7 +94,7 @@ test('on a phone a week card has its logo or length on the left of its name, cre
 });
 
 test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css'), actions = read('front/app/actions.mjs');
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css'), actions = read('front/app/actions.mjs');
   assert.match(view, /button\('week-done',day\.opened\?'▴ Replier':`✓ \$\{day\.done\.length\} terminée/);
   assert.match(actions, /case 'week-done':/);
   assert.match(view, /weight:items\.length\?1:done\.length\?\.75:\.5/);
@@ -105,7 +105,7 @@ test('the week is short: finished races fold per day, busy days are wider, the h
 });
 
 test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css');
   // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
   assert.match(view, /function planOf\(item\)/);
   assert.match(view, /icon:'📺',label:'Stream'/);

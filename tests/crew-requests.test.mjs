@@ -63,6 +63,8 @@ test('a pilot asks for a crew, every organiser is told, one creates it and the p
   // The organisers (role « crews », and the admin from ADMIN_DISCORD_IDS only if he has a membership) see it; a pilot sees only his own.
   const seen=(await req('/api/crew-requests','GET',null,'orga')).data.requests;
   assert.equal(seen.length,1);assert.equal(seen[0].name,'Les Tortues 2');assert.deepEqual(seen[0].registrationIds,[mine,mate]);
+  assert.deepEqual((await req('/api/session?crewRequests=1','GET',null,'orga')).data.crewRequests,seen);
+  assert.deepEqual((await req('/api/session?crewRequests=1','GET',null,'mate')).data.crewRequests,[]);
   assert.equal((await req('/api/crew-requests','GET',null,'mate')).data.requests.length,0);
   assert.equal((await req('/api/crew-requests','GET',null,'pilot')).data.requests[0].mine,true);
   const told=DB.db.prepare("SELECT user_id FROM notifications WHERE kind='crew_request'").all().map(row=>row.user_id);

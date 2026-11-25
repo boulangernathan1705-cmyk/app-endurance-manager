@@ -5,7 +5,7 @@ globalThis.document={readyState:'loading',getElementById(){return null;},addEven
 globalThis.addEventListener=()=>{};
 const {api,load,state}=await import('../front/app/core.mjs');
 const event={id:'race',format:'endurance',circuit:'spa',departures:[],name:'Race'};
-const session={access:'member',user:{id:'pilot',name:'Pilot'},community:{id:'community'},permissions:['access']};
+const session={access:'member',user:{id:'pilot',name:'Pilot'},community:{id:'community'},permissions:['access'],crewRequests:[]};
 
 function mockedFetch(t,fn){const previous=globalThis.fetch;globalThis.fetch=fn;t.after(()=>{globalThis.fetch=previous;});}
 
@@ -25,7 +25,7 @@ test('permissions and account switches clear both event lists; unchanged session
   state.archiveLoaded=true;state.participantsLoaded=true;state.user=session.user;state.access='member';
   let current=structuredClone(session),revision=1;const seen=[];
   mockedFetch(t,async(path,options)=>{
-    if(path==='/api/session')return Response.json(current);
+    if(path==='/api/session?crewRequests=1')return Response.json(current);
     if(path==='/api/participants')return Response.json({participants:[]});
     assert.match(path,/^\/api\/races\?/);seen.push(options.headers['If-None-Match']||null);
     const tag=`W/"${revision}-${path}"`;
@@ -33,7 +33,8 @@ test('permissions and account switches clear both event lists; unchanged session
     return Response.json({events:[event]},{headers:{ETag:tag}});
   });
   await load();assert.deepEqual(seen.splice(0),[null,null]);
-  await load();assert.ok(seen.splice(0).every(Boolean));
+  current.crewRequests=[{id:'crew-request'}];await load();assert.ok(seen.splice(0).every(Boolean));
+  assert.deepEqual(state.crewRequests,current.crewRequests);
   current.permissions.push('crews');await load();assert.deepEqual(seen.splice(0),[null,null]);
   current.user={id:'other',name:'Other'};revision++;await load();assert.deepEqual(seen.splice(0),[null,null]);
   current={access:'anonymous',user:null,permissions:[]};await load();assert.equal(state.events.length,0);assert.deepEqual(seen.splice(0),[]);
