@@ -28,3 +28,7 @@ Resized to max 640 × 480, WebP quality 78. No image generation or runtime remot
 - laguna-seca: https://assets.lmu-assister.com/tracks/covers/weathertech-raceway-laguna-seca.webp
 - road-atlanta: https://assets.lmu-assister.com/tracks/covers/michelin-raceway-road-atlanta.webp
 - long-beach: https://assets.lmu-assister.com/tracks/covers/grand-prix-of-long-beach.webp
+
+## Panoramic trial on LMU cards
+
+18 previously downloaded LMU Assister `tracks/backgrounds/` WebP photos, stored separately in `images/endurance/lmu-pano/`. The previous covers are retained for other views and fallback. These are the real source photos, not the illustrative AI mockup. Source rights must be checked before production.

@@ -19,6 +19,11 @@ const LMU_ARTWORK = new Set(['bahrain','barcelona','cota','daytona','fuji','imol
 export function enduranceArtworkClass(event, game) {
   return enduranceSim(event, game) === 'lmu' && LMU_ARTWORK.has(event?.circuit) ? ' endurance-track-'+event.circuit : '';
 }
+// Known LMU circuits only; no arbitrary class names from event input.
+export function endurancePanoramaClass(event, game) {
+  const track = enduranceArtworkClass(event, game);
+  return track ? ' endurance-pano'+track : '';
+}
 export function enduranceHeader(event, game) {
   const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
   const duration = enduranceDuration(event);

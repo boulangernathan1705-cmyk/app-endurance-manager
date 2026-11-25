@@ -34,16 +34,21 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
   const caption=art.locator('.endurance-card-caption');
   await expect(caption).toBeVisible();
   const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
-  expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
-  expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+  if(sim==='iracing'){
+   expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
+   expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+  }else{
+   await expect(card.locator('.week-pano-map img')).toBeVisible();
+   expect(artBox.width).toBeGreaterThan(100);
+  }
   expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
+  const artwork=sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing.webp';
+  expect(sim==='lmu'?await card.evaluate(el=>getComputedStyle(el).backgroundImage):await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
   expect(await page.evaluate(async artwork=>{
    const image=new Image();image.src=artwork;
    try {await image.decode();return image.naturalWidth>=250;} catch {return false;}
   },artwork)).toBe(true);
-  if(width===390){
+  if(width===390&&sim==='iracing'){
    expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
    expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
    const a=await art.boundingBox(),b=await card.locator('.week-block-body').boundingBox();

@@ -38,17 +38,42 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       const caption=art.locator('.endurance-card-caption');
       const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
       expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
-      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
-      expect(artBox.width).toBeGreaterThanOrEqual(89);
-      expect(artBox.height).toBeCloseTo(Math.min(150,Math.max(126,width*.37)),0);
-      artworkSizes.push([Math.round(artBox.width),Math.round(artBox.height)]);
+      if(game==='iracing'){
+        expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
+        expect(artBox.width).toBeGreaterThanOrEqual(89);
+        expect(artBox.height).toBeCloseTo(Math.min(150,Math.max(126,width*.37)),0);
+        artworkSizes.push([Math.round(artBox.width),Math.round(artBox.height)]);
+      }else{
+        await expect(card).toHaveClass(/endurance-pano/);
+        expect(artBox.height).toBeLessThanOrEqual(60);
+        expect(artBox.width).toBeGreaterThanOrEqual(120);
+        expect(captionBox.height).toBeLessThanOrEqual(artBox.height+1);
+        const body=card.locator('.race-card-body');
+        const track=await card.evaluate(el=>[...el.classList].find(c=>c.startsWith('endurance-track-')).slice(16));
+        expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/lmu-pano/'+track+'.webp');
+        expect(await body.evaluate(el=>getComputedStyle(el).backgroundSize.split(',').every(v=>v.trim()==='cover'))).toBe(true);
+        expect(await art.evaluate(el=>getComputedStyle(el,'::before').display)).toBe('none');
+        expect(await img.evaluate(el=>getComputedStyle(el).filter)).toContain('invert(1)');
+      }
       expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
-      expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
-      expect(h.width).toBeGreaterThan(a.width);
+      if(game==='iracing'){
+        expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
+        expect(h.width).toBeGreaterThan(a.width);
+      }else{
+        expect(a.y+a.height).toBeLessThanOrEqual(h.y+1);
+        expect(Math.abs(a.x-h.x)).toBeLessThanOrEqual(2);
+        expect(Math.abs(a.width-h.width)).toBeLessThanOrEqual(2);
+      }
       expect(d.height).toBeLessThanOrEqual(34);
       expect(await head.evaluate(el=>getComputedStyle(el).paddingRight)).toBe('0px');
-      expect((await card.locator('.race-card-circuit').boundingBox()).x).toBeGreaterThanOrEqual(t.x+t.width-1);
+      const mapPanel=await panel.boundingBox();
+      if(game==='iracing')expect(mapPanel.x).toBeGreaterThanOrEqual(t.x+t.width-1);
+      else{
+        expect(mapPanel.x).toBeGreaterThanOrEqual(h.x+h.width-1);
+        expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(t.y+1);
+        expect(t.y).toBeGreaterThanOrEqual(h.y+h.height-1);
+      }
       expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
       for(const rect of [box,drawing,picture]){
@@ -61,7 +86,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(picture.width).toBeLessThanOrEqual(drawing.width+1);
       expect(await img.evaluate(node=>getComputedStyle(node).transform)).toBe('none');
     }
-    expect(new Set(artworkSizes.map(size=>size.join('x'))).size).toBe(1);
+    if(game==='iracing')expect(new Set(artworkSizes.map(size=>size.join('x'))).size).toBe(1);
   }
 });
 

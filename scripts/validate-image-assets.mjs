@@ -44,3 +44,5 @@ await validateWebp('images/endurance-manager-banner.webp',{minWidth:1900,minHeig
 for (const sim of ['lmu','iracing']) await validateWebp(`images/endurance/${sim}.webp`,{minWidth:400,minHeight:250,maxBytes:100000});
 
 for (const circuit of ['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']) await validateWebp(`images/endurance/lmu/${circuit}.webp`,{minWidth:250,minHeight:250,maxBytes:180000});
+
+for (const circuit of ['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']) await validateWebp(`images/endurance/lmu-pano/${circuit}.webp`,{minWidth:400,minHeight:120,maxBytes:180000});
