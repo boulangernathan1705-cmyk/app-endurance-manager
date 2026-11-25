@@ -1,0 +1,40 @@
+name: Temporary LMU image recovery
+on:
+  push:
+    branches: [temp/lmu-thumbnail-recovery]
+permissions: {}
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download and validate public images
+        shell: bash
+        run: |
+          mkdir -p images/assister images/official
+          python3 - <<'PY'
+          import urllib.request, concurrent.futures, pathlib
+          sources = [["assister/paul-ricard.webp","https://assets.lmu-assister.com/tracks/backgrounds/4-hours-of-castellet-paul-ricard-circuit.webp"],["assister/portimao.webp","https://assets.lmu-assister.com/tracks/backgrounds/6-hours-of-portimao-algarve-international-circuit.webp"],["assister/bahrain.webp","https://assets.lmu-assister.com/tracks/backgrounds/8-hours-of-bahrain-bahrain-international-circuit.webp"],["assister/monza.webp","https://assets.lmu-assister.com/tracks/backgrounds/6-hours-of-monza-autodromo-nazionale-monza.webp"],["official/spa.png","https://lemansultimate.com/wp-content/uploads/2024/02/Spa-1.png"],["official/le-mans.png","https://lemansultimate.com/wp-content/uploads/2024/02/Desktop-Screenshot-2024.01.30-10.34.52.72.png"],["official/monza.png","https://lemansultimate.com/wp-content/uploads/2024/02/Monza-1.png"],["official/portimao.png","https://lemansultimate.com/wp-content/uploads/2024/02/Portimao-1.png"],["official/bahrain.png","https://lemansultimate.com/wp-content/uploads/2024/02/Bahrain-18.png"],["official/fuji.png","https://lemansultimate.com/wp-content/uploads/2024/02/Fuji-1.png"],["official/sebring.png","https://lemansultimate.com/wp-content/uploads/2024/02/Sebring-10.png"],["official/imola.png","https://lemansultimate.com/wp-content/uploads/2024/07/image-22.png"],["official/interlagos.png","https://lemansultimate.com/wp-content/uploads/2024/11/Interlagos-9.png"],["official/cota.png","https://lemansultimate.com/wp-content/uploads/2024/09/Desktop-Screenshot-2024.08.29-10.36.10.51-1.png"],["official/lusail.jpg","https://lemansultimate.com/wp-content/uploads/2025/05/Qatar6-scaled.jpg"],["official/silverstone.png","https://lemansultimate.com/wp-content/uploads/2025/09/le-mans-ultimate.exe-Screenshot-2025.09.24-11.03.48.85-scaled.png"],["official/paul-ricard.jpg","https://lemansultimate.com/wp-content/uploads/2025/12/PaulRicard_1.jpg"],["official/barcelona.png","https://lemansultimate.com/wp-content/uploads/2026/07/Barca-1-scaled.png"],["official/daytona.png","https://lemansultimate.com/wp-content/uploads/2026/07/Daytona-1-scaled.png"],["official/laguna-seca.png","https://lemansultimate.com/wp-content/uploads/2026/07/Laguna-1-scaled.png"],["official/road-atlanta.png","https://lemansultimate.com/wp-content/uploads/2026/09/RoadAtlantaGVs-39-scaled.png"],["official/long-beach.png","https://lemansultimate.com/wp-content/uploads/2026/09/le-mans-ultimate.exe-Screenshot-2026.09.08-10.18.23.51-1-scaled.png"]]
+          def download(item):
+              name, url = item
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}), timeout=20) as response:
+                      data = response.read(20_000_001)
+                  if len(data) > 20_000_000 or not (data.startswith(b'\x89PNG\r\n\x1a\n') or data.startswith(b'\xff\xd8\xff') or (data[:4] == b'RIFF' and data[8:12] == b'WEBP')):
+                      raise ValueError('invalid or oversized image')
+                  pathlib.Path('images',name).write_bytes(data)
+                  return f'OK {name} {len(data)} bytes {url}'
+              except Exception as e:
+                  return f'FAIL {name} {e} {url}'
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              results = list(pool.map(download, sources))
+          report = '\n'.join(results)
+          print(report)
+          pathlib.Path('images/report.txt').write_text(report)
+          PY
+      - name: Save temporary review archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: lmu-circuit-images
+          path: images/
+          retention-days: 1
