@@ -26,6 +26,7 @@
 .week-block.is-endurance .week-plan-row b { font-size: var(--em-text-sm); }
 .week-block.is-endurance .week-plan-row i { font-style: normal; opacity: .65; }
 .week-block.is-endurance .week-block-facts { grid-column: auto; }
+.week-block.is-endurance .week-plan-row:not(.is-stream) { justify-content: flex-start; gap: 6px; }
 .week-block.is-endurance .week-plan-row.is-stream > span:first-child { color: var(--em-kind-stream); }
 .week-block.is-endurance .week-plan-row .week-stream-link { font-size: inherit; }
 .race-card.is-endurance .endurance-card-head { width: 100%; margin-bottom: var(--em-space-1); border-radius: var(--em-radius-sm) var(--em-radius-sm) 0 0; }
@@ -137,7 +138,7 @@ html[data-game] #app button.race-card.is-endurance .race-head > .race-date small
   }
   html[data-game] #app button.race-card.is-endurance .race-situation,
   html[data-game] #app button.race-card.is-endurance .race-fill { grid-column: 1/-1; }
-  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 19px !important; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 15.5px !important; }
   html[data-game] #app button.race-card.is-endurance .race-head .event-type-badge { max-width: 100%; white-space: normal; }
 }
 
@@ -196,7 +197,7 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
    title length, badges or number of starts. Keep the caption at its bottom. */
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
   flex-basis: clamp(90px,32%,138px);
-  height: 150px; min-height: 150px; max-height: 150px; align-self: flex-start;
+  height: 76px; min-height: 76px; max-height: 76px; align-self: stretch;
 }
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-lmu {
   --endurance-focus: 49% 56%;
@@ -206,8 +207,34 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-s
 }
 @media (max-width: 760px) {
   html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
-    height: clamp(126px,37vw,150px); min-height: 0; max-height: none;
+    flex-basis: clamp(89px,29%,120px); height: 100px; min-height: 100px; max-height: 100px;
   }
+}
+
+/* The weekly agenda is the reference: a short banner on desktop, a compact
+   picture to the left on mobile, and the same information density. */
+.week-block.is-endurance .endurance-card-caption .endurance-card-duration,
+html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-duration {
+  font-size: 13px; font-weight: 900; padding: 2px 4px; border-radius: 4px;
+  background: rgba(255,255,255,.12); color: #fff;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top { gap: 6px; }
+html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 15.5px; line-height: 1.25; }
+html[data-game] #app button.race-card.is-endurance .race-head .race-meta { font-size: 12.5px; line-height: 1.25; }
+html[data-game] #app button.race-card.is-endurance .race-start { white-space: nowrap; }
+html[data-game] #app button.race-card.is-endurance .endurance-start-flag { font-size: 11px; }
+@media (min-width:761px) {
+  html[data-game] #app button.race-card.is-endurance .race-card-top { flex-direction: column; }
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+    flex: 0 0 auto; width: 100%; border-radius: 5px 5px 0 0;
+    clip-path: none; border-bottom: 2px solid var(--endurance-color);
+  }
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption { padding-right: 6px; }
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head::after { display: none; }
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-wide); }
+}
+@media (max-width:760px) {
+  html[data-game] #app button.race-card.is-endurance > .race-card-body { gap: 5px !important; padding: 7px 8px 8px !important; }
 }
 
 /* Detailed endurance: a diagonal separates the local photo from the existing
