@@ -150,6 +150,11 @@ for(const game of ['lmu','iracing'])test('endurance-circuit-catalog-'+game,async
       item.append(label,hero);sheet.append(item);
     }
     app.replaceChildren(sheet);
+    // Isolate the contact sheet from fixed application chrome, including mobile navigation.
+    for(let node=app;node.parentElement&&node!==document.body;node=node.parentElement){
+      for(const sibling of node.parentElement.children)if(sibling!==node)sibling.style.setProperty('display','none','important');
+    }
+    for(const node of document.querySelectorAll('body *'))if(!sheet.contains(node)&&!node.contains(sheet)&&getComputedStyle(node).position==='fixed')node.style.setProperty('display','none','important');
     return circuits.length;
   },{game,mapWidth:mapSize.width,mapHeight:mapSize.height});
   const images=page.locator('#circuit-audit-sheet img');
