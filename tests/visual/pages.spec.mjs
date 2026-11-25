@@ -261,17 +261,23 @@ test('endurance-lmu-panoramas',async({page},testInfo)=>{
   const events=circuits.map((c,i)=>({...SPA,id:'aaaaaaa'+(i%10)+'-aaaa-4aaa-8aaa-aaaaaaaa'+String(i).padStart(4,'0'),name:c.name,circuit:c.id,departures:[{...SPA.departures[0],availability:[],crews:[]}]}));
   await page.route('**/api/races?**',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({events})}));
   await page.goto('/lmu/');
-  const cards=page.locator('button.race-card.is-endurance.endurance-pano');
+  const cards=page.locator('button.race-card.is-endurance.endurance-preview');
   await expect(cards).toHaveCount(18);
   const audit=await cards.evaluateAll(async items=>Promise.all(items.map(async card=>{
-    const id=[...card.classList].find(c=>c.startsWith('endurance-track-')).slice(16);
+    const id=[...card.classList].find(c=>c.startsWith('endurance-preview-track-')).slice('endurance-preview-track-'.length);
+    card.classList.add('is-panorama-preview');
     const body=card.querySelector('.race-card-body'),style=getComputedStyle(body),img=new Image();
     img.src='/images/endurance/lmu-pano/'+id+'.webp';let loaded=true;try{await img.decode();}catch{loaded=false;}
-    return {id,ok:loaded&&img.naturalWidth>img.naturalHeight&&style.backgroundImage.includes(img.getAttribute('src'))&&body.scrollWidth<=body.clientWidth+1};
+    const ok=loaded&&img.naturalWidth>img.naturalHeight&&style.backgroundImage.includes(img.getAttribute('src'))&&body.scrollWidth<=body.clientWidth+1;
+    card.classList.remove('is-panorama-preview');return {id,ok};
   })));
   expect(audit.filter(a=>!a.ok)).toEqual([]);
   await page.evaluate(()=>document.fonts.ready);
   await cards.locator('img').evaluateAll(async imgs=>Promise.all(imgs.map(async img=>{img.loading='eager';await img.decode().catch(()=>{});})));
   // Keep groups small enough to review through the GitHub image viewer.
-  for(let i=0;i<18;i++)await expect(cards.nth(i)).toHaveScreenshot('endurance-pano-'+audit[i].id+'.png',{timeout:20000});
+  for(let i=0;i<18;i++){
+    const card=cards.nth(i);await card.evaluate(el=>el.classList.add('is-panorama-preview'));
+    await expect(card).toHaveScreenshot('endurance-pano-'+audit[i].id+'.png',{timeout:20000});
+    await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
+  }
 });
