@@ -3,6 +3,7 @@
 // énergie, Télémétrie, Carte. The feeds come from the team's room (server/live.mjs, through the relay when the site has
 // one), the same as the old page front/live-page.mjs; plugin 2.0 adds the car ten times a second (tm), its settings and
 // every car's tank. Raw numbers only, no advice.
+import {bindMapMarkers, moveMapMarkers} from './live-map-markers.mjs';
 import {COLORS} from '../shared/combos.mjs';
 import {addToPath, isRace, lapsLeft, median, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
 
@@ -618,11 +619,11 @@ function moveCars(feed, et, pos) {
     motion.cars.set(car.id, list);
   }
 }
-function placed(feed, car) {
+function placed(feed, car, now = performance.now()) {
   const motion = motions.get(feed.key), list = motion?.cars.get(car.id);
   if (!list?.length || still) return [car.x, car.z];
-  const quick = motion.quickAt && performance.now() - motion.quickAt < 3000;
-  const at = performance.now() / 1000 + motion.offset - (quick ? QUICK_DELAY : PLAYBACK_DELAY);
+  const quick = motion.quickAt && now - motion.quickAt < 3000;
+  const at = now / 1000 + motion.offset - (quick ? QUICK_DELAY : PLAYBACK_DELAY);
   const next = list.findIndex(item => item.et > at);
   if (next === -1) return [list.at(-1).x, list.at(-1).z];
   if (next === 0) return [list[0].x, list[0].z];
@@ -675,16 +676,8 @@ function map(feed) {
 
 function glide() {
   requestAnimationFrame(glide);
-  if (still || document.hidden || !frame || view.tab !== 'map') return;
-  const svg = app.querySelector('.pw-map');
-  if (!svg) return;
-  const {feed, minX, maxZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
-  for (const node of svg.querySelectorAll('[data-car]')) {
-    const car = field.get(Number(node.dataset.car));
-    if (!car) continue;
-    const [x, z] = placed(feed, car);
-    node.setAttribute('transform', `translate(${(30 + (x - minX) * k).toFixed(1)},${(30 + (maxZ - z) * k).toFixed(1)})`);
-  }
+  if (still || document.hidden || !frame?.svg || view.tab !== 'map') return;
+  moveMapMarkers(frame, placed, performance.now());
 }
 
 // ---------- The page ----------
@@ -692,6 +685,7 @@ function glide() {
 const PANELS = {board, chrono, car, tele, map};
 function render() {
   if (!view.started) return;
+  frame = null;
   const feed = current();
   if (!feed) {
     app.innerHTML = `${header(null)}<div class="pw-card pw-empty"><h1>Personne ne roule en ce moment</h1>
@@ -700,6 +694,7 @@ function render() {
   }
   const scroll = window.scrollY;
   app.innerHTML = `${header(feed)}${driverCard(feed)}${carsStrip()}${tabs()}<div class="pw-panel-wrap pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</div>`;
+  if (frame) bindMapMarkers(frame, app.querySelector('.pw-map'));
   if (scroll) window.scrollTo(0, scroll);
   if (view.tab === 'tele') drawCurves(feed);
   if (view.tab === 'map') fitMap();
