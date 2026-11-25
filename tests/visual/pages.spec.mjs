@@ -104,6 +104,13 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
   expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
   expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
+  expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
+  expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
+  const mapImage=map.locator('img'),picture=await mapImage.boundingBox();
+  expect(picture.x).toBeGreaterThan(m.x+3);
+  expect(picture.x+picture.width).toBeLessThan(m.x+m.width-3);
+  expect(Math.abs(picture.x+picture.width/2-m.x-m.width/2)).toBeLessThan(5);
+  expect(Math.abs(picture.y+picture.height/2-m.y-m.height/2)).toBeLessThan(5);
   const [date,title]=await Promise.all([header.locator('.endurance-detail-meta').boundingBox(),header.locator('.event-title').boundingBox()]);
   expect(Math.abs(date.x-title.x)).toBeLessThanOrEqual(2);
   expect(title.y).toBeGreaterThanOrEqual(date.y+date.height-1);
@@ -114,4 +121,47 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   await page.evaluate(()=>document.fonts.ready);
   await map.locator('img').evaluate(async img=>{img.loading='eager';await img.decode();});
   await expect(header).toHaveScreenshot('endurance-detail-'+game+'.png');
+});
+
+/* A visual contact sheet of every circuit in each simulator, using the real
+   detailed-header map styles and original image sources (no mock drawings). */
+for(const game of ['lmu','iracing'])test('endurance-circuit-catalog-'+game,async({page},testInfo)=>{
+  test.setTimeout(120000);
+  await mockSite(page);
+  const race=game==='lmu'?SPA:SEBRING;
+  await page.goto('/'+game+'/#event='+race.id);
+  const header=page.locator('.race-header.is-endurance-detail');
+  await expect(header).toBeVisible();
+  const mapSize=await header.locator('.circuit-visual').boundingBox();
+  const count=await page.evaluate(async({game,mapWidth,mapHeight})=>{
+    const {GAME_CATALOGS}=await import('/shared/catalog.mjs');
+    const {circuitVisual}=await import('/front/app/core.mjs');
+    const circuits=GAME_CATALOGS[game].circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd'));
+    const app=document.querySelector('#app'),sheet=document.createElement('div');
+    sheet.id='circuit-audit-sheet';
+    sheet.style.cssText='display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;background:#101619;padding:4px;box-sizing:border-box;width:100%';
+    for(const circuit of circuits){
+      const item=document.createElement('section');item.className='race-header is-endurance-detail';
+      item.style.cssText='min-width:0;overflow:hidden';
+      const label=document.createElement('div');label.textContent=circuit.id;label.style.cssText='font-size:10px;line-height:14px;overflow-wrap:anywhere;padding:3px;color:#fff';
+      const hero=document.createElement('div');hero.className='endurance-detail-hero';
+      hero.style.cssText='display:block;height:'+Math.round(mapHeight*Math.min(1, (innerWidth/3-12)/mapWidth))+'px;width:100%';
+      hero.innerHTML=circuitVisual(circuit.id);
+      item.append(label,hero);sheet.append(item);
+    }
+    app.replaceChildren(sheet);
+    return circuits.length;
+  },{game,mapWidth:mapSize.width,mapHeight:mapSize.height});
+  const images=page.locator('#circuit-audit-sheet img');
+  await expect(images).toHaveCount(count);
+  const audit=await images.evaluateAll(async imgs=>Promise.all(imgs.map(async img=>{
+    img.loading='eager';
+    try{await img.decode();}catch{return {id:img.dataset.circuit,loaded:false};}
+    const m=img.parentElement.getBoundingClientRect(),p=img.getBoundingClientRect();
+    return {id:img.dataset.circuit,loaded:true,inside:p.left>=m.left+3&&p.right<=m.right-3&&p.top>=m.top+3&&p.bottom<=m.bottom-3,
+      centered:Math.abs(p.x+p.width/2-m.x-m.width/2)<8&&Math.abs(p.y+p.height/2-m.y-m.height/2)<8};
+  })));
+  expect(audit.filter(a=>!a.loaded||!a.inside||!a.centered)).toEqual([]);
+  console.log(game+' : '+count+' circuits chargés et cadrés ('+testInfo.project.name+')');
+  await expect(page.locator('#circuit-audit-sheet')).toHaveScreenshot('endurance-circuit-catalog-'+game+'.png',{timeout:20000});
 });
