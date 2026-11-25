@@ -229,3 +229,63 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-s
     height: clamp(126px,37vw,150px); min-height: 0; max-height: none;
   }
 }
+
+/* Detailed endurance: the same two local photos and caption, with the existing
+   circuit map over the dark right side. Solo/stream headers are untouched. */
+html[data-game] #app .race-header.is-endurance-detail {
+  display: grid; grid-template-columns: minmax(0,1fr); gap: 0; padding: 0 !important;
+  border: 1px solid color-mix(in srgb,var(--endurance-color) 55%,var(--em-border));
+  border-radius: var(--em-radius-lg); overflow: hidden; background: var(--em-panel-2);
+}
+.endurance-detail-hero { position: relative; isolation: isolate; min-width: 0; }
+.endurance-detail-hero > .endurance-card-head {
+  min-height: 0; height: clamp(184px,26vw,255px);
+  border-bottom: 2px solid var(--endurance-color); border-radius: 0; background: #111719;
+}
+.endurance-detail-hero > .endurance-card-head::before {
+  background-image: linear-gradient(90deg,transparent 27%,rgba(17,23,25,.30) 57%,#111719 82%),var(--endurance-photo);
+  background-size: 100% 100%, 80% auto; background-position: center,left 48%;
+  background-repeat: no-repeat;
+}
+.endurance-detail-hero > .endurance-card-head > .endurance-card-caption {
+  z-index: 2; padding: 10px 14px; background: rgba(9,14,20,.84);
+}
+.endurance-detail-hero .endurance-card-caption .endurance-card-brand { font-size: 16px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 11px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 16px; }
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual {
+  position: absolute !important; z-index: 1; top: 12px; right: 12px; bottom: 48px; left: auto;
+  display: flex; align-items: center; justify-content: center; width: 34% !important;
+  height: auto !important; min-width: 0 !important; min-height: 0 !important; max-width: none;
+  margin: 0 !important; padding: 0; background: none; border: 0; transform: none !important;
+}
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual img {
+  width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%;
+  object-fit: contain; transform: none !important;
+}
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content {
+  display: block; padding: 15px 18px; min-width: 0;
+  border-left: 3px solid var(--endurance-color);
+}
+html[data-game] #app .race-header.is-endurance-detail .race-head { gap: 8px; }
+html[data-game] #app .race-header.is-endurance-detail .race-head > .race-date {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start;
+  width: auto !important; min-width: 0; height: auto; gap: 4px; padding: 0 !important; margin: 0;
+  border: 0; border-radius: 0; background: none; align-self: flex-start;
+}
+html[data-game] #app .race-header.is-endurance-detail .race-date strong { font-size: 14px; }
+html[data-game] #app .race-header.is-endurance-detail .race-date small { font-size: 13px; }
+html[data-game] #app .race-header.is-endurance-detail .event-title {
+  border: 0; padding: 0; overflow-wrap: anywhere;
+}
+html[data-game] #app .race-header.is-endurance-detail .race-info-chips { margin-top: 5px; }
+@media (max-width:760px) {
+  .endurance-detail-hero > .endurance-card-head { height: clamp(166px,46vw,220px); }
+  .endurance-detail-hero > .endurance-card-head::before { background-size: 100% 100%, auto 112%; }
+  .endurance-detail-hero > .endurance-card-head > .endurance-card-caption { padding: 7px 12px; }
+  .endurance-detail-hero .endurance-card-caption .endurance-card-brand,
+  .endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 14px; }
+  .endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 9px; }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { bottom: 38px; }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content { padding: 13px 12px; }
+}

@@ -86,3 +86,25 @@ test('endurance-list-lmu',async({page})=>{
   await settle(page);
   await expect(page.locator('#app')).toHaveScreenshot('endurance-list-lmu.png');
 });
+
+for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=>{
+  await mockSite(page);
+  const race=game==='lmu'?{...SPA,name:'Chdf',circuit:'cota',eventType:'special',details:{trackLimits:'strict',tyres:25,grid:55,fairShare:false}}:{...SEBRING,official:true,durationMinutes:120,durationHours:2};
+  await page.route('**/api/races?**',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({events:[race]})}));
+  await page.goto('/'+game+'/#event='+race.id);
+  const header=page.locator('.race-header.is-endurance-detail');
+  await expect(header).toContainText(race.name);
+  await expect(header.locator('.endurance-card-duration')).toHaveText(game==='lmu'?'6H':'2H');
+  const hero=header.locator('.endurance-detail-hero'),art=hero.locator('.endurance-card-head'),map=hero.locator('.circuit-visual'),caption=hero.locator('.endurance-card-caption');
+  await expect(map).toBeVisible();
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+game+'.webp');
+  const [a,m,c]=await Promise.all([art.boundingBox(),map.boundingBox(),caption.boundingBox()]);
+  expect(m.x).toBeGreaterThan(a.x+a.width/2);
+  expect(m.y+m.height).toBeLessThanOrEqual(c.y+1);
+  expect(await header.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  // Only the hero's map needs to settle here. Lazy crew images further down
+  // the page are outside this snapshot and may never start loading.
+  await page.evaluate(()=>document.fonts.ready);
+  await map.locator('img').evaluate(async img=>{img.loading='eager';await img.decode();});
+  await expect(header).toHaveScreenshot('endurance-detail-'+game+'.png');
+});
