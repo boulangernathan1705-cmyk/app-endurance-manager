@@ -1,0 +1,46 @@
+name: LMU public image URL review
+on:
+  push:
+    branches: [temp/lmu-thumbnail-recovery]
+    paths: [.github/workflows/temp-lmu-public-images.yml]
+permissions: {}
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check a bounded list of public image URLs
+        run: |
+          mkdir -p review
+          python3 - <<'PY'
+          import urllib.request, urllib.error, pathlib, time
+          groups={"paul-ricard":["4-hours-of-castellet-paul-ricard-circuit"],"portimao":["6-hours-of-portimao-algarve-international-circuit"],"bahrain":["8-hours-of-bahrain-bahrain-international-circuit"],"monza":["6-hours-of-monza-autodromo-nazionale-monza"],"spa":["6-hours-of-spa-francorchamps-circuit-de-spa-francorchamps","6-hours-of-spa-circuit-de-spa-francorchamps","6-hours-of-spa-francorchamps-spa-francorchamps"],"le-mans":["24-hours-of-le-mans-circuit-de-la-sarthe","24-hours-of-le-mans-circuit-des-24-heures-du-mans","24-hours-of-le-mans-le-mans"],"fuji":["6-hours-of-fuji-fuji-speedway","6-hours-of-fuji-fuji-international-speedway"],"sebring":["1000-miles-of-sebring-sebring-international-raceway","12-hours-of-sebring-sebring-international-raceway"],"imola":["6-hours-of-imola-autodromo-enzo-e-dino-ferrari","6-hours-of-imola-imola-circuit"],"interlagos":["6-hours-of-sao-paulo-autodromo-jose-carlos-pace","6-hours-of-sao-paulo-interlagos-circuit","6-hours-of-sao-paulo-autodromo-de-interlagos"],"cota":["lone-star-le-mans-circuit-of-the-americas","6-hours-of-cota-circuit-of-the-americas","6-hours-of-austin-circuit-of-the-americas"],"lusail":["qatar-1812-km-lusail-international-circuit","qatar-1812km-lusail-international-circuit","qatar-1812-km-losail-international-circuit"],"silverstone":["4-hours-of-silverstone-silverstone-circuit","6-hours-of-silverstone-silverstone-circuit"],"barcelona":["4-hours-of-barcelona-circuit-de-barcelona-catalunya","4-hours-of-barcelona-circuit-de-catalunya","4-hours-of-barcelona-barcelona-catalunya-circuit"],"daytona":["24-hours-of-daytona-daytona-international-speedway","rolex-24-at-daytona-daytona-international-speedway","rolex-24-daytona-international-speedway"],"laguna-seca":["monterey-sports-car-championship-weathertech-raceway-laguna-seca","laguna-seca-weathertech-raceway-laguna-seca","4-hours-of-laguna-seca-weathertech-raceway-laguna-seca"],"road-atlanta":["petit-le-mans-michelin-raceway-road-atlanta","10-hours-of-road-atlanta-michelin-raceway-road-atlanta","petit-le-mans-road-atlanta"],"long-beach":["grand-prix-of-long-beach-streets-of-long-beach","long-beach-grand-prix-long-beach-street-circuit","grand-prix-of-long-beach-long-beach-street-circuit"]}
+          report=[]
+          for name,slugs in groups.items():
+              for slug in slugs:
+                  url='https://assets.lmu-assister.com/tracks/backgrounds/'+slug+'.webp'
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}),timeout=8) as r:
+                          data=r.read(20_000_001)
+                      if len(data)>20_000_000 or data[:4]!=b'RIFF' or data[8:12]!=b'WEBP':
+                          raise ValueError('not a WebP image')
+                      pathlib.Path('review',name+'.webp').write_bytes(data)
+                      report.append('OK '+name+' '+str(len(data))+' '+url)
+                      break
+                  except urllib.error.HTTPError as e:
+                      report.append('MISS '+name+' '+str(e.code)+' '+url)
+                      if e.code in (401,403,429):
+                          break
+                  except Exception as e:
+                      report.append('MISS '+name+' '+str(e)+' '+url)
+                  time.sleep(0.25)
+              else:
+                  report.append('NOT FOUND '+name)
+          pathlib.Path('review/report.txt').write_text('\n'.join(report))
+          print('\n'.join(report))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lmu-assister-circuit-backgrounds
+          path: review/
+          retention-days: 1
