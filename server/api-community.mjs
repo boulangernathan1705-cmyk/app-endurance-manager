@@ -6,7 +6,7 @@ import {
   discordRequest, botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap,
   saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, checkBotRights, missingRights, RECAP_BOT_PERMISSIONS
 } from './recap-discord.mjs';
-import {siteOf} from './discord-weekly.mjs';
+import {siteOf} from './discord-weekly-snapshot.mjs';
 import {announceStream, sendAnnouncementPreview} from './discord-announce.mjs';
 import {HttpError, fail, now, json, administrators, body, rateLimit, text} from './core.mjs';
 import {TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';

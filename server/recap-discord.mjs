@@ -5,7 +5,7 @@ import {administrators} from './core.mjs';
 import {notify} from './notifications.mjs';
 import {communityAdmins} from './access.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
-import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
+import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly-snapshot.mjs';
 import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES, nextStartsRecap} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
