@@ -1,7 +1,7 @@
 import {helpContext} from '../context-help.mjs';
 import {api,reportClientError} from './api-client.mjs';
 import {createRaceService} from './race-service.mjs';
-import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from '../../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent, catalogForGame} from '../../shared/catalog.mjs';
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
@@ -97,7 +97,9 @@ export function pilotCount(registrations) { return new Set(registrations.filter(
 export function circuitInfo(id) { return CIRCUITS.find(circuit => circuit.id === id) || null; }
 export function circuitLabel(id) { return circuitInfo(id)?.name || 'Circuit à préciser'; }
 export function circuitVisual(id, compact = false) {
-  const circuit = circuitInfo(id); if (!circuit) return '';
+  // The weekly dashboard includes races from both simulators, regardless of the active game.
+  const circuit = circuitInfo(id) || catalogForGame(gameForEvent({circuit:id})).circuits.find(item=>item.id===id);
+  if (!circuit) return '';
   const map = circuitMapConfig(id);
   const src = map ? circuitMapSource(map.file) : `/images/circuits/${circuit.file}`;
   const attrs = map ? ` data-circuit-source="commons" data-circuit-map="${esc(map.key)}" style="--circuit-scale:${map.scale};--circuit-x:${map.x}%;--circuit-y:${map.y}%;--circuit-mobile-scale:${map.mobileScale};--circuit-mobile-x:${map.mobileX}%;--circuit-mobile-y:${map.mobileY}%"` : '';

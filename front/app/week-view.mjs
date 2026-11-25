@@ -1,4 +1,4 @@
-import {enduranceHeader, enduranceSim, endurancePanoramaClass} from '../endurance-card.mjs';
+import {enduranceHeader, enduranceSim, endurancePreviewClass} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
@@ -154,7 +154,7 @@ function block(item,now){
   // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
   // championship endurances. Other races keep their simulator's colour.
   const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
-  const panorama=solo?'':endurancePanoramaClass(event,enduSim);
+  const panorama=solo?'':endurancePreviewClass(event,enduSim);
   const cls=`week-block is-${kind.key}${sim2}${panorama}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
@@ -167,11 +167,11 @@ function block(item,now){
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${!solo?enduranceHeader(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceHeader(event,enduSim,`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${solo?plan.band:''}
     <span class="week-block-body">
-    <span class="week-block-title">${panorama?`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`:''}
+    <span class="week-block-title">
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:''}
     <span class="week-block-name">${esc(event.name)}</span>
