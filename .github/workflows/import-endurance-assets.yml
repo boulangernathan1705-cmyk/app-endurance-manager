@@ -16,7 +16,7 @@ jobs:
           set -eu
           mkdir -p images/endurance
           curl --fail --location --max-time 25 --retry 1 -o /tmp/lmu.png 'https://lemansultimate.com/wp-content/uploads/2024/02/Toyota-GR010-1.png'
-          curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://cf.boxthislap.org/app/uploads/2023/12/ir_GT3_daytona-696x391.webp' || curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://boxthislap.org/app/uploads/2023/12/ir_GT3_daytona.webp'
+          curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://i0.wp.com/boxthislap.org/app/uploads/2023/12/ir_GT3_daytona.webp?fit=900%2C506&ssl=1' || curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://www.apexracingleague.com/wp-content/uploads/2025/06/Daytona-Jacopo-Rampazzo-1-scaled.jpg'
           python -m pip install 'Pillow==11.3.0'
           python - <<'PY'
           from PIL import Image, ImageOps
