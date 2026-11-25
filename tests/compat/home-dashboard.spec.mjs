@@ -43,7 +43,8 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
    try {await image.decode();return image.naturalWidth>=400;} catch {return false;}
   },sim)).toBe(true);
   if(width===390){
-   if(sim==='lmu')expect(await caption.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('linear-gradient');
+   expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
+   expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
    const a=await art.boundingBox(),b=await card.locator('.week-block-body').boundingBox();
    expect(a.x+a.width).toBeLessThanOrEqual(b.x+1);
    expect(b.width).toBeGreaterThan(150);

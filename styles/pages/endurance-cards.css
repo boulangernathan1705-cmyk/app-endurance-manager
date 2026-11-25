@@ -65,9 +65,9 @@
   .week-block.is-endurance > .endurance-card-head {
     grid-column: 1; grid-row: 1; align-self: stretch; justify-content: flex-end; flex-direction: column; align-items: flex-start;
     min-height: 92px; padding: 8px 12px 9px 7px; border: 0;
-    background: var(--endurance-color); clip-path: polygon(0 0,100% 0,90% 100%,0 100%);
+    --endurance-cut: 10%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
   }
-  .week-block.is-endurance > .endurance-card-head::before { clip-path: polygon(0 0,98% 0,88% 100%,0 100%); }
+
   .week-block.is-endurance .week-block-body { grid-column: 2; grid-row: 1; align-content: center; padding: 8px 8px 8px 3px; }
   .week-block.is-endurance .endurance-card-brand { font-size: clamp(15px, 5vw, 23px); }
   .week-block.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
@@ -103,10 +103,7 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
   flex: 0 0 clamp(82px, 25%, 112px); width: auto; min-width: 0; min-height: 90px; margin: 0;
   align-items: flex-start; justify-content: flex-end; flex-direction: column;
   padding: 8px 12px 8px 8px; border: 0; border-radius: 5px 0 0 5px;
-  background: var(--endurance-color); clip-path: polygon(0 0,100% 0,91% 100%,0 100%);
-}
-html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head::before {
-  clip-path: polygon(0 0,98% 0,89% 100%,0 100%);
+  --endurance-cut: 9%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
 }
 html[data-game] #app button.race-card.is-endurance .endurance-card-brand { font-size: clamp(16px, 4.5vw, 20px); }
 html[data-game] #app button.race-card.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
@@ -151,7 +148,7 @@ html[data-game] #app button.race-card.is-endurance .race-head > .race-date small
 .endurance-card-caption {
   position: relative; display: flex; align-items: center; justify-content: space-between;
   gap: 3px; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 6px;
-  background: rgba(9,14,20,.91);
+  background: rgba(9,14,20,.78);
 }
 .endurance-card-caption .endurance-card-label {
   display: flex; flex-direction: row; justify-content: flex-start; flex-wrap: wrap;
@@ -176,19 +173,11 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
 html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 11px; }
 html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 7px; }
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption {
-  padding-right: 14%; background: transparent; isolation: isolate;
-}
-html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(9,14,20,.91);
-  clip-path: polygon(0 0,90% 0,89% 100%,0 100%);
+  padding-right: 14%;
 }
 @media (max-width: 760px) {
   .week-block.is-endurance > .endurance-card-head { padding: 0; align-items: stretch; }
-  .week-block.is-endurance .endurance-card-caption { padding-right: 15%; background: transparent; isolation: isolate; }
-  .week-block.is-endurance .endurance-card-caption::before {
-    content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(9,14,20,.91);
-    clip-path: polygon(0 0,89% 0,88% 100%,0 100%);
-  }
+  .week-block.is-endurance .endurance-card-caption { padding-right: 15%; }
 }
 .cal-cell.is-endurance .endurance-card-head { padding: 2px 4px; }
 .cal-cell.is-endurance .endurance-card-caption { padding: 0; background: none; }
@@ -201,15 +190,6 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-c
    iRacing's approved home artwork remains untouched. */
 .week-block.is-endurance.is-lmu > .endurance-card-head {
   --endurance-focus: 49% 58%;
-}
-.week-block.is-endurance.is-lmu .endurance-card-caption {
-  background: rgba(9,14,20,.62);
-}
-@media (max-width: 760px) {
-  .week-block.is-endurance.is-lmu .endurance-card-caption { background: transparent; }
-  .week-block.is-endurance.is-lmu .endurance-card-caption::before {
-    background: linear-gradient(0deg,rgba(9,14,20,.85),rgba(9,14,20,.44));
-  }
 }
 
 /* The list has one common artwork size per viewport, regardless of simulator,
@@ -244,20 +224,14 @@ html[data-game] #app .race-header.is-endurance-detail {
 }
 .endurance-detail-hero > .endurance-card-head {
   grid-column: 1; grid-row: 1; height: 100%; min-height: 0; border: 0; border-radius: 0;
-  background: var(--endurance-color); clip-path: polygon(0 0,100% 0,88% 100%,0 100%);
+  --endurance-cut: 12%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
 }
 .endurance-detail-hero > .endurance-card-head::before {
   background-image: var(--endurance-photo);
   background-size: cover; background-position: center 52%; background-repeat: no-repeat;
-  clip-path: polygon(0 0,calc(100% - 2px) 0,calc(88% - 2px) 100%,0 100%);
 }
 .endurance-detail-hero > .endurance-card-head > .endurance-card-caption {
-  padding: 7px calc(12% + 10px) 7px 12px; background: transparent; isolation: isolate;
-}
-.endurance-detail-hero > .endurance-card-head > .endurance-card-caption::before {
-  content: ""; position: absolute; inset: 0; z-index: -1;
-  background: rgba(9,14,20,.81);
-  clip-path: polygon(0 0,calc(100% - 2px) 0,calc(88% - 2px) 100%,0 100%);
+  padding: 7px calc(12% + 10px) 7px 12px;
 }
 .endurance-detail-hero .endurance-card-caption .endurance-card-brand { font-size: 15px; }
 .endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 10px; }
@@ -266,16 +240,17 @@ html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .
   grid-column: 2; grid-row: 1; position: static !important; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; width: 100% !important;
   height: 100% !important; min-width: 0 !important; min-height: 0 !important; max-width: none;
-  margin: 0 !important; padding: 12px 10px 12px 2px; background: none; border: 0; transform: none !important;
+  margin: 0 !important; padding: 10px; background: none; border: 0; transform: none !important;
 }
 html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual img {
+  position: static !important; inset: auto !important; flex: none;
   width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%;
-  object-fit: contain; transform: none !important;
+  margin: 0 !important; object-fit: contain; object-position: center;
+  transform: translate(var(--circuit-x,0%),var(--circuit-y,0%)) scale(var(--circuit-scale,.9)) !important;
 }
 .endurance-detail-hero:not(:has(> .circuit-visual)) { grid-template-columns: minmax(0,1fr); }
-.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head,
-.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head::before,
-.endurance-detail-hero:not(:has(> .circuit-visual)) .endurance-card-caption::before { clip-path: none; }
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head { clip-path: none; --endurance-cut: 0%; }
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head::after { display: none; }
 .endurance-detail-hero:not(:has(> .circuit-visual)) .endurance-card-caption { padding-right: 12px; }
 html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content {
   display: block; padding: 12px 16px; min-width: 0; border: 0;
@@ -307,4 +282,21 @@ html[data-game] #app .race-header.is-endurance-detail .race-info-chips {
   .endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 9px; }
   html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content { padding: 10px 12px 12px; }
   html[data-game] #app .race-header.is-endurance-detail .race-badges > * { font-size: 9px; }
+}
+
+/* One clipping plane for the photo and the complete caption. Draw the thin
+   accent above both layers so no translucent wedge appears next to duration. */
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head::after,
+.endurance-detail-hero > .endurance-card-head::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: var(--endurance-color);
+  clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
+}
+@media (max-width:760px) {
+  .week-block.is-endurance > .endurance-card-head::after {
+    content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background: var(--endurance-color);
+    clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
+  }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { padding: 7px; }
 }
