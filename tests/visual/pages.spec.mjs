@@ -102,6 +102,9 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   expect(m.x).toBeGreaterThan(a.x+a.width/2);
   expect(m.y+m.height).toBeLessThanOrEqual(c.y+1);
   expect(await header.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-  await settle(page);
+  // Only the hero's map needs to settle here. Lazy crew images further down
+  // the page are outside this snapshot and may never start loading.
+  await page.evaluate(()=>document.fonts.ready);
+  await map.locator('img').evaluate(async img=>{img.loading='eager';await img.decode();});
   await expect(header).toHaveScreenshot('endurance-detail-'+game+'.png');
 });
