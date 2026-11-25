@@ -4,12 +4,14 @@ import {test,expect} from '@playwright/test';
 for(const width of [1440,390])test(`the home shows the week and the next race at ${width}px`,async({page})=>{
  await page.setViewportSize({width,height:1000});
  // Both starts in a few minutes: always in this week.
- const now=Date.now(),soon=now+5*60000;
+ const now=Date.parse('2030-11-06T09:00:00Z'),soon=now+5*60000;
+ await page.clock.setFixedTime(now);
  const reg={id:'reg-1',participantId:'pilot',name:'Nathan',mine:true,category:'Hypercar',status:'whole',cars:[],carAny:true};
  const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'special',capacity:30,categories:['Hypercar'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:'15:00',startsAt,availability,crews}]});
  const lmu=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',soon,[reg],[{id:'crew',name:'Apex Racing',category:'Hypercar',registrationIds:['reg-1']}]);
  const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+60000);
+ lmu.departures.push({...lmu.departures[0],id:'second-start',startsAt:soon+2*60000,time:'10:07',availability:[],crews:[]});
  await page.route('**/api/**',route=>{
   const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
   if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance'],community:{id:'test',slug:'test',name:'Test',appearance:{}},communities:[]};
@@ -66,7 +68,8 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await expect(page.locator('.week-grid')).not.toContainText('fin ');
  await expect(page.locator('.week-block.is-endurance .week-plan-row em')).toHaveCount(0);
  await expect(page.locator('.week-block.is-endurance .week-plan-time i')).toHaveCount(0);
- await expect(page.locator('.week-block.is-endurance .week-plan-time b')).toHaveCount(2);
+ await expect(page.locator('.week-block.is-endurance .week-plan-time b')).toHaveCount(3);
+ await expect(page.locator('.week-block.is-lmu .week-plan-row')).toHaveCount(2);
  await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
