@@ -64,6 +64,9 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await expect(page.locator('.week-block').filter({hasText:'Production Endurance Challenge'})).toContainText(/iRacing[\s\S]*Sebring International Raceway/);
  // No end time on the cards (Nathan 2026-11-01): the circuit instead.
  await expect(page.locator('.week-grid')).not.toContainText('fin ');
+ await expect(page.locator('.week-block.is-endurance .week-plan-row em')).toHaveCount(0);
+ await expect(page.locator('.week-block.is-endurance .week-plan-time i')).toHaveCount(0);
+ await expect(page.locator('.week-block.is-endurance .week-plan-time b')).toHaveCount(2);
  await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
