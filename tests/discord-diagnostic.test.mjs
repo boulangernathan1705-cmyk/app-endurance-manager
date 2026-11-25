@@ -90,3 +90,42 @@ test('platform supervision refuses community administrators who are not platform
   assert.equal(response.status,200);
   assert.ok((await response.json()).communities.some(row=>row.slug==='test'));
 });
+
+test('closed thread verification queries only the tracked Discord thread and distinguishes its state',async t=>{
+  const env={...setup(),DISCORD_BOT_TOKEN:'test-bot'};
+  const id='600000000000000001';
+  env.DB.db.prepare("UPDATE discord_recap_publications SET channel_id=?,closed_at=?,in_thread=1 WHERE event_id='e1'").run(id,NOW);
+  const calls=[];
+  let answer;
+  t.mock.method(globalThis,'fetch',async (url,options)=>{
+    calls.push([url,options.method]);
+    return Response.json(answer.data,{status:answer.status});
+  });
+  const path='/api/platform/discord/supervision/thread';
+  const check=(query='community=test&event=e1',manager=true)=>platformApi({
+    path,method:'GET',request:new Request('https://site.test'+path+'?'+query),env,actor:{manager}
+  });
+  const summary=await discordSupervision(env,NOW);
+  assert.deepEqual(summary.communities[0].closedThreads,[{eventId:'e1',name:'6h de Spa',closedAt:NOW}]);
+  assert.equal(calls.length,0);
+  await assert.rejects(check(undefined,false),error=>error.status===403);
+  await assert.rejects(check('community=other&event=e1'),error=>error.status===404);
+  await assert.rejects(check('community=test&event=e3'),error=>error.status===404);
+  assert.equal(calls.length,0);
+  const original=env.DB.prepare.bind(env.DB);
+  env.DB.prepare=sql=>{assert.match(sql.trim(),/^SELECT/i);return original(sql);};
+  const thread={id,guild_id:GUILD,type:11};
+  const cases=[
+    [200,{...thread,thread_metadata:{archived:true}},'archived'],
+    [200,{...thread,thread_metadata:{archived:false}},'active'],
+    [404,{code:10003},'missing'],
+    [404,{code:50001},'forbidden'],
+    [403,{code:50013},'forbidden'],
+    [500,{},'unavailable']
+  ];
+  for(const [status,data,state] of cases){
+    answer={status,data};
+    assert.deepEqual(await (await check()).json(),{state});
+  }
+  assert.deepEqual(calls,Array.from({length:cases.length},()=>['https://discord.com/api/v10/channels/'+id,'GET']));
+});

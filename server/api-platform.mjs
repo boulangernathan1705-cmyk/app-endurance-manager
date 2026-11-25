@@ -7,12 +7,21 @@ import {discordGuild} from './access.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 import {botInvite} from './api-community.mjs';
-import {discordSupervision} from './discord-supervision.mjs';
+import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     return json(await discordSupervision(env));
+  }
+  if (path === '/api/platform/discord/supervision/thread' && method === 'GET') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const params = new URL(request.url).searchParams;
+    const slug = params.get('community'), eventId = params.get('event');
+    if (!slug || !eventId) fail(400, 'Choisis une communauté et un fil.');
+    const result = await checkClosedDiscordThread(env, slug, eventId);
+    if (!result) fail(404, 'Fil fermé introuvable dans le suivi de cette communauté.');
+    return json(result);
   }
   // Platform managers: the communities, and a new one (its admins then set it up on its « Mise en place » page).
   // Showcase of the main address: its data replaced by fictional races, crews and pilots (server/demo.mjs).
