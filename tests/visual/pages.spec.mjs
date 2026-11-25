@@ -74,3 +74,15 @@ test('endurance-list',async({page})=>{
   await settle(page);
   await expect(page.locator('#app')).toHaveScreenshot('endurance-list.png');
 });
+
+test('endurance-list-lmu',async({page})=>{
+  await mockSite(page);
+  await page.route('**/api/races?**',route=>{
+    const event={...SPA,name:'Chdf',circuit:'cota',official:false,eventType:'special',departures:[{...SPA.departures[0],availability:[],crews:[]}]};
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({events:[event]})});
+  });
+  await page.goto('/lmu/');
+  await expect(page.locator('button.race-card.is-endurance')).toContainText('Chdf');
+  await settle(page);
+  await expect(page.locator('#app')).toHaveScreenshot('endurance-list-lmu.png');
+});
