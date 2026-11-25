@@ -9,6 +9,8 @@ Endurances LMU et iRacing. Répondre à Nathan en français.
 
 ## Point de départ par domaine
 
+Les dépendances, contrats et tests ciblés sont dans la [cartographie de l’architecture](docs/ARCHITECTURE.md).
+
 | Domaine | À lire en premier | Tests à cibler |
 | --- | --- | --- |
 | Sessions, droits et courses | `server/worker.mjs`, `server/access.mjs`, `docs/DISCORD_ROLES.md` | `access`, `communities`, `event-refresh` |
