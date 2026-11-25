@@ -24,6 +24,7 @@ export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=fa
   // Pending: a change on the site (dirty), an old calendar format, or a community not looked at since the week turned
   // (Monday 7h30, Paris): its calendar, week messages and finished race threads change with the time alone, not with a
   // change on the site, so they would otherwise wait for its hourly turn (up to 4 hours with 4 communities, 2026-11-02).
+  // The calendar predicates match the partial index added by migration 0103.
   const statement=env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? `WHERE last_error IS NULL AND (dirty=1 OR (enabled=1 AND checked_at<?) OR (enabled=1 AND EXISTS (SELECT 1 FROM discord_recap_publications p WHERE p.community_id=community_recap_settings.community_id AND p.closed_at IS NULL AND p.event_id LIKE 'week:calendar%' AND p.message_id IS NOT NULL AND p.content_hash NOT LIKE '${CALENDAR_FORMAT}%')))` : ''} ORDER BY checked_at,community_id`);
   const rows=(await (pending ? statement.bind(lastWeekTurn(timestamp)) : statement).all()).results || [];
   if (!rows.length) return 0;
