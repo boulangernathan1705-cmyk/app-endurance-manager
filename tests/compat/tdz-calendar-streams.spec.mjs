@@ -47,7 +47,8 @@ for(const width of [1440,390])test(`EVENT TDZ month: streamed endurances, one st
   // The stream announced during the streamed start is that start's; the endurance nobody streams stays in Endurance.
   await expect(page.locator('.cal')).not.toContainText('Stream du Nurburgring');
   await expect(page.locator('.cal')).not.toContainText('6h de Spa');
-  await grid.locator(`[data-day="${month}-08"]:visible`).last().click();
+  // The day number selects the day; clicking an event itself opens that race.
+  await grid.locator(`${width>700?".cal-num":".cal-tap"}[data-day="${month}-08"]`).click();
   await expect(page.locator('.cal-side')).toContainText('Stream 13h30 · départ 14h · Équipage 01 · La Praline · Paul');
   if(info.project.name.startsWith('chromium'))await page.screenshot({path:test.info().outputPath(`calendrier-${width}.png`),fullPage:true});
   await page.getByRole('button',{name:'📺 Streams'}).click();

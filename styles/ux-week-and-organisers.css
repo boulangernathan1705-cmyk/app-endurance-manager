@@ -401,6 +401,7 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .week-block.is-endurance.is-lmu { --endurance-color: var(--em-kind-lmu); }
 .week-block.is-endurance.is-iracing { --endurance-color: var(--em-kind-iracing); }
 .week-block.is-endurance::before { display: none; }
+.week-block.is-endurance .week-block-band { display: none; }
 .week-block.is-endurance:hover { background: color-mix(in srgb, var(--endurance-color) 6%, var(--em-panel-2)); }
 .week-block.is-endurance .week-block-body { display: grid; gap: var(--em-space-1); padding: var(--em-space-2); }
 .week-block.is-endurance .week-block-title { display: grid; grid-column: auto; grid-row: auto; gap: 2px; }
