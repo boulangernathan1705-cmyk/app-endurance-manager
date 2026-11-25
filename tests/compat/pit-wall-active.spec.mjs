@@ -60,3 +60,26 @@ for (const [url, svg, fast] of frames) {
     }
   });
 }
+
+test('live updates refresh data without replacing the focused tab', async ({page}) => {
+  await page.route('**/api/**', route => route.fulfill({json:{}}));
+  let socket;
+  await page.routeWebSocket('**/api/combos/live', route => { socket = route; });
+  await page.goto('/mur.html');
+  await expect.poll(() => Boolean(socket)).toBe(true);
+  const now = await page.evaluate(() => Date.now());
+  const feed = snapshot(now);
+  const send = () => socket.send(JSON.stringify({type:'feed', now, feed}));
+  send();
+
+  const tab = page.locator('button[data-tab="board"]');
+  await expect(tab).toBeVisible();
+  await tab.focus();
+  const original = await tab.elementHandle();
+
+  feed.snap.me.driver = 'Relève test';
+  send();
+  await expect(page.locator('.pw-who b')).toHaveText('Relève test');
+  expect(await original.evaluate(node => node.isConnected)).toBe(true);
+  await expect(tab).toBeFocused();
+});
