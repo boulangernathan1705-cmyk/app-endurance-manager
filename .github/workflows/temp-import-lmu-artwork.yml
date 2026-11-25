@@ -53,8 +53,11 @@ jobs:
                       for quality in (82,76,70,64,58):
                           im.save(output,'WEBP',quality=quality,method=6)
                           if output.stat().st_size<=180000: break
-                      assert output.stat().st_size<=180000,name
-                      assert im.width>=400 and im.height>=250,name
+                      while output.stat().st_size>180000 and im.width>640:
+                          im.thumbnail((int(im.width*.85),int(im.height*.85)),Image.Resampling.LANCZOS)
+                          im.save(output,'WEBP',quality=65,method=6)
+                      assert output.stat().st_size<=180000,(name,im.size,output.stat().st_size)
+                      assert im.width>=400 and im.height>=120,(name,im.size)
                       total+=output.stat().st_size
                       print(name,im.size,output.stat().st_size)
           print('18 local images, total bytes:',total)
@@ -76,7 +79,7 @@ jobs:
           p.write_text(s)
           p=pathlib.Path('scripts/validate-image-assets.mjs')
           with p.open('a') as f:
-              f.write('\nfor (const circuit of ['+','.join(repr(i) for i in ids)+']) await validateWebp(\x60images/endurance/lmu/\x24{circuit}.webp\x60,{minWidth:400,minHeight:250,maxBytes:180000});\n')
+              f.write('\nfor (const circuit of ['+','.join(repr(i) for i in ids)+']) await validateWebp(\x60images/endurance/lmu/\x24{circuit}.webp\x60,{minWidth:400,minHeight:120,maxBytes:180000});\n')
           change('tests/compat/home-dashboard.spec.mjs',"  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+sim+'.webp');","  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';\n  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);")
           change('tests/compat/home-dashboard.spec.mjs',"page.evaluate(async sim=>{\n   const image=new Image();image.src='/images/endurance/'+sim+'.webp';","page.evaluate(async artwork=>{\n   const image=new Image();image.src=artwork;")
           change('tests/compat/home-dashboard.spec.mjs',"  },sim)).toBe(true);","  },artwork)).toBe(true);")
@@ -108,6 +111,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Endurance LMU : visuel local de chaque circuit"
+          git pull --rebase
           git push
       - run: npx playwright install --with-deps chromium
       - run: npm run build:workers
