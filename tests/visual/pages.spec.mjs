@@ -62,3 +62,15 @@ test('organisateurs',async({page})=>{
   await settle(page);
   await expect(page.locator('#app')).toHaveScreenshot('organisateurs.png');
 });
+
+test('endurance-list',async({page})=>{
+  await mockSite(page);
+  await page.route('**/api/races?**',route=>{
+    const event={...SEBRING,official:true,eventType:'special',durationMinutes:120,durationHours:2,departures:[0,1,2].map((day,index)=>({...SEBRING.departures[0],id:'start-'+index,startsAt:SATURDAY+day*24*HOUR,date:new Date(SATURDAY+day*24*HOUR).toISOString().slice(0,10),time:['20:00','08:00','19:00'][index]}))};
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({events:[event]})});
+  });
+  await page.goto('/iracing/');
+  await expect(page.locator('button.race-card.is-endurance')).toContainText('Production Endurance Challenge');
+  await settle(page);
+  await expect(page.locator('#app')).toHaveScreenshot('endurance-list.png');
+});

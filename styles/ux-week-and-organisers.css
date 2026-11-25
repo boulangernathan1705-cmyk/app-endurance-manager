@@ -464,7 +464,6 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .race-card.is-endurance .endurance-card-aside .endurance-card-brand { font-size: 16px; }
 .race-card.is-endurance .endurance-card-aside .endurance-card-kind { font-size: 7px; letter-spacing: .03em; }
 @media (max-width: 760px) {
-  .race-card.is-endurance .race-card-circuit { display: none !important; }
   .race-card.is-endurance .race-head { min-width: 0; overflow-wrap: anywhere; }
 }
 /* Month cells are intentionally text-only: images would compete with dates in a dense grid. */
@@ -473,3 +472,51 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .cal-cell.is-endurance .endurance-card-label { flex-direction: row; align-items: center; color: inherit; gap: 3px; }
 .cal-cell.is-endurance .endurance-card-brand { font-size: 10px; font-style: normal; letter-spacing: 0; }
 .cal-cell.is-endurance .endurance-card-kind { font-size: 9px; letter-spacing: 0; text-transform: none; }
+
+/* Endurance list only: the date is an inline line above the name, never stacked on the artwork.
+   The circuit is beside the schedule on phones and retains its desktop panel. */
+html[data-game] #app button.race-card.is-endurance .race-card-top { gap: 10px; align-items: stretch; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+  flex: 0 0 clamp(82px, 25%, 112px); width: auto; min-width: 0; min-height: 90px; margin: 0;
+  align-items: flex-start; justify-content: flex-end; flex-direction: column;
+  padding: 8px 12px 8px 8px; border: 0; border-radius: 5px 0 0 5px;
+  background: var(--endurance-color); clip-path: polygon(0 0,100% 0,91% 100%,0 100%);
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head::before {
+  clip-path: polygon(0 0,98% 0,89% 100%,0 100%);
+}
+html[data-game] #app button.race-card.is-endurance .endurance-card-brand { font-size: clamp(16px, 4.5vw, 20px); }
+html[data-game] #app button.race-card.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
+html[data-game] #app button.race-card.is-endurance .race-head { padding: 0; min-width: 0; justify-content: center; }
+html[data-game] #app button.race-card.is-endurance .race-head > .race-date {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start;
+  gap: 3px 4px; width: auto !important; min-width: 0; max-width: 100%; height: auto;
+  align-self: flex-start; border: 0; border-radius: 0; padding: 0 !important; background: none;
+  line-height: 1.2; margin: 0 0 3px;
+}
+html[data-game] #app button.race-card.is-endurance .race-head > .race-date strong {
+  font-size: 13px; white-space: nowrap; color: var(--em-text);
+}
+html[data-game] #app button.race-card.is-endurance .race-head > .race-date small {
+  font-size: 12px; white-space: nowrap; color: var(--em-muted);
+}
+@media (max-width: 760px) {
+  html[data-game] #app button.race-card.is-endurance > .race-card-body {
+    display: grid !important; grid-template-columns: minmax(0,1fr) 64px; gap: 8px !important;
+    align-items: start; padding: 10px 12px 12px !important;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-card-content { display: contents; }
+  html[data-game] #app button.race-card.is-endurance .race-card-top { grid-column: 1/-1; grid-row: 1; }
+  html[data-game] #app button.race-card.is-endurance .race-starts { grid-column: 1; grid-row: 2; min-width: 0; }
+  html[data-game] #app button.race-card.is-endurance .race-card-circuit {
+    display: flex; grid-column: 2; grid-row: 2; position: static; order: 0;
+    align-self: center; width: 64px; height: 56px; min-height: 0; margin: 0; padding: 0;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-card-circuit > .circuit-visual {
+    width: 100%; height: 100% !important; min-width: 0 !important; min-height: 0; max-width: 100%;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-situation,
+  html[data-game] #app button.race-card.is-endurance .race-fill { grid-column: 1/-1; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 19px !important; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-type-badge { max-width: 100%; white-space: normal; }
+}
