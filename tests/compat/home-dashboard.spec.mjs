@@ -10,7 +10,7 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'special',capacity:30,categories:['Hypercar'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:'15:00',startsAt,availability,crews}]});
  const lmu=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',soon,[reg],[{id:'crew',name:'Apex Racing',category:'Hypercar',registrationIds:['reg-1']}]);
- const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+60000);
+ const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+24*3600000);
  lmu.departures.push({...lmu.departures[0],id:'second-start',startsAt:soon+2*60000,time:'10:07',availability:[],crews:[]});
  await page.route('**/api/**',route=>{
   const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
@@ -50,12 +50,14 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
    const image=new Image();image.src=artwork;
    try {await image.decode();return image.naturalWidth>=250;} catch {return false;}
   },artwork)).toBe(true);
-  if(width===390){
+  {
+   expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
    expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
    expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
    const a=await art.boundingBox(),b=await card.locator('.week-block-body').boundingBox();
    expect(a.x+a.width).toBeLessThanOrEqual(b.x+1);
-   expect(b.width).toBeGreaterThan(150);
+   expect(b.width).toBeGreaterThan(width===390?150:80);
+   expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   }
  }
  await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveCount(0);
