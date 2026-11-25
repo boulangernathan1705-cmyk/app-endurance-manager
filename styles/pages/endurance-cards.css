@@ -230,62 +230,81 @@ html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-s
   }
 }
 
-/* Detailed endurance: the same two local photos and caption, with the existing
-   circuit map over the dark right side. Solo/stream headers are untouched. */
+/* Detailed endurance: a diagonal separates the local photo from the existing
+   circuit map. Only the detailed endurance header uses this composition. */
 html[data-game] #app .race-header.is-endurance-detail {
   display: grid; grid-template-columns: minmax(0,1fr); gap: 0; padding: 0 !important;
-  border: 1px solid color-mix(in srgb,var(--endurance-color) 55%,var(--em-border));
+  border: 1px solid color-mix(in srgb,var(--endurance-color) 40%,var(--em-border));
   border-radius: var(--em-radius-lg); overflow: hidden; background: var(--em-panel-2);
 }
-.endurance-detail-hero { position: relative; isolation: isolate; min-width: 0; }
+.endurance-detail-hero {
+  position: relative; isolation: isolate; min-width: 0; display: grid;
+  grid-template-columns: minmax(0,7fr) minmax(0,3fr); background: #131b20;
+  height: clamp(172px,22vw,240px);
+}
 .endurance-detail-hero > .endurance-card-head {
-  min-height: 0; height: clamp(184px,26vw,255px);
-  border-bottom: 2px solid var(--endurance-color); border-radius: 0; background: #111719;
+  grid-column: 1; grid-row: 1; height: 100%; min-height: 0; border: 0; border-radius: 0;
+  background: var(--endurance-color); clip-path: polygon(0 0,100% 0,88% 100%,0 100%);
 }
 .endurance-detail-hero > .endurance-card-head::before {
-  background-image: linear-gradient(90deg,transparent 27%,rgba(17,23,25,.30) 57%,#111719 82%),var(--endurance-photo);
-  background-size: 100% 100%, 80% auto; background-position: center,left 48%;
-  background-repeat: no-repeat;
+  background-image: var(--endurance-photo);
+  background-size: cover; background-position: center 52%; background-repeat: no-repeat;
+  clip-path: polygon(0 0,calc(100% - 2px) 0,calc(88% - 2px) 100%,0 100%);
 }
 .endurance-detail-hero > .endurance-card-head > .endurance-card-caption {
-  z-index: 2; padding: 10px 14px; background: rgba(9,14,20,.84);
+  padding: 7px calc(12% + 10px) 7px 12px; background: transparent; isolation: isolate;
 }
-.endurance-detail-hero .endurance-card-caption .endurance-card-brand { font-size: 16px; }
-.endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 11px; }
-.endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 16px; }
+.endurance-detail-hero > .endurance-card-head > .endurance-card-caption::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: rgba(9,14,20,.81);
+  clip-path: polygon(0 0,calc(100% - 2px) 0,calc(88% - 2px) 100%,0 100%);
+}
+.endurance-detail-hero .endurance-card-caption .endurance-card-brand { font-size: 15px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 10px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 14px; }
 html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual {
-  position: absolute !important; z-index: 1; top: 12px; right: 12px; bottom: 48px; left: auto;
-  display: flex; align-items: center; justify-content: center; width: 34% !important;
-  height: auto !important; min-width: 0 !important; min-height: 0 !important; max-width: none;
-  margin: 0 !important; padding: 0; background: none; border: 0; transform: none !important;
+  grid-column: 2; grid-row: 1; position: static !important; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; width: 100% !important;
+  height: 100% !important; min-width: 0 !important; min-height: 0 !important; max-width: none;
+  margin: 0 !important; padding: 12px 10px 12px 2px; background: none; border: 0; transform: none !important;
 }
 html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual img {
   width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%;
   object-fit: contain; transform: none !important;
 }
+.endurance-detail-hero:not(:has(> .circuit-visual)) { grid-template-columns: minmax(0,1fr); }
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head,
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head::before,
+.endurance-detail-hero:not(:has(> .circuit-visual)) .endurance-card-caption::before { clip-path: none; }
+.endurance-detail-hero:not(:has(> .circuit-visual)) .endurance-card-caption { padding-right: 12px; }
 html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content {
-  display: block; padding: 15px 18px; min-width: 0;
-  border-left: 3px solid var(--endurance-color);
+  display: block; padding: 12px 16px; min-width: 0; border: 0;
 }
-html[data-game] #app .race-header.is-endurance-detail .race-head { gap: 8px; }
-html[data-game] #app .race-header.is-endurance-detail .race-head > .race-date {
+html[data-game] #app .race-header.is-endurance-detail .race-head { gap: 6px; }
+.endurance-detail-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; width: 100%; min-width: 0; }
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-meta > .race-date {
   display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start;
   width: auto !important; min-width: 0; height: auto; gap: 4px; padding: 0 !important; margin: 0;
-  border: 0; border-radius: 0; background: none; align-self: flex-start;
+  border: 0; border-radius: 0; background: none; align-self: center;
 }
 html[data-game] #app .race-header.is-endurance-detail .race-date strong { font-size: 14px; }
 html[data-game] #app .race-header.is-endurance-detail .race-date small { font-size: 13px; }
+html[data-game] #app .race-header.is-endurance-detail .race-badges { min-width: 0; justify-content: flex-end; gap: 4px; }
+html[data-game] #app .race-header.is-endurance-detail .race-badges > * { margin: 0; max-width: 100%; white-space: normal; font-size: 10px; }
 html[data-game] #app .race-header.is-endurance-detail .event-title {
-  border: 0; padding: 0; overflow-wrap: anywhere;
+  color: var(--em-text-strong, #f4f6f5) !important; border: 0; padding: 0 !important; margin: 0;
+  text-indent: 0; overflow-wrap: anywhere;
 }
-html[data-game] #app .race-header.is-endurance-detail .race-info-chips { margin-top: 5px; }
+html[data-game] #app .race-header.is-endurance-detail .event-title::before { content: none; }
+html[data-game] #app .race-header.is-endurance-detail .race-info-chips {
+  width: 100%; margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--em-border);
+}
 @media (max-width:760px) {
-  .endurance-detail-hero > .endurance-card-head { height: clamp(166px,46vw,220px); }
-  .endurance-detail-hero > .endurance-card-head::before { background-size: 100% 100%, auto 112%; }
-  .endurance-detail-hero > .endurance-card-head > .endurance-card-caption { padding: 7px 12px; }
+  .endurance-detail-hero { height: clamp(138px,39vw,190px); }
+  .endurance-detail-hero > .endurance-card-head > .endurance-card-caption { padding-block: 6px; padding-left: 9px; }
   .endurance-detail-hero .endurance-card-caption .endurance-card-brand,
-  .endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 14px; }
+  .endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 13px; }
   .endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 9px; }
-  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { bottom: 38px; }
-  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content { padding: 13px 12px; }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content { padding: 10px 12px 12px; }
+  html[data-game] #app .race-header.is-endurance-detail .race-badges > * { font-size: 9px; }
 }
