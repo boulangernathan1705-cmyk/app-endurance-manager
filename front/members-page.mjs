@@ -635,7 +635,7 @@ function reportsMarkup(reports) {
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 const SUPERVISION_PANEL = `<section class="settings-card"><h2>Supervision Discord</h2>
-  <p class="members-help">État de toutes les communautés, d’après la base du site. Aucune action sur Discord.</p>
+  <p class="members-help">État de toutes les communautés d’après le suivi du site. La vérification des fils fermés interroge Discord en lecture seule.</p>
   <details class="discord-diagnostic" data-bot-supervision><summary>Ouvrir le tableau de suivi</summary>
     <div class="setup-actions"><button type="button" class="secondary-button" data-supervision-refresh>Actualiser</button></div>
     <div data-supervision-body aria-live="polite"><p class="members-help">Chargement…</p></div></details></section>`;
@@ -647,6 +647,11 @@ function supervisionMarkup(result) {
     const [tone,label]=states[item.state]||states.attention;
     const issues=item.issues.map(issue=>`<li>${esc(labels[issue.kind]||issue.kind)} : ${esc(issue.name)}${issue.since?' · '+esc(when(issue.since)):''}</li>`).join('');
     const errors=item.errors.map(error=>`<p class="settings-status" role="alert">⚠ ${esc(error)}</p>`).join('');
+    const closedThreads=(item.closedThreads||[]).map(thread=>`<li>
+      ${esc(thread.name)} · Fermé le ${esc(when(thread.closedAt))}
+      <button type="button" class="secondary-button" data-supervision-thread
+        data-community="${esc(item.slug)}" data-event="${esc(thread.eventId)}">Vérifier sur Discord</button>
+      <span class="settings-status" role="status"></span></li>`).join('');
     return `<details class="discord-diagnostic"><summary>${esc(item.name)} · <span class="${tone==='bad'?'platform-ko':tone==='ok'?'platform-ok':''}">${esc(label)}</span></summary>
       <ul class="members-help diag-facts">
       <li>Récap : ${item.recapOn?'actif':'inactif'} · Vocaux : ${item.voicesOn?'actifs':'inactifs'}</li>
@@ -659,13 +664,14 @@ function supervisionMarkup(result) {
       <li>${item.orphanCount} ancien(s) suivi(s) avec salon restant</li>
       ${item.wrongServer?'<li>Le serveur configuré ne correspond plus à la communauté.</li>':''}</ul>
       ${errors}${issues?`<ul class="members-help">${issues}</ul>`:''}
-      ${item.issueCount>item.issues.length?`<p class="members-help">${item.issueCount-item.issues.length} autre(s) anomalie(s).</p>`:''}</details>`;
+      ${item.issueCount>item.issues.length?`<p class="members-help">${item.issueCount-item.issues.length} autre(s) anomalie(s).</p>`:''}
+      ${closedThreads?`<details class="discord-diagnostic"><summary>Fils fermés récemment</summary>
+        <ul class="members-help">${closedThreads}</ul></details>`:''}</details>`;
   }).join('');
   const problems=result.communities.filter(item=>['error','attention'].includes(item.state)).length;
   return `<p class="members-help">Relevé : ${esc(when(result.generatedAt))} · ${result.communities.length} communauté(s) · ${problems} à surveiller.</p>
     ${result.development?'<p class="members-help">DEV : les tâches planifiées sont désactivées. Les dates ne prouvent pas une panne.</p>':''}
     ${!result.botConfigured?'<p class="settings-status" role="alert">Le token du bot n’est pas configuré.</p>':''}
-    <p class="members-help">Les états sont déclaratifs : ils ne prouvent pas la présence réelle des salons ou du bot. Pour un contrôle réel, utilise le diagnostic Discord de la communauté.</p>
     ${rows||'<p class="members-help">Aucun serveur lié.</p>'}`;
 }
 async function loadSupervision(panel) {
@@ -680,7 +686,22 @@ app.addEventListener('toggle',event=>{
   const panel=event.target;
   if(panel.matches?.('[data-bot-supervision]')&&panel.open&&!panel.dataset.loaded&&!panel.querySelector('button').disabled)loadSupervision(panel);
 },true);
+async function verifySupervisionThread(button) {
+  const status=button.nextElementSibling;
+  const states={archived:'Archivé sur Discord',active:'Encore actif sur Discord',missing:'Introuvable sur Discord',
+    forbidden:'Accès refusé par Discord',unavailable:'État indisponible',unconfigured:'Bot Discord non configuré'};
+  const params=new URLSearchParams({community:button.dataset.community,event:button.dataset.event});
+  button.disabled=true;
+  status.textContent='Vérification…';
+  try {
+    const {state}=await api(`/api/platform/discord/supervision/thread?${params}`);
+    status.textContent=states[state]||states.unavailable;
+  } catch(error) {status.textContent=error.message;}
+  finally {button.disabled=false;}
+}
 app.addEventListener('click',event=>{
+  const thread=event.target.closest('[data-supervision-thread]');
+  if(thread)verifySupervisionThread(thread);
   const button=event.target.closest('[data-supervision-refresh]');
   if(button)loadSupervision(button.closest('[data-bot-supervision]'));
 });

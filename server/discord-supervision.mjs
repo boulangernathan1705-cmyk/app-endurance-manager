@@ -5,6 +5,30 @@ import {parseLayout} from './discord-layout.mjs';
 import {raceWeekOpen} from './discord-weekly-format.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {botToken, discordFetch} from './discord-api.mjs';
+
+export async function checkClosedDiscordThread(env, slug, eventId) {
+  const row = await env.DB.prepare(`SELECT p.channel_id, p.guild_id FROM discord_recap_publications p
+    JOIN communities c ON c.id=p.community_id AND c.discord_guild_id=p.guild_id
+    WHERE c.slug=? AND p.event_id=? AND p.closed_at IS NOT NULL AND p.in_thread=1
+      AND p.event_id<>'' AND p.event_id NOT LIKE 'week:%'`).bind(slug, eventId).first();
+  if (!/^\d{15,22}$/.test(row?.channel_id || '')) return null;
+  if (!botToken(env)) return {state:'unconfigured'};
+  let response;
+  try {
+    response = await discordFetch(env, 'GET', `/channels/${row.channel_id}`);
+  } catch {
+    return {state:'unavailable'};
+  }
+  if (response.status === 403 || response.code === 50001 || response.code === 50013) return {state:'forbidden'};
+  if (response.status === 404 && response.code === 10003) return {state:'missing'};
+  const thread = response.data;
+  if (!response.ok || thread?.id !== row.channel_id || thread.guild_id !== row.guild_id
+      || ![10,11,12].includes(thread.type) || typeof thread.thread_metadata?.archived !== 'boolean') {
+    return {state:'unavailable'};
+  }
+  return {state:thread.thread_metadata.archived ? 'archived' : 'active'};
+}
 
 const HOUR = 3600000, GRACE = 15*60000;
 const parse = value => { try { const list=JSON.parse(value); return Array.isArray(list)?list:[]; } catch { return []; } };
@@ -16,7 +40,7 @@ const startOf = row => {
 };
 export async function discordSupervision(env,timestamp=Date.now()) {
   const all=async sql=>(await env.DB.prepare(sql).all()).results||[];
-  const [communities,settings,publications,crews,orphans]=await Promise.all([
+  const [communities,settings,publications,crews,orphans,closedThreads]=await Promise.all([
     allCommunities(env),
     all(`SELECT c.id AS community_id,s.enabled,s.checked_at AS recap_checked,s.last_error AS recap_error,s.dirty,s.guild_id,s.layout,
       v.community_id AS voice_setting,v.last_error AS voice_error,v.last_error_at,
@@ -33,6 +57,15 @@ export async function discordSupervision(env,timestamp=Date.now()) {
     all(`SELECT d.community_id,COUNT(*) AS n FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id
       WHERE (d.voice_id IS NOT NULL OR d.text_id IS NOT NULL OR d.category_id IS NOT NULL)
       AND (c.id IS NULL OR d.closed_at IS NOT NULL) GROUP BY d.community_id`),
+    all(`SELECT community_id, event_id, name, closed_at FROM (
+      SELECT p.community_id,p.event_id,e.name,p.closed_at,
+        ROW_NUMBER() OVER (PARTITION BY p.community_id ORDER BY p.closed_at DESC,p.event_id) AS position
+      FROM discord_recap_publications p
+      JOIN communities c ON c.id=p.community_id AND c.discord_guild_id=p.guild_id
+      LEFT JOIN events e ON e.id=p.event_id
+      WHERE p.closed_at IS NOT NULL AND p.in_thread=1 AND NULLIF(p.channel_id,'') IS NOT NULL
+        AND p.event_id<>'' AND p.event_id NOT LIKE 'week:%'
+    ) WHERE position<=5 ORDER BY closed_at DESC,event_id`),
   ]);
   const byId=new Map(settings.map(row=>[row.community_id,row]));
   const rows=communities.filter(c=>c.discordGuildId).map(c=>{
@@ -64,6 +97,9 @@ export async function discordSupervision(env,timestamp=Date.now()) {
     return {slug:c.slug,name:c.name,recapOn,voicesOn,lastRecap,lastVoice,queueAt,dirty:Boolean(s.dirty),wrongServer:recapOn&&s.guild_id!==c.discordGuildId,
       openThreads,openVoices,waitingVoices,overdueThreads,overdueVoices,incompleteVoices,orphanCount,errors,
       state:errors.length?'error':warnings?'attention':configured?'recorded':'off',
+      closedThreads:closedThreads.filter(row=>row.community_id===c.id).map(row=>({
+        eventId:row.event_id,name:row.name||'Course retirée du site',closedAt:row.closed_at
+      })),
       issues:issues.sort((a,b)=>a.since-b.since).slice(0,12),issueCount:issues.length};
   });
   return {generatedAt:timestamp,development:isDevelopment(env),botConfigured:Boolean(String(env.DISCORD_BOT_TOKEN||'').trim()),communities:rows};
