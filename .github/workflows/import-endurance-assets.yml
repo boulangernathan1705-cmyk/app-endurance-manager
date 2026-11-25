@@ -1,0 +1,37 @@
+name: Import ponctuel des visuels endurance
+on:
+  push:
+    branches: [feature/endurance-photo-cards]
+permissions:
+  contents: write
+jobs:
+  import:
+    if: contains(github.event.head_commit.message, '[import visuels]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Télécharger et optimiser les deux captures
+        run: |
+          set -eu
+          mkdir -p images/endurance
+          curl --fail --location --max-time 25 --retry 1 -o /tmp/lmu.png 'https://lemansultimate.com/wp-content/uploads/2024/02/Toyota-GR010-1.png'
+          curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://cf.boxthislap.org/app/uploads/2023/12/ir_GT3_daytona-696x391.webp' || curl --fail --location --max-time 25 --retry 1 -o /tmp/iracing.webp 'https://boxthislap.org/app/uploads/2023/12/ir_GT3_daytona.webp'
+          python - <<'PY'
+          from PIL import Image, ImageOps
+          from pathlib import Path
+          for name, path in [('lmu', '/tmp/lmu.png'), ('iracing', '/tmp/iracing.webp')]:
+              with Image.open(path) as source:
+                  image = ImageOps.exif_transpose(source).convert('RGB')
+                  assert image.width >= 400 and image.height >= 250
+                  image.thumbnail((640, 480))
+                  dest = Path('images/endurance') / (name + '.webp')
+                  image.save(dest, 'WEBP', quality=78, method=6)
+                  assert dest.stat().st_size < 100000
+                  print(name, image.size, dest.stat().st_size)
+          PY
+          git add images/endurance
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Ajout des deux captures endurance optimisées'
+          git push
