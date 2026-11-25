@@ -97,15 +97,20 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   await expect(header.locator('.endurance-card-duration')).toHaveText(game==='lmu'?'6H':'2H');
   const hero=header.locator('.endurance-detail-hero'),art=hero.locator('.endurance-card-head'),map=hero.locator('.circuit-visual'),caption=hero.locator('.endurance-card-caption');
   await expect(map).toBeVisible();
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu/cota.webp':'/images/endurance/iracing.webp');
+  expect(game==='lmu'?await hero.evaluate(el=>getComputedStyle(el).backgroundImage):await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/cota.webp':'/images/endurance/iracing.webp');
   const [a,m,c]=await Promise.all([art.boundingBox(),map.boundingBox(),caption.boundingBox()]);
-  expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
+  if(game==='iracing')expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
   expect(m.width).toBeGreaterThan(70);
-  expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
+  if(game==='iracing')expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
   expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
-  expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
-  expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
-  expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
+  if(game==='iracing'){
+    expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
+    expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
+    expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
+  }else{
+    await expect(hero.locator('.endurance-detail-content')).toBeVisible();
+    expect(await art.evaluate(el=>getComputedStyle(el,'::before').display)).toBe('none');
+  }
   const mapImage=map.locator('img'),picture=await mapImage.boundingBox();
   expect(picture.x).toBeGreaterThan(m.x+3);
   expect(picture.x+picture.width).toBeLessThan(m.x+m.width-3);
@@ -240,4 +245,28 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
   console.log('18 covers, 54 framings verified ('+testInfo.project.name+')');
   await page.evaluate(()=>document.fonts.ready);
   await expect(page.locator('#lmu-artwork-audit')).toHaveScreenshot('endurance-lmu-artwork-catalog.png',{timeout:20000});
+});
+
+/* Use real list markup for all 18 panoramas; no synthetic circuit images. */
+test('endurance-lmu-panoramas',async({page},testInfo)=>{
+  test.setTimeout(120000);
+  await mockSite(page);
+  const {GAME_CATALOGS}=await import('../../shared/catalog.mjs');
+  const circuits=GAME_CATALOGS.lmu.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd'));
+  const events=circuits.map((c,i)=>({...SPA,id:'aaaaaaa'+(i%10)+'-aaaa-4aaa-8aaa-aaaaaaaa'+String(i).padStart(4,'0'),name:c.name,circuit:c.id,departures:[{...SPA.departures[0],availability:[],crews:[]}]}));
+  await page.route('**/api/races?**',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({events})}));
+  await page.goto('/lmu/');
+  const cards=page.locator('button.race-card.is-endurance.endurance-pano');
+  await expect(cards).toHaveCount(18);
+  const audit=await cards.evaluateAll(async items=>Promise.all(items.map(async card=>{
+    const id=[...card.classList].find(c=>c.startsWith('endurance-track-')).slice(16);
+    const body=card.querySelector('.race-card-body'),style=getComputedStyle(body),img=new Image();
+    img.src='/images/endurance/lmu-pano/'+id+'.webp';let loaded=true;try{await img.decode();}catch{loaded=false;}
+    return {id,ok:loaded&&img.naturalWidth>img.naturalHeight&&style.backgroundImage.includes(img.getAttribute('src'))&&body.scrollWidth<=body.clientWidth+1};
+  })));
+  expect(audit.filter(a=>!a.ok)).toEqual([]);
+  await page.evaluate(()=>document.fonts.ready);
+  await cards.locator('img').evaluateAll(async imgs=>Promise.all(imgs.map(async img=>{img.loading='eager';await img.decode().catch(()=>{});})));
+  // Keep groups small enough to review through the GitHub image viewer.
+  for(let i=0;i<18;i++)await expect(cards.nth(i)).toHaveScreenshot('endurance-pano-'+audit[i].id+'.png',{timeout:20000});
 });

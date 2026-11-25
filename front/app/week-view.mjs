@@ -1,11 +1,11 @@
-import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
+import {enduranceHeader, enduranceSim, endurancePanoramaClass} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
 import {calendarType} from './season-calendar.mjs';
-import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances,circuitVisual} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta,streamedStarts,mergedStream} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -154,7 +154,8 @@ function block(item,now){
   // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
   // championship endurances. Other races keep their simulator's colour.
   const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
-  const cls=`week-block is-${kind.key}${sim2}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  const panorama=solo?'':endurancePanoramaClass(event,enduSim);
+  const cls=`week-block is-${kind.key}${sim2}${panorama}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
@@ -170,7 +171,7 @@ function block(item,now){
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${solo?plan.band:''}
     <span class="week-block-body">
-    <span class="week-block-title">
+    <span class="week-block-title">${panorama?`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`:''}
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:''}
     <span class="week-block-name">${esc(event.name)}</span>
