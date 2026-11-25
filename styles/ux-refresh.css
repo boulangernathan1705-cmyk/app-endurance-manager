@@ -4,5 +4,9 @@
 @import url("./ux-race-crews.css");
 @import url("./ux-race-details-events.css");
 @import url("./ux-departure-planning.css");
-@import url("./ux-week-and-organisers.css");
-@import url("./ux-mobile-navigation-controls.css");
+@import url("./pages/weekly-calendar.css");
+@import url("./pages/crew-organisers.css");
+@import url("./pages/endurance-cards.css");
+@import url("./components/bottom-navigation.css");
+@import url("./components/create-menu.css");
+@import url("./pages/race-planning-extensions.css");

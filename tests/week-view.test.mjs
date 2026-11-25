@@ -57,7 +57,7 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(view, /home-layout\$\{box\?'':' is-full'\}/);
   // An event block takes its simulator's colour, like its card.
   assert.match(view, /kind\.key==='event'\?` sim-\$\{simForEvent\(event\)\}`/);
-  assert.match(read('styles/ux-week-and-organisers.css'), /\.week-block\.is-event \{ --kind: var\(--sim, var\(--em-kind-event\)\); \}/);
+  assert.match(read('styles/pages/weekly-calendar.css'), /\.week-block\.is-event \{ --kind: var\(--sim, var\(--em-kind-event\)\); \}/);
   // Those who may create races add an event or announce a stream from here.
   assert.match(view, /can\('create_race'\)&&state\.soloRaces/);
   // Behind one small « ＋ Ajouter » menu (core.mjs addMenu, 2026-11-03).
@@ -82,7 +82,8 @@ test('a week card shows its simulator on top, its start time(s), the name and it
 });
 
 test('community cards retain logos while endurances share a compact header', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css');
+  const view = read('front/app/week-view.mjs');
+  const css = read('styles/pages/weekly-calendar.css') + read('styles/pages/endurance-cards.css');
   assert.match(view, /<span class="week-block-body">/);
   assert.match(view, /enduranceHeader\(event,enduSim\)/);
   assert.doesNotMatch(view, /\/images\/event-access\/endurance-/);
@@ -94,7 +95,7 @@ test('community cards retain logos while endurances share a compact header', () 
 });
 
 test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css'), actions = read('front/app/actions.mjs');
+  const view = read('front/app/week-view.mjs'), css = read('styles/pages/weekly-calendar.css'), actions = read('front/app/actions.mjs');
   assert.match(view, /button\('week-done',day\.opened\?'▴ Replier':`✓ \$\{day\.done\.length\} terminée/);
   assert.match(actions, /case 'week-done':/);
   assert.match(view, /weight:items\.length\?1:done\.length\?\.75:\.5/);
@@ -105,7 +106,7 @@ test('the week is short: finished races fold per day, busy days are wider, the h
 });
 
 test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
-  const view = read('front/app/week-view.mjs'), css = read('styles/ux-week-and-organisers.css');
+  const view = read('front/app/week-view.mjs'), css = read('styles/pages/weekly-calendar.css');
   // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
   assert.match(view, /function planOf\(item\)/);
   assert.match(view, /icon:'📺',label:'Stream'/);
