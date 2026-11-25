@@ -59,6 +59,23 @@ for(const game of ['lmu','iracing'])test(`${game}: official special filter, rese
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const events=[race(game),race(game,{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',name:'Regular series',eventType:'lmu'}),race(game,{id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',name:'Community race',official:false,eventType:'private'})];
   await boot(page,game,events);
+  // The outer border and stripe follow the simulator, not special/series/private badges.
+  for(const width of [390,1366]){
+    await page.setViewportSize({width,height:900});
+    for(const card of await page.locator('button.race-card.is-endurance').all()){
+      const colors=await card.evaluate((el,sim)=>{
+        const sample=document.createElement('span');
+        sample.style.cssText='position:absolute;pointer-events:none;background:var(--em-kind-'+sim+');border:1px solid color-mix(in srgb,var(--em-kind-'+sim+') 40%,var(--em-border))';
+        el.append(sample);
+        const expected=getComputedStyle(sample),actual=getComputedStyle(el),stripe=getComputedStyle(el,'::before');
+        const result={border:actual.borderTopColor,expectedBorder:expected.borderTopColor,stripe:stripe.backgroundColor,expectedStripe:expected.backgroundColor};
+        sample.remove();
+        return result;
+      },game);
+      expect(colors.border).toBe(colors.expectedBorder);
+      expect(colors.stripe).toBe(colors.expectedStripe);
+    }
+  }
   await page.locator('[data-action="race-filter-toggle"]').click();
   await page.locator('[data-action="race-filter"][data-group="types"][data-value="special"]').click();
   await expect(page.locator('.event-card')).toHaveCount(1);

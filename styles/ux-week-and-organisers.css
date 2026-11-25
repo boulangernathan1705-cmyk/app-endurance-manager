@@ -475,6 +475,15 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 
 /* Endurance list only: the date is an inline line above the name, never stacked on the artwork.
    The circuit is beside the schedule on phones and retains its desktop panel. */
+/* Same simulator border as the home agenda, independent of event type. */
+html[data-game] #app button.race-card.is-endurance {
+  --event-accent: var(--endurance-color);
+  border-color: color-mix(in srgb, var(--endurance-color) 40%, var(--em-border));
+}
+html[data-game] #app button.race-card.is-endurance::before {
+  background: var(--endurance-color);
+  box-shadow: none;
+}
 html[data-game] #app button.race-card.is-endurance .race-card-top { gap: 10px; align-items: stretch; }
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
   flex: 0 0 clamp(82px, 25%, 112px); width: auto; min-width: 0; min-height: 90px; margin: 0;
