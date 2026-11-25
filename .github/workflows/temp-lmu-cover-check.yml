@@ -1,0 +1,42 @@
+name: LMU card covers only
+on:
+  push:
+    branches: [temp/lmu-cover-check]
+    paths: [.github/workflows/temp-lmu-cover-check.yml]
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check corresponding public cover files
+        run: |
+          mkdir -p review
+          python3 - <<'PY'
+          import urllib.request, urllib.error, pathlib, time
+          sources={"paul-ricard":"4-hours-of-castellet-paul-ricard-circuit","portimao":"6-hours-of-portimao-algarve-international-circuit","bahrain":"8-hours-of-bahrain-bahrain-international-circuit","monza":"6-hours-of-monza-autodromo-nazionale-monza","spa":"6-hours-of-spa-francorchamps-circuit-de-spa-francorchamps","fuji":"6-hours-of-fuji-fuji-speedway","sebring":"1000-miles-of-sebring-sebring-international-raceway","imola":"6-hours-of-imola-autodromo-enzo-e-dino-ferrari","cota":"lone-star-le-mans-circuit-of-the-americas","lusail":"qatar-1812km-lusail-international-circuit","silverstone":"4-hours-of-silverstone-silverstone-circuit","le-mans":"24-heures-du-mans-circuit-de-la-sarthe","interlagos":"rolex-6-hours-of-sao-paulo-autodromo-jose-carlos-pace","barcelona":"4-hours-of-barcelona-circuit-de-barcelona","daytona":"daytona-international-speedway-road-course","laguna-seca":"weathertech-raceway-laguna-seca","road-atlanta":"michelin-raceway-road-atlanta","long-beach":"grand-prix-of-long-beach"}
+          report=[]
+          for circuit,slug in sources.items():
+              url='https://assets.lmu-assister.com/tracks/covers/'+slug+'.webp'
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'EnduranceManager-ImageReview/1.0'}),timeout=5) as r:
+                      data=r.read(20000001)
+                  if len(data)>20000000 or data[:4]!=b'RIFF' or data[8:12]!=b'WEBP': raise ValueError('not a WebP image')
+                  pathlib.Path('review',circuit+'.webp').write_bytes(data)
+                  line='OK '+circuit+' '+str(len(data))+' '+url
+              except urllib.error.HTTPError as e:
+                  line='MISS '+circuit+' '+str(e.code)+' '+url
+                  if e.code in (401,403,429):
+                      report.append(line)
+                      break
+              except Exception as e: line='MISS '+circuit+' '+str(e)+' '+url
+              report.append(line)
+              time.sleep(.5)
+          print('\n'.join(report))
+          pathlib.Path('review/report.txt').write_text('\n'.join(report))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lmu-card-covers
+          path: review/
+          retention-days: 1
