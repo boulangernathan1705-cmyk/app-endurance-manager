@@ -24,8 +24,41 @@ export function endurancePanoramaClass(event, game) {
   const track = enduranceArtworkClass(event, game);
   return track ? ' endurance-pano'+track : '';
 }
-export function enduranceHeader(event, game) {
+// The compact cards share one interaction; the detail page retains its own hero.
+export function endurancePreviewClass(event, game) {
+  const sim = enduranceSim(event, game);
+  const track = String(event?.circuit || '').replace(/^iracing-/, '');
+  return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
+}
+export function enduranceHeader(event, game, previewMap = '') {
   const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
   const duration = enduranceDuration(event);
-  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}"><span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
+  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${previewMap}<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
+}
+
+/* Touch: first tap previews, second tap opens the normal link/button.
+   A keyboard activation or mouse click still opens immediately. */
+if (typeof document !== 'undefined') {
+  const selector = '.week-block.is-endurance.endurance-preview, button.race-card.is-endurance.endurance-preview';
+  let touchCard = null;
+  const cardOf = target => target?.closest?.(selector) || null;
+  const clear = except => document.querySelectorAll(selector.split(', ').map(s=>s+'.is-panorama-preview').join(', ')).forEach(card=>{
+    if(card!==except) card.classList.remove('is-panorama-preview');
+  });
+  document.addEventListener('pointerdown', event=>{
+    touchCard = event.pointerType === 'touch' || event.pointerType === 'pen' ? cardOf(event.target) : null;
+  }, true);
+  document.addEventListener('pointercancel', ()=>{touchCard=null;}, true);
+  document.addEventListener('click', event=>{
+    const card = cardOf(event.target);
+    const touch = event.detail !== 0 && (event.pointerType === 'touch' || event.pointerType === 'pen' || (card && card===touchCard));
+    touchCard=null;
+    if(!card || !touch) { clear(null); return; }
+    if(card.classList.contains('is-panorama-preview')) { clear(null); return; }
+    clear(card);
+    card.classList.add('is-panorama-preview');
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')clear(null);},true);
 }
