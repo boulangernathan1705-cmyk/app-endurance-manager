@@ -97,7 +97,7 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   await expect(header.locator('.endurance-card-duration')).toHaveText(game==='lmu'?'6H':'2H');
   const hero=header.locator('.endurance-detail-hero'),art=hero.locator('.endurance-card-head'),map=hero.locator('.circuit-visual'),caption=hero.locator('.endurance-card-caption');
   await expect(map).toBeVisible();
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+game+'.webp');
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu/cota.webp':'/images/endurance/iracing.webp');
   const [a,m,c]=await Promise.all([art.boundingBox(),map.boundingBox(),caption.boundingBox()]);
   expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
   expect(m.width).toBeGreaterThan(70);
