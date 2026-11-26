@@ -14,6 +14,7 @@ export function paceStats(drivers, who, hidden) {
   const sectors = rows.filter(row => row.sectors);
   return [{...CREW, laps:rows.reduce((sum, row) => sum + row.laps, 0), ve:meanOf(rows, 've'), fuel:meanOf(rows, 'fuel'), avg:meanOf(rows, 'avg'),
     best:minOf(rows.map(row => row.best)), slope:meanOf(rows, 'slope'),
+    q25:meanOf(rows.filter(row=>known(row.q25)&&known(row.q75)), 'q25'), q75:meanOf(rows.filter(row=>known(row.q25)&&known(row.q75)), 'q75'),
     sectors:sectors.length ? {laps:sectors.reduce((sum, row) => sum + row.sectors.laps, 0), avg:[0, 1, 2].map(index => mean(sectors.map(row => row.sectors.avg[index]))),
       best:[0, 1, 2].map(index => minOf(sectors.map(row => row.sectors.best[index])))} : null}, ...rows];
 }

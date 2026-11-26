@@ -159,16 +159,18 @@ const CUT = 'CASE WHEN pit=1 OR n-LAG(n) OVER (PARTITION BY session_id ORDER BY 
 // the chosen setup, by day or by night, between two track temperatures (NULL: any). A stint is the run of laps between
 // two laps that touched the pits (CUT); one shorter than STINT_MIN timed laps keeps only the pilot's best lap. Stints are cut
 // before the filters, so a stint crossing dusk or a track temperature bound keeps its length.
-const CLEAN = `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut
-    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?),
+const cleanSQL = (endurance=false) => `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut
+    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?${endurance ? ' AND EXISTS (SELECT 1 FROM combo_sessions s WHERE s.id=combo_laps.session_id AND (s.session_type IS NULL OR s.session_type BETWEEN 0 AND 4 OR s.session_type BETWEEN 10 AND 13))' : ''}),
   stints AS (SELECT *, SUM(cut) OVER (PARTITION BY session_id ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint FROM raw),
-  runs AS (SELECT *, SUM(pit=0 AND ignored=0 AND t>0) OVER (PARTITION BY session_id, stint) AS run FROM stints),
+  runs AS (SELECT *, SUM(pit=0 AND ignored=0 AND t>0${endurance?' AND invalid=0':''}) OVER (PARTITION BY session_id, stint) AS run FROM stints),
   base AS (SELECT * FROM runs WHERE (? IS NULL OR setup=?)
       AND (? IS NULL OR (light IS NOT NULL AND (light<${NIGHT_BELOW})=(?='night'))) AND (? IS NULL OR track_temp>=?) AND (? IS NULL OR track_temp<=?)),
   timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND ignored=0 AND t>0),
   best AS (SELECT user_id, cond, MIN(t) AS best FROM timed GROUP BY user_id, cond),
   clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond
-    WHERE timed.t<=best.best*${CLEAN_RATIO} AND (timed.run>=${STINT_MIN} OR timed.t=best.best))`;
+    WHERE timed.t<=best.best*${CLEAN_RATIO} AND (timed.run>=${STINT_MIN}${endurance?'':' OR timed.t=best.best'}))`;
+const CLEAN = cleanSQL();
+const ENDURANCE = cleanSQL(true);
 const wheelAverages = kind => WHEELS.map(wheel => `AVG(NULLIF(${kind}_${wheel},0)) AS ${kind}_${wheel}`).join(',');
 const wheels = (row, kind, digits) => WHEELS.map(wheel => round(row[`${kind}_${wheel}`], digits));
 
@@ -205,7 +207,7 @@ export async function sheet(env, community, userId, combo, url, current = false,
   const scope = [community.id, combo.track, combo.car, filters.from, filters.to];
   const lapScope = [...scope, filters.setup, filters.setup, filters.moment, filters.moment, filters.trackMin, filters.trackMin, filters.trackMax, filters.trackMax];
   const where = 'community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?';
-  const [drivers, slopes, tyres, moments, setups, sample, stops, service, game, notes] = await Promise.all([
+  const [drivers, slopes, tyres, moments, setups, sample, stops, service, game, notes, endurance] = await Promise.all([
     all(env, `${CLEAN} SELECT user_id, cond, COUNT(*) AS laps, AVG(NULLIF(ve,0)) AS ve, COUNT(NULLIF(ve,0)) AS ve_laps, AVG(NULLIF(fuel,0)) AS fuel,
       AVG(t) AS avg, MIN(t) AS best, AVG(NULLIF((wear_fl+wear_fr+wear_rl+wear_rr)/4.0,0)) AS wear, COUNT(s1) AS sector_laps, AVG(s1) AS s1, AVG(s2) AS s2, AVG(s3) AS s3, MIN(s1) AS best1, MIN(s2) AS best2, MIN(s3) AS best3
       FROM clean GROUP BY user_id, cond`, ...lapScope),
@@ -229,12 +231,27 @@ export async function sheet(env, community, userId, combo, url, current = false,
     withNotes ? all(env, `SELECT n.id, n.user_id, n.body, n.created_at, n.updated_at, n.event_id, n.theme, n.pinned, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
       LEFT JOIN users u ON u.id=n.user_id LEFT JOIN memberships m ON m.user_id=n.user_id AND m.community_id=n.community_id
       WHERE n.community_id=? AND n.track=? AND n.car=? AND (n.event_id IS NULL OR n.event_id=?)
-      ORDER BY n.pinned DESC,n.created_at DESC LIMIT 200`, community.id, combo.track, combo.car,race?.id ?? null) : []
+      ORDER BY n.pinned DESC,n.created_at DESC LIMIT 200`, community.id, combo.track, combo.car,race?.id ?? null) : [],
+    // Website-only preparation: exclude qualifying and warm-up before selecting clean laps.
+    // Old sessions of unknown type are retained only when they contain a proper stint.
+    current ? [] : all(env, `${ENDURANCE}, ranked AS (
+      SELECT *, ROW_NUMBER() OVER(PARTITION BY user_id,cond ORDER BY t) AS pace_rank,
+      COUNT(*) OVER(PARTITION BY user_id,cond) AS pace_count FROM clean)
+      SELECT 'pace' AS kind,user_id,cond,NULL AS compound,COUNT(*) AS laps,AVG(t) AS avg,
+        CASE WHEN COUNT(*)>=4 THEN MAX(CASE WHEN pace_rank=(pace_count+3)/4 THEN t END) END AS q25,
+        CASE WHEN COUNT(*)>=4 THEN MAX(CASE WHEN pace_rank=(3*pace_count+3)/4 THEN t END) END AS q75,
+        AVG(NULLIF(ve,0)) AS ve,AVG(NULLIF(fuel,0)) AS fuel,
+        NULL AS wear_fl,NULL AS wear_fr,NULL AS wear_rl,NULL AS wear_rr
+      FROM ranked GROUP BY user_id,cond
+      UNION ALL
+      SELECT 'tyres',user_id,cond,compound,COUNT(*),NULL,NULL,NULL,NULL,NULL,${wheelAverages('wear')}
+      FROM clean GROUP BY user_id,cond,compound`, ...lapScope)
   ]);
 
   // Each pilot: his name on the community's Discord server, his colour; the most laps first.
   const lapsOf = new Map();
   for (const row of drivers) lapsOf.set(row.user_id, (lapsOf.get(row.user_id) || 0) + row.laps);
+  for (const row of endurance) if (row.kind==='pace' && !lapsOf.has(row.user_id)) lapsOf.set(row.user_id,row.laps);
   const people = lapsOf.size ? await all(env, `SELECT u.id, COALESCE(NULLIF(m.nickname,''), u.name) AS name, c.color FROM users u
     LEFT JOIN memberships m ON m.user_id=u.id AND m.community_id=? LEFT JOIN combo_colors c ON c.user_id=u.id AND c.community_id=?
     WHERE u.id IN (SELECT value FROM json_each(?))`, community.id, community.id, JSON.stringify([...lapsOf.keys()])) : [];
@@ -258,7 +275,12 @@ export async function sheet(env, community, userId, combo, url, current = false,
       compounds[name].drivers.push({id:row.user_id, laps:row.laps, wear:wheels(row, 'wear', 3), temp:wheels(row, 'temp', 1), kpa:wheels(row, 'kpa', 1), brake:wheels(row, 'brake', 0)});
     }
     const moment = moments.find(row => row.cond === cond);
-    return [cond, {laps, trackTemp:laps ? [round(tmin, 1), round(tmax, 1)] : null,
+    const prep = {drivers:[],compounds:{}};
+    for (const row of endurance.filter(item=>item.cond===cond)) {
+      if (row.kind==='pace') prep.drivers.push({id:row.user_id,laps:row.laps,avg:round(row.avg),q25:round(row.q25),q75:round(row.q75),ve:round(row.ve),fuel:round(row.fuel)});
+      else {const name=row.compound||'?'; const group=prep.compounds[name] ||= {laps:0,drivers:[]}; group.laps+=row.laps; group.drivers.push({id:row.user_id,laps:row.laps,wear:wheels(row,'wear',3)});}
+    }
+    return [cond, {...(!current?{endurance:prep}:{}),laps, trackTemp:laps ? [round(tmin, 1), round(tmax, 1)] : null,
       moments:{day:moment?.day || 0, night:moment?.night || 0},
       drivers:drivers.filter(row => row.cond === cond).sort((a, b) => b.laps - a.laps).map(row => ({id:row.user_id, laps:row.laps, ve:round(row.ve),
         veLaps:row.ve_laps, fuel:round(row.fuel), wear:round(row.wear), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4),

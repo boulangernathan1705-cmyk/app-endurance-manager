@@ -3,11 +3,11 @@ import {test,expect} from '@playwright/test';
 const alpha={id:'alpha',slug:'alpha',name:'Alpha',shortName:'A'},beta={id:'beta',slug:'beta',name:'Beta',shortName:'B'};
 const start=(id='start')=>({id,date:'2090-10-15',time:'14:00',startsAt:Date.parse('2090-10-15T12:00:00Z'),availability:[],crews:[]});
 const race=(game,extras={})=>({id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Special official',official:true,format:'endurance',circuit:game==='iracing'?'iracing-spa':'spa',eventType:'special',categories:['GT3'],details:{},durationHours:2,durationMinutes:120,departures:[start()],version:1,...extras});
-async function boot(page,game,events){
+async function boot(page,game,events,combos=false){
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
     let data={ok:true};
-    if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','crews','solo_open'],community:alpha,communities:[alpha,beta],soloRaces:true,eventTypes:['OPEN','SAFE'],eventTdz:true};
+    if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','crews','solo_open',...(combos?['combos']:[])],combos,community:alpha,communities:[alpha,beta],soloRaces:true,eventTypes:['OPEN','SAFE'],eventTdz:true};
     else if(['/api/events','/api/races'].includes(path))data={events};
     else if(path==='/api/participants')data={participants:[]};
     else if(path.includes('notifications'))data={notifications:[],unread:0};
@@ -214,4 +214,18 @@ for (const game of ['lmu','iracing']) test(`${game}: preview preserves card size
   const detail=page.locator('.race-header.is-endurance-detail');
   await expect(detail).toBeVisible();
   await expect(detail.locator('.circuit-visual img')).toHaveCount(1);
+});
+
+for(const enabled of [true,false])test('pilot space on iRacing and shared home, module '+enabled,async({page})=>{
+  await page.setViewportSize({width:1366,height:900});
+  await boot(page,'iracing',[race('iracing')],enabled);
+  const link=page.locator('#navigation .nav-plugin-button');
+  await expect(link).toHaveCount(enabled?1:0);
+  if(enabled)await expect(link).toBeVisible();
+  await page.locator('#navigation .nav-week-button').click();
+  await expect(link).toHaveCount(enabled?1:0);
+  await page.setViewportSize({width:390,height:844});
+  const mobile=page.locator('.tab-bar [data-tab="nav-plugin-button"]');
+  await expect(mobile).toHaveCount(enabled?1:0);
+  if(enabled)await expect(mobile).toBeVisible();
 });
