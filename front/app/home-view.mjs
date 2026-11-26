@@ -16,7 +16,7 @@ import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
 import {isStream,streamDetails,streamPlatform} from '../../shared/stream.mjs';
 import {streamedStarts,mergedStream} from './solo.mjs';
-import {otherEndurances,renderWeek} from './week-view.mjs';
+import {otherEndurances,renderWeek,configureTdzViews} from './week-view.mjs';
 import {isSolo,streamPanel,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,streamTimes,soloFill,ANY_CATEGORY} from './solo.mjs';
 
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -310,3 +310,5 @@ export function renderTdzCalendar(message=''){
 }
 
 export function tdzAdvancedControls(events){const filters=homeAdvanced();return {button:filterButton(activeFilterCount(filters)),panel:state.raceFilterOpen?filterPanel(events,filters):''};}
+
+configureTdzViews({renderCalendar:renderTdzCalendar,advancedControls:tdzAdvancedControls});

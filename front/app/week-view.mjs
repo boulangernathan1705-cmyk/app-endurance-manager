@@ -1,5 +1,4 @@
 import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter,filterHomeEvents} from './tdz-home-state.mjs';
-import {renderTdzCalendar,tdzAdvancedControls} from './home-view.mjs';
 import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
@@ -282,15 +281,20 @@ function crewsBox(){
     ${button('crews-page','Voir les équipages →','','home-next-go')}</aside>`;
 }
 
+// The home view composes the optional TDZ month/list and advanced filters. Register those renderers
+// from home-view rather than importing it here: the weekly calendar remains an independent module.
+let tdzViews;
+export function configureTdzViews(views){tdzViews=views;}
+
 export function renderWeek(message=''){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
-  if(fusedTdzHome()&&homeView()!=='week'){renderTdzCalendar(message);return;}
+  if(fusedTdzHome()&&tdzViews&&homeView()!=='week'){tdzViews.renderCalendar(message);return;}
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
   const days=weekStarts(fusedTdzHome()?filterHomeEvents(all):all,monday).map(day=>({...day,items:day.items.filter(item=>fusedTdzHome()||keep(item,chosen))}));
-  const advanced=fusedTdzHome()?tdzAdvancedControls(all):null;
+  const advanced=fusedTdzHome()&&tdzViews?tdzViews.advancedControls(all):{button:'',panel:''};
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
