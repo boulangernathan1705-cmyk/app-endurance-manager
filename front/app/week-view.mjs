@@ -173,13 +173,13 @@ function block(item,now){
     <span class="week-block-body">
     <span class="week-block-title">
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
-    ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:''}
+    ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:enduranceCardIdentity(event,enduSim)}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event,starts):''}
-    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}<span class="endurance-card-facts">${enduranceCardIdentity(event,enduSim)}${enduranceCardDuration(event)}</span></span>`}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}${enduranceCardDuration(event)}</span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>
