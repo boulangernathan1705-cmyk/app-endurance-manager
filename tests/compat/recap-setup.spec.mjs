@@ -3,17 +3,18 @@ import {mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const TEXT='555555555555555555', CATEGORY='666666666666666666', PIT='777777777777777777';
+const FMT={slug:'fmt',name:'FMT',shortName:'FMT'};
 // This suite mocks every API request, so it never writes to a community or to a real Discord server.
-async function mockAdmin(page,{permission=true,initialRecap=null,repairError=null,solo=true}={}) {
+async function mockAdmin(page,{permission=true,initialRecap=null,repairError=null,solo=true,community=FMT}={}) {
   const calls=[];let botRecap=initialRecap;
   await page.route('**/api/**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname,method=request.method();
     calls.push({path,method,input:request.postDataJSON()});
     let data={ok:true},status=200;
-    if(path==='/api/session')data={user:{id:'100000000000000001',name:'Max'},permissions:['admin','access'],manager:false,community:{name:'Ma communauté',shortName:'MC',appearance:{}},communities:[]};
+    if(path==='/api/session')data={user:{id:'100000000000000001',name:'Max'},permissions:['admin','access'],manager:false,community:{...community,appearance:{}},communities:[]};
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
-    if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{soloRaces:solo},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
-    if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',recapBotAdminInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=8&guild_id=1',discordInviteUrl:'https://discord.gg/example'};
+    if(path==='/api/community/settings')data={community,modules:{soloRaces:solo,eventTdzAvailable:community.slug==='tdz'},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
+    if(path==='/api/community/setup')data={community,siteUrl:'https://site.example',guild:{id:'900000000000000001',name:community.name,botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',recapBotAdminInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=8&guild_id=1',discordInviteUrl:'https://discord.gg/example'};
     if(path==='/api/community/recap/destinations')data={server:{ready:true,missing:[]},destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',private:true,ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
     if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['🏎️ LMU · 6h de Spa','🏎️ LMU · 24h du Mans']:['récap-de-la-semaine · Endurances LMU']).map(name=>({name,payload:{embeds:[{title:'📝 Endurances LMU',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Équipage A** · GT3 · 🔓 Ouvert\n👤 Pilote 1 · 👤 Pilote 2'}],url:'https://site.example/lmu/#event=spa'}]}}))};
     if(path==='/api/community/discord'&&method==='DELETE'){botRecap={...botRecap,enabled:false};data={ok:true,done:true};}
@@ -122,12 +123,20 @@ test('« Tout retirer » asks once more on the button itself',async({page})=>{
 });
 
 test('no calendar row without the events module',async({page})=>{
-  await mockAdmin(page,{solo:false});
+  await mockAdmin(page,{solo:false,community:{slug:'spm',name:'SPM',shortName:'SPM'}});
   const form=page.locator('[data-discord-form]');
   await (await reach(page,form.locator('input[name="mode"][value="general"]'))).check();
   await expect(form.locator('select[name="events"]')).toHaveCount(0);
   await (await reach(page,form.locator('input[name="mode"][value="events"]'))).check();
   await expect(form.locator('input[name="showEvents"]')).toHaveCount(0);
+});
+
+test('TDZ uses its own calendar name in the Discord setup',async({page})=>{
+  const calls=await mockAdmin(page,{community:{slug:'tdz',name:'Les Tondeuz à Gazon',shortName:'TDZ'}});
+  const form=page.locator('[data-discord-form]');
+  await expect(form.getByText('# 🗓️・calendrier',{exact:true}).first()).toBeAttached();
+  await expect(form.getByText('# event-solo-de-la-semaine',{exact:true})).toHaveCount(0);
+  expect(saves(calls)).toHaveLength(0);
 });
 
 const brokenRecap={enabled:true,mode:'events',layout:{mode:'events',sims:'all',split:false,showWeek:true,showEvents:true,under:CATEGORY,voices:false,reminders:false},lmuId:CATEGORY,lmuName:'Endurances',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};

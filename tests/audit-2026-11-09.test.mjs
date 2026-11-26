@@ -7,7 +7,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'
 
 // Audit of 2026-11-09 (Nathan OK'd its 14 points).
 test('the Discord setting says what the bot does: a poster, « S’inscrire », @everyone on stream days only', () => {
-  const page = read('front/members-page.mjs');
+  const page = read('front/admin/discord-settings.mjs');
   assert.doesNotMatch(page, /avec @everyone : les events/);
   assert.doesNotMatch(page, /Présent et Absent/);
   assert.doesNotMatch(page, /La soirée avec/);
