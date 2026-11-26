@@ -420,3 +420,94 @@ th.an-who { color: var(--dc) !important; }
   .cb-prep table { width:100%; min-width:0; }
   .cb-prep tr { break-inside:avoid; }
 }
+
+/* Pilot workspace: preparation is a brief, statistics retain the detailed measures. */
+#combos-app { gap:var(--em-space-4); }
+#combos-app .cb-hero {gap:var(--em-space-2);}
+#combos-app .cb-hero-top {min-height:32px;}
+#combos-app .cb-picker {border-radius:var(--em-radius-lg); background:var(--em-panel-2);}
+#combos-app .cb-picker > summary {padding:var(--em-space-4);}
+.cb-picker-race {font-size:var(--em-text-xs);color:var(--em-accent);font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.cb-more {position:relative;}
+.cb-more > summary {list-style:none;cursor:pointer;padding:6px 12px;border:1px solid var(--em-border);border-radius:var(--em-radius-sm);}
+.cb-more > summary::-webkit-details-marker {display:none;}
+.cb-more > div {position:absolute;right:0;top:100%;z-index:5;background:var(--em-panel-2);padding:var(--em-space-2);border:1px solid var(--em-border);border-radius:var(--em-radius-sm);white-space:nowrap;}
+#combos-app .cb-workspace-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--em-space-2);margin:0;border:0;}
+#combos-app .cb-workspace-tabs button {border:1px solid var(--em-border);background:var(--em-panel);border-radius:var(--em-radius-sm);margin:0;min-height:44px;font-size:var(--em-text-md);}
+#combos-app .cb-workspace-tabs button[aria-pressed=true] {color:var(--em-accent);border-color:var(--em-accent);background:var(--em-panel-2);}
+#combos-app .cb-context {display:grid;gap:var(--em-space-2);padding:var(--em-space-3);border:1px solid var(--em-border);border-radius:var(--em-radius-md);background:var(--em-panel);}
+.cb-context-main {display:flex;flex-wrap:wrap;gap:var(--em-space-3);align-items:center;min-width:0;}
+.cb-context-main .cb-drivers {flex:1 1 auto;align-items:center;padding:0;}
+.cb-context-main .cb-conds {display:flex;gap:var(--em-space-1);flex-wrap:wrap;}
+.cb-context-main .cb-cond {min-height:40px;padding:6px 10px;}
+.cb-context-main .cb-filterbox {flex:0 1 auto;min-width:0;}
+.cb-context-main .cb-filterbox[open] {flex:1 1 100%;}
+.cb-context-main .cb-filterbox-body {position:static;}
+.cb-context-main .cb-moments {margin-top:var(--em-space-3);}
+#combos-app .cb-prep {margin:0;min-width:0;padding:var(--em-space-4);border-radius:var(--em-radius-lg);}
+#combos-app .cb-prep .cb-overview {grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--em-space-3);margin:var(--em-space-4) 0;}
+#combos-app .cb-overview > div {background:var(--em-panel-2);border-radius:var(--em-radius-md);padding:var(--em-space-4);}
+#combos-app .cb-overview strong {font-size:clamp(21px,2.6vw,32px);font-weight:800;line-height:1.1;}
+#combos-app .cb-overview > div:nth-child(2) strong {color:var(--em-ok);}
+#combos-app .cb-overview small {font-size:var(--em-text-sm);line-height:1.35;}
+#combos-app .cb-note-fields input[type=number],#combos-app .cb-rubber input {width:90px;max-width:100%;}
+.cb-targets {display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--em-space-2) var(--em-space-4);padding:var(--em-space-3);margin:var(--em-space-3) 0;border-radius:var(--em-radius-sm);background:var(--em-panel-2);}
+.cb-targets span {font-size:var(--em-text-lg);font-weight:700;}
+.cb-targets small {color:var(--em-muted);}
+.cb-prep-tyres {display:grid;gap:var(--em-space-3);padding:var(--em-space-4);border:1px solid var(--em-border);border-radius:var(--em-radius-md);margin:var(--em-space-4) 0;}
+.cb-tyre-projection {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--em-space-5);align-items:center;}
+.cb-wheel-diagram {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--em-space-2) var(--em-space-4);}
+.cb-wheel-diagram > div {padding:var(--em-space-3);background:var(--em-panel-2);border:1px solid var(--em-border);border-radius:var(--em-radius-sm);display:grid;gap:var(--em-space-1);text-align:center;}
+.cb-wheel-diagram small {color:var(--em-muted);}
+.cb-wheel-diagram strong {font-size:var(--em-text-xl);font-variant-numeric:tabular-nums;}
+.cb-relay-bars {display:grid;gap:var(--em-space-3);}
+.cb-relay-bars > div {display:grid;grid-template-columns:1fr auto;gap:var(--em-space-1);}
+.cb-meter {grid-column:1/-1;height:7px;border-radius:var(--em-radius-pill);background:var(--em-border);overflow:hidden;}
+.cb-meter i {display:block;height:100%;background:var(--dc,var(--em-accent));border-radius:inherit;}
+.cb-rubber {display:flex;align-items:center;gap:var(--em-space-2);flex-wrap:wrap;color:var(--em-muted);font-size:var(--em-text-sm);}
+.cb-pilot-targets {padding:var(--em-space-3);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--em-space-2);}
+.cb-pilot-targets article {display:grid;gap:var(--em-space-1);background:var(--em-panel-2);border-left:3px solid var(--dc,var(--em-accent));border-radius:var(--em-radius-sm);padding:var(--em-space-3);font-size:var(--em-text-sm);}
+.cb-stat-tabs {display:flex;gap:var(--em-space-2);flex-wrap:wrap;}
+.cb-stat-content {min-width:0;display:grid;gap:var(--em-space-4);}
+.cb-pace-chart {display:grid;gap:var(--em-space-3);}
+.cb-pace-row {display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:var(--em-space-2);align-items:center;font-variant-numeric:tabular-nums;}
+.cb-pace-row > span:first-child {overflow-wrap:anywhere;}
+.cb-pace-row > span:nth-child(3) {color:var(--em-muted);font-size:var(--em-text-sm);}
+.cb-method,.cb-note-new,.cb-pit-advanced {padding:var(--em-space-3);border:1px solid var(--em-border);border-radius:var(--em-radius-sm);}
+.cb-method summary,.cb-note-new summary,.cb-pit-advanced summary {cursor:pointer;font-weight:600;}
+.cb-note-new[open] form {margin-top:var(--em-space-3);}
+.cb-note.is-pinned {border-left:3px solid var(--em-warn);padding-left:var(--em-space-3);}
+#combos-app .cb-wrap,#combos-app .cb-tyre {overflow-x:auto;max-width:100%;}
+#combos-app .cb-wrap table,#combos-app .cb-tyre table {min-width:max-content;}
+#combos-app .cb-card,#combos-app .cb-fold {min-width:0;}
+#combos-app .cb-pit-advanced fieldset {margin-top:var(--em-space-2);}
+@media(max-width:760px){
+  #combos-app {padding-inline:var(--em-space-3);gap:var(--em-space-3);}
+  #combos-app .cb-prep {padding:var(--em-space-3);}
+  #combos-app .cb-prep .cb-overview {grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--em-space-2);}
+  #combos-app .cb-overview > div {padding:var(--em-space-3);}
+  #combos-app .cb-workspace-tabs button {padding:8px 4px;font-size:var(--em-text-sm);}
+  .cb-context-main {gap:var(--em-space-2);}
+  .cb-context-main .cb-drivers {flex-basis:100%;}
+  .cb-context-main .cb-chip,.cb-stat-tabs .cb-chip {min-height:40px;}
+  .cb-tyre-projection {grid-template-columns:minmax(0,1fr);gap:var(--em-space-3);}
+  .cb-prep-tyres {padding:var(--em-space-3);}
+  #combos-app .cb-picker-track {font-size:var(--em-text-xl);}
+  #combos-app .cb-wrap table {font-size:var(--em-text-sm);}
+}
+@media print {
+  #combos-app .cb-prep .cb-overview {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .cb-prep .cb-pilot-targets {display:grid;}
+  .cb-prep .cb-meter {border:1px solid black;}
+}
+
+#combos-app .cb-prep-bottom {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--em-space-4);align-items:start;}
+#combos-app .cb-prep-bottom:has([data-fold=pit][open]) {grid-template-columns:minmax(0,1fr);}
+#combos-app .cb-pit-heading {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--em-space-3);align-items:center;}
+.cb-pit-heading > [data-pit-quick] {grid-row:2;grid-column:1/-1;min-width:0;}
+.cb-pit-quick {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--em-space-2);}
+.cb-pit-quick > span {display:grid;gap:var(--em-space-1);padding:var(--em-space-2);background:var(--em-panel-2);border:1px solid var(--em-border);border-radius:var(--em-radius-sm);min-width:0;}
+.cb-pit-quick small {font-size:var(--em-text-xs);color:var(--em-muted);white-space:normal;}
+.cb-pit-quick strong {font-size:var(--em-text-lg);font-variant-numeric:tabular-nums;}
+.cb-pit-configure {grid-row:1;grid-column:2;color:var(--em-accent);}
+@media(max-width:760px){#combos-app .cb-prep-bottom {grid-template-columns:minmax(0,1fr);gap:var(--em-space-3);} .cb-pit-quick strong{font-size:var(--em-text-md);}}
