@@ -152,9 +152,13 @@ for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css', 'sw.j
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
-await cp(root + 'front', new URL('front/', out), {recursive: true});
+const publicModuleAsset = path => !path.endsWith('.map');
+await cp(root + 'front', new URL('front/', out), {recursive: true, filter: publicModuleAsset});
 await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');
-await cp(root + 'shared', new URL('shared/', out), {recursive: true});
+await cp(root + 'shared', new URL('shared/', out), {
+  recursive: true,
+  filter: path => path !== root + 'shared/relay-pass.mjs' && publicModuleAsset(path)
+});
 
 // The SimHub plugin (its code lives in the endurance-manager-plugin repo; each of its Releases opens a PR here that
 // replaces connectors/simhub-plugin/v0/: the DLL, its plugin.json as published, the installer). Served twice:
