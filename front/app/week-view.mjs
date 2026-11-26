@@ -5,7 +5,7 @@ import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranc
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
 import {calendarType} from './season-calendar.mjs';
-import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances,circuitVisual} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta,streamedStarts,mergedStream} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -167,7 +167,7 @@ function block(item,now){
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${!solo?enduranceArtwork(event,enduSim,`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceArtwork(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${solo?plan.band:''}
     <span class="week-block-body">
@@ -179,7 +179,7 @@ function block(item,now){
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event,starts):''}
-    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}<span class="week-endurance-facts">${enduranceCardIdentity(event,enduSim)}${enduranceCardDuration(event)}</span></span>`}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}<span class="endurance-card-facts">${enduranceCardIdentity(event,enduSim)}${enduranceCardDuration(event)}</span></span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

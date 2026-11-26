@@ -36,12 +36,12 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
   const badge=card.locator('.week-endurance-schedule .endurance-card-identity');
   await expect(badge).toHaveText(sim==='lmu'?'LMU Endurance':'iRacing Endurance');
   await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
-  await expect(card.locator('.week-pano-map')).toBeHidden();
+  await expect(card.locator('.circuit-visual')).toHaveCount(0);
   await expect(card.locator('.week-endurance-schedule .endurance-start-icon')).toHaveCount(1);
   const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';
   expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
   await card.evaluate(el=>el.classList.add('is-panorama-preview'));
-  await expect(card.locator('.week-pano-map img')).toBeVisible();
+  await expect(card.locator('.circuit-visual')).toHaveCount(0);
   expect(await card.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/lmu-pano/sebring.webp');
   await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
   expect(await page.evaluate(async artwork=>{

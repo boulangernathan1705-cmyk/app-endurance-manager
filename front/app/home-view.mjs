@@ -3,7 +3,7 @@ import {raceFilterKey,mySituation,emptyRaceFilters,normalizeRaceFilters,filtered
 import {readFilterState,writeFilterState,setFilterDate} from '../filter-state.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
-import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {calendarType,seasonCalendar} from './season-calendar.mjs';
 import {loadArchive} from './core.mjs';
@@ -109,8 +109,8 @@ function eventCard({event,next,archived,end}){
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
   const solo=isSolo(event);
   const calendarDate=raceDateBlock(event,archived);
-  const enduranceDate=solo?'':`<span class="race-endurance-date">${calendarDate}<span class="race-endurance-facts">${enduranceCardDuration(event)}<span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span></span></span>`;
-  const classification=solo?officialBadge(event)+accessBadge(event):`<span class="race-endurance-meta">${officialBadge(event)}${eventTypeBadge(event.eventType)}${enduranceCardIdentity(event)}</span>`;
+  const enduranceDate=solo?'':`<span class="race-endurance-date">${calendarDate}<span class="endurance-card-facts">${enduranceCardIdentity(event)}${enduranceCardDuration(event)}</span></span>`;
+  const classification=solo?officialBadge(event)+accessBadge(event):`<span class="race-endurance-meta">${officialBadge(event)}${eventTypeBadge(event.eventType)}</span>`;
   return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance endurance-sim-${enduranceSim(event)}${endurancePreviewClass(event)}`}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${solo?calendarDate:enduranceArtwork(event)}<span class="race-head">${enduranceDate}<span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>${classification}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 // Filters of the race list (communities, type, category, dates, situation), kept in the browser.

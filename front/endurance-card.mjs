@@ -32,14 +32,14 @@ export function endurancePreviewClass(event, game) {
   const track = String(event?.circuit || '').replace(/^iracing-/, '');
   return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
-export function enduranceArtwork(event, game, previewMap = '', caption = '') {
+export function enduranceArtwork(event, game, caption = '') {
   const sim = enduranceSim(event, game);
-  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${previewMap}${caption}</span>`;
+  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${caption}</span>`;
 }
 
 export function enduranceCardIdentity(event, game) {
   const label = enduranceSim(event, game) === 'iracing' ? 'iRacing' : 'LMU';
-  return `<span class="endurance-card-identity">${label} Endurance</span>`;
+  return `<span class="endurance-card-identity"><b>${label}</b> <span>Endurance</span></span>`;
 }
 
 export function enduranceCardDuration(event) {
@@ -50,11 +50,11 @@ export function enduranceCardDuration(event) {
 
 export const enduranceStartIcon = '<svg class="endurance-start-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 
-export function enduranceHeader(event, game, previewMap = '', alwaysDuration = false) {
+export function enduranceHeader(event, game) {
   const label = enduranceSim(event, game) === 'iracing' ? 'iRacing' : 'LMU';
-  const duration = enduranceDuration(event, alwaysDuration);
+  const duration = enduranceDuration(event);
   const caption = `<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span>`;
-  return enduranceArtwork(event, game, previewMap, caption);
+  return enduranceArtwork(event, game, caption);
 }
 
 /* Touch: first tap previews, second tap opens the normal link/button.
