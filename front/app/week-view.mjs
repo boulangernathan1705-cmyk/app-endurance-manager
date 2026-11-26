@@ -1,5 +1,5 @@
-import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter} from './tdz-home-state.mjs';
-import {renderTdzCalendar} from './home-view.mjs';
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter,filterHomeEvents} from './tdz-home-state.mjs';
+import {renderTdzCalendar,tdzAdvancedControls} from './home-view.mjs';
 import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
@@ -289,7 +289,8 @@ export function renderWeek(){
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,chosen))}));
+  const days=weekStarts(fusedTdzHome()?filterHomeEvents(all):all,monday).map(day=>({...day,items:day.items.filter(item=>fusedTdzHome()||keep(item,chosen))}));
+  const advanced=fusedTdzHome()?tdzAdvancedControls(all):null;
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
@@ -315,7 +316,7 @@ export function renderWeek(){
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
     <div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
-        ${fusedTdzHome()?homeFilterBar():`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
+        ${fusedTdzHome()?homeFilterBar()+advanced.button+advanced.panel:`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
         <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
       </section>
       ${box}

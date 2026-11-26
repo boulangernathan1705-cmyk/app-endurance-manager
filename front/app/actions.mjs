@@ -150,7 +150,7 @@ async function perform(action,target){
       if (overlay?.returnFocus?.isConnected) overlay.returnFocus.focus();
       break;
     }
-    case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'home': if(target.dataset.list==='solo'&&fusedTdzHome()){renderWeek();break;} if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.
     case 'tdz-home-view': if(fusedTdzHome()){setHomeView(target.dataset.view);renderWeek();}break;
@@ -173,9 +173,9 @@ async function perform(action,target){
     case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
     case 'cal-kind': state.calendarKind=target.dataset.kind; state.calendarMine=false; renderHome(); break;
     case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome(); break;
-    case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
-    case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
-    case 'race-filter-reset': resetRaceFilters(); renderHome(); break;
+    case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
+    case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
+    case 'race-filter-reset': resetRaceFilters(); if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': if(!state.events.some(event=>event.id===target.dataset.id)&&otherGameEvent(target.dataset.id)){location.href=`/${otherGameEvent(target.dataset.id).otherGame}/#event=${encodeURIComponent(target.dataset.id)}`;break;} state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;

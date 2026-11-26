@@ -1,7 +1,7 @@
 // Keeps the address bar in sync with the page, so a race can be shared as a link
 // (/lmu/#event=<id>) and the browser Back button returns to the previous page.
 // The events calendar (every sim) has its own address, /events/, so a copied link never names a sim.
-import {fusedTdzHome,setHomeView} from './tdz-home-state.mjs';
+import {fusedTdzHome,setHomeView,homeFilters,selectHomeFilter} from './tdz-home-state.mjs';
 import {app,state,activeGame,loadArchive,showError} from './core.mjs';
 
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
@@ -70,6 +70,7 @@ export async function applyRoute(route,message=''){
   if(route.list==='solo'&&fusedTdzHome()){
     let saved='';try{saved=localStorage.getItem('calendar-view:solo')||'';}catch{}
     setHomeView(saved==='list'?'list':'month');
+    selectHomeFilter('all');selectHomeFilter('event');
     history.replaceState(null,'',`/${activeGame}/${location.search}${WEEK_HASH}`);
     views.renderWeek();return;
   }

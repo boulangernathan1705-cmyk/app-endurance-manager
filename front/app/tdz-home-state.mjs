@@ -2,6 +2,9 @@
 import {state,button,esc} from './core.mjs';
 import {filterStorageKey,readFilterState,writeFilterState} from '../filter-state.mjs';
 import {weekStart,parisDay} from '../week-days.mjs';
+import {simForEvent} from '../../shared/catalog.mjs';
+import {isStream} from '../../shared/stream.mjs';
+import {normalizeRaceFilters} from '../race-filters.mjs';
 import {parisMonth,seasonMonths} from '../../shared/season.mjs';
 export const fusedTdzHome=()=>state.access==='member'&&state.eventTdz&&state.soloRaces;
 const key=()=>filterStorageKey('tdz-home',{communityId:state.community?.id,userId:state.user?.id});
@@ -11,7 +14,7 @@ export function homePrefs(){
   if(state.tdzHomeScope!==scope){
     const saved=readFilterState(scope);
     state.tdzHomeScope=scope;
-    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.filter(k=>kinds.includes(k)):[]};
+    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.filter(k=>kinds.includes(k)):[],advanced:normalizeRaceFilters(saved.advanced,{format:'solo',kindIds:state.eventTypes||[]})};
     state.weekOffset=0;
   }
   return state.tdzHomePrefs;
@@ -55,4 +58,27 @@ export function weekContains(departure,monday){
   const at=Number(departure.startsAt);
   if(departure.startsAt==null||!Number.isFinite(at)||departure.tbd)return false;
   const day=parisDay(at);return day>=monday&&day<monday+7;
+}
+
+// Shared filtering by departure: a registration or stream on another day must not leak into the selected week.
+export function homeAdvanced(){return homePrefs().advanced;}
+export function saveHomeAdvanced(){save();}
+export function homeMatches(event,departure){
+  const chosen=homeFilters(),types=[...chosen].filter(k=>k!=='mine'),advanced=homeAdvanced();
+  const solo=event.format==='solo',game=event.otherGame||simForEvent(event);
+  const regs=(departure.availability||[]).filter(reg=>reg.status!=='unavailable');
+  const mine=regs.some(reg=>reg.mine),streamed=regs.some(reg=>reg.streamTime);
+  if(types.length&&!types.includes(solo?'event':game)&&!(types.includes('event')&&streamed)&&!(types.includes('stream')&&(isStream(event)||streamed||Boolean(event.details?.streamTime))))return false;
+  if(chosen.has('mine')&&!mine)return false;
+  if(advanced.sims.length&&!advanced.sims.includes(simForEvent(event)))return false;
+  if(advanced.kinds.length&&(!solo||!advanced.kinds.includes(event.details?.type)))return false;
+  if(advanced.from&&(!departure.date||departure.date<advanced.from))return false;
+  if(advanced.to&&(!departure.date||departure.date>advanced.to))return false;
+  if(advanced.situation==='registered'&&!mine)return false;
+  if(advanced.situation==='free'&&mine)return false;
+  if(advanced.situation==='absent'&&!(event.absences||[]).some(a=>a.mine))return false;
+  return true;
+}
+export function filterHomeEvents(events){
+  return events.flatMap(event=>{const departures=(event.departures||[]).filter(d=>homeMatches(event,d));return departures.length||(!(event.departures||[]).length&&homeMatches(event,{}))?[{...event,departures}]:[];});
 }
