@@ -78,6 +78,7 @@ export async function crewsApi({path, method, request, env, actor, community}) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour demander un équipage.');
     const input = await body(request);
     const event = await eventById(env, requestCreate[1], community);
+    if (event.official_schedule_status) fail(409, 'Les demandes sont suspendues pour cette course iRacing.');
     if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
     const departure = departureById(event, requestCreate[2]);
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé.');
@@ -144,6 +145,7 @@ export async function crewsApi({path, method, request, env, actor, community}) {
     const crew=crewRoute ? await env.DB.prepare(`SELECT * FROM crews c WHERE id=? AND (community_id=? OR EXISTS (SELECT 1 FROM events oe WHERE oe.id=c.event_id AND oe.community_id='official'))`).bind(crewRoute[1],community.id).first() : null;
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
     const event=await eventById(env,crew?.event_id || crewCreate[1],community);
+    if (crewCreate && event.official_schedule_status) fail(409,'Les inscriptions sont suspendues pour cette course iRacing.');
     const {community:here, actor:who} = await actingCommunity(env, actor, community, crew ? crew.community_id : input.communityId, event);
     if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
     const departure=departureById(event,crew?.departure_id || crewCreate[2]);
@@ -259,12 +261,12 @@ export async function crewsApi({path, method, request, env, actor, community}) {
     const ownRows=can(who,'manage_registrations')||input.join===false?[]:(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
     const selected=ownRows.find(reg=>personal(reg,actor));
     if (!selected) {
-      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id).run();
+      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) SELECT ?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id,event.id,event.version).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
     const results=await env.DB.batch([
-      env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
+      env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) SELECT ?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id,event.id,event.version),
       env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
       env.DB.prepare(leaveOtherStarts).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,startsToLeave(event,departure,here))
     ]);

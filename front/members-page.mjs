@@ -3,6 +3,7 @@ import {MODE_NAMES, closeDiscordSheet, discordInput, discordPage, discordRefresh
 import {diagWhen, installCommunityDiagnostics} from './admin/discord-diagnostics.mjs';
 import {bannerImage, botImage, closeCropper, cropCanvas, openCropper, resetCropper, setZoom} from './admin/image-cropper.mjs';
 import {SUPERVISION_PANEL,installDiscordSupervision} from './admin/discord-supervision.mjs';
+import {IRACING_PANEL,installIracingSupervision} from './admin/iracing-supervision.mjs';
 import {helpContext} from './context-help.mjs';
 import {todoItems} from './admin-todo.mjs';
 const app = document.getElementById('members-app');
@@ -271,6 +272,7 @@ function reportsMarkup(reports) {
 }
 
 installDiscordSupervision(app, {api, esc, diagWhen});
+installIracingSupervision(app, api);
 
 async function platformMarkup() {
   // The testers' reports sent from the plugin to this community (module Plugin SimHub open here), else nothing.
@@ -281,7 +283,7 @@ async function platformMarkup() {
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
   const plugin = communities.map(item => `<label class="platform-row platform-plugin"><strong>${esc(item.name)}</strong><span class="admin-switch"><input type="checkbox" role="switch" data-platform-plugin="${esc(item.slug)}" aria-label="Plugin SimHub pour ${esc(item.name)}" ${item.plugin ? 'checked' : ''}><i aria-hidden="true"></i></span></label>`).join('');
-  return `${SUPERVISION_PANEL}${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
+  return `${SUPERVISION_PANEL}${IRACING_PANEL}${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
     <section class="settings-card"><h2>Plugin SimHub</h2><p class="members-help">Ouvre l’onglet Plugin SimHub d’une communauté. Ses administrateurs donnent ensuite l’autorisation « Plugin SimHub » aux rôles.</p><div class="platform-list">${plugin}</div></section>
     ${reports ? reportsMarkup(reports) : ''}
     ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>

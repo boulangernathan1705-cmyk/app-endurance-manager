@@ -85,8 +85,12 @@ export async function communityApi({path, method, request, env, actor, community
   if (path === '/api/admin/iracing-import' && method === 'POST') {
     requirePermission(actor,'admin');
     // Manual update from the iRacing space (admins), e.g. to repair after a change of the schedule data.
-    try { return json(await syncIracingEvents(env)); }
-    catch (error) { fail(502, 'Le calendrier iRacing est momentanément indisponible. Réessaie plus tard.'); }
+    let result;
+    try { result = await syncIracingEvents(env); }
+    catch { fail(502, 'Le calendrier iRacing est momentanément indisponible. Réessaie plus tard.'); }
+    if (result.busy) fail(409, 'Une synchronisation iRacing est déjà en cours.');
+    const {created, completed, repaired, updated, disabled} = result;
+    return json({created, completed, repaired, updated, disabled, partial:Boolean(result.errors?.length)});
   }
   // Members of the community: the players found on its Discord server, with their Discord roles and what
   // these roles allow here. Roles and access are managed on Discord; the role settings page comes with step 4.

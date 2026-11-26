@@ -50,7 +50,7 @@ export async function waitingMoves(env, event, data) {
   }
   const members = move.filter(reg => reg.crew_id), crewIds = JSON.stringify(crews.map(crew => crew.id));
   const list = items => JSON.stringify(items);
-  return {statements:version => {
+  return {lossy:drop.length > 0, crewIds:crews.map(crew => crew.id), registrationIds:move.map(reg => reg.id), statements:version => {
     const same = 'EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)', at = [event.id, version];
     return [
       ...(added ? [env.DB.prepare("UPDATE events SET departures=json_insert(departures,'$[#]',json(?)) WHERE id=? AND version=?").bind(JSON.stringify(added), ...at)] : []),
@@ -64,11 +64,13 @@ export async function waitingMoves(env, event, data) {
 }
 // Pilots on the waiting start, once real times exist: a crew's manager picks its time, its pilots are told,
 // a pilot without a crew picks his own. Returns the players told.
-export async function askToChooseStart(env, event, waitingId) {
+export async function askToChooseStart(env, event, waitingId, affected = null) {
   const all = async (sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
   const crews = await all('SELECT id, name, owner_user_id, community_id FROM crews WHERE event_id=? AND departure_id=?', event.id, waitingId);
   const told = [], organisers = new Map();
+  const crewIds = affected && new Set(affected.crewIds);
   for (const crew of crews) {
+    if (crewIds && !crewIds.has(crew.id)) continue;
     // Without a manager (made by an organiser for others), the organisers of its community choose.
     if (!crew.owner_user_id && !organisers.has(crew.community_id)) {
       const home = await communityById(env, crew.community_id).catch(() => null);
@@ -81,7 +83,9 @@ export async function askToChooseStart(env, event, waitingId) {
   }
   const alone = await all(`SELECT DISTINCT p.user_id, r.community_id FROM registrations r JOIN participants p ON p.id=r.participant_id
     WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL
-      AND NOT EXISTS(SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id)`, event.id, waitingId);
+      AND NOT EXISTS(SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id)
+      AND (? IS NULL OR r.id IN (SELECT value FROM json_each(?)))`, event.id, waitingId,
+    affected ? 1 : null,JSON.stringify(affected?.registrationIds || []));
   await notify(env, alone, 'choose_departure', event, {skip:told});
   return [...told, ...alone.map(row => row.user_id)];
 }

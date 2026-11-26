@@ -3,7 +3,7 @@ import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation, mutationTarget} from './discord-weekly-format.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
 import {cleanup, communityLabel, origin} from './core.mjs';
-import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
+import {importNextCommunity, syncIracingEvents} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
@@ -249,17 +249,18 @@ export default {
     if (env.DISCORD_BOT_TOKEN) run('Crew request cards cleanup failed', () => cleanCrewRequestCards(env, at.getTime()));
     // :07 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
-    // :23 Official team and solo iRacing endurances, once for the whole platform.
-    if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
+    // The existing trigger checks every 30 minutes; the calendar itself is due every six hours.
+    if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing calendar failed', async () => {
+      const result = await importNextCommunity(env, at);
+      if (result.deferred) await syncIracingEvents(env,{timestamp:at.getTime(),scheduled:true,specialOnly:true});
+    });
     // :37 The weekly Discord recaps checked longest ago.
     if (slot === 2) run('Discord weekly scheduled sync failed', () => syncDueRecaps(env, 3));
     // :07 and :53: a Discord setting still being put in place (or taken off) goes on (not next to the iRacing import).
     else if (slot !== 1) run('Discord pending sync failed', () => syncDueRecaps(env, 1, at.getTime(), {pending:true}));
-    // :53 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
-    if (slot === 3) run('Special times or showcase failed', async () => {
-      if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});
-      await refreshShowcaseIfDue(env, at);
-    });
+    if (slot === 3 && env.IRACING_IMPORT !== 'off') run('iRacing special event times failed',
+      () => syncIracingEvents(env,{timestamp:at.getTime(),scheduled:true,specialOnly:true}));
+    if (slot === 3) run('Showcase refresh failed', () => refreshShowcaseIfDue(env, at));
   }
 };
 

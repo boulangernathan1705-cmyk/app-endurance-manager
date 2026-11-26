@@ -89,7 +89,9 @@ export function badge(category) { return `<span class="event-category-badge ${ca
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
 const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', lmu:`Manche du championnat officiel de ${activeGame==='iracing'?'iRacing':'Le Mans Ultimate'}.`, private:'Course organisée par ta communauté.'};
 export function eventTypeBadge(type) { const key = EVENT_TYPES[type] ? type : 'private', item = EVENT_TYPES[key]; return `<span class="event-type-badge ${item.css}" data-tip="${esc(EVENT_TYPE_TIPS[key] || '')}">${esc(item.label)}</span>`; }
-export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge" data-tip="Les horaires officiels ne sont pas encore connus : inscris-toi et forme ton équipage, chacun choisira son départ quand ils seront publiés.">Horaires à confirmer</span>' : ''; }
+export function schedulePendingBadge(event) {
+  if (event?.officialScheduleStatus) return `<span class="event-schedule-badge">${event.officialScheduleStatus === 'cancelled' ? 'Annulée par iRacing' : 'Reportée par iRacing'}</span>`;
+  return event?.schedulePending ? '<span class="event-schedule-badge" data-tip="Les horaires officiels ne sont pas encore connus : inscris-toi et forme ton équipage, chacun choisira son départ quand ils seront publiés.">Horaires à confirmer</span>' : ''; }
 // Pilots of a category on the whole race: a pilot entered on several starts counts once.
 export function eventCategoryCount(event, category) { return pilotCount(event.departures.flatMap(departure => departure.availability.filter(reg => reg.category === category))); }
 export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}" data-tip="${count} pilote${count > 1 ? 's' : ''} inscrit${count > 1 ? 's' : ''} en ${esc(category)}, tous départs confondus.">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }

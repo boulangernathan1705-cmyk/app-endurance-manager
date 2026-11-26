@@ -252,12 +252,12 @@ async function perform(action,target){
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
     case 'iracing-import': {
-      // Admins: official iRacing calendars updated at once (also synchronized hourly).
+      // Admins: official iRacing calendars updated at once (also synchronized periodically).
       const label=target.textContent;target.disabled=true;target.textContent='Mise à jour…';
       let result;
       try{result=await api('/api/admin/iracing-import','POST',{});}finally{target.disabled=false;target.textContent=label;}
-      const parts=[result.repaired?`${result.repaired} circuit${result.repaired>1?'s':''} complété${result.repaired>1?'s':''}`:'',result.skipped?`${result.skipped} course${result.skipped>1?'s':''} à vérifier`:'',result.created?`${result.created} course${result.created>1?'s':''} ajoutée${result.created>1?'s':''}`:'',result.completed?`${result.completed} horaire${result.completed>1?'s':''} complété${result.completed>1?'s':''}`:''].filter(Boolean);
-      await refreshAfterSave(parts.length?`Calendrier iRacing mis à jour : ${parts.join(', ')}.`:'Calendrier iRacing déjà à jour.');
+      const parts=[result.repaired?`${result.repaired} circuit${result.repaired>1?'s':''} complété${result.repaired>1?'s':''}`:'',result.updated?`${result.updated} course${result.updated>1?'s':''} mise${result.updated>1?'s':''} à jour`:'',result.created?`${result.created} course${result.created>1?'s':''} ajoutée${result.created>1?'s':''}`:'',result.completed?`${result.completed} horaire${result.completed>1?'s':''} complété${result.completed>1?'s':''}`:''].filter(Boolean);
+      await refreshAfterSave(result.disabled?'La synchronisation iRacing est désactivée.':result.partial?'Calendrier iRacing partiellement mis à jour.':parts.length?`Calendrier iRacing mis à jour : ${parts.join(', ')}.`:'Calendrier iRacing déjà à jour.');
       break;
     }
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;

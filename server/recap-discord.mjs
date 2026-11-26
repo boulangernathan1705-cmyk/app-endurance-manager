@@ -292,7 +292,7 @@ export function eventDeletionTime(event) {
   // A tbd entry is an event-level waiting area kept for registrations, not an actual start.
   // Once the schedule is published, only real departures determine the Discord lifecycle.
   const departures = parse(event?.departures).filter(item => !item?.tbd);
-  if (!departures.length || event?.schedule_pending || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
+  if (!departures.length || event?.schedule_pending || event?.official_schedule_status === 'postponed' || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
   const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
   if (!(minutes > 0)) return null;
   // A race's thread goes with its week, when the next one turns (Monday 7h30, Paris): the channel never shows two weeks
@@ -304,13 +304,13 @@ export function eventDeletionTime(event) {
 export function racesOpenNow(events, scope, timestamp) {
   return events.filter(event => {
     const iracing = isIracing(event);
-    if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
+    if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending || event.official_schedule_status) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
     return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && raceWeekOpen(item.startsAt, timestamp));
   }).map(event => event.id);
 }
 // The endurances (the calendar's events have their own message).
-const raceEvents = (env, community) => env.DB.prepare(`SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE (community_id=? OR community_id='official') AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ORDER BY created_at,id`)
+const raceEvents = (env, community) => env.DB.prepare(`SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,official_schedule_status,community_id FROM events WHERE (community_id=? OR community_id='official') AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ORDER BY created_at,id`)
   .bind(community.id).all().then(result => result.results || []);
 // The races where this community has an entry, an absence or a crew.
 async function enteredRaces(env, community) {
@@ -1130,7 +1130,7 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.
 export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const rows = (await env.DB.prepare(`SELECT p.*,s.destination_id AS anchor_id,s.iracing_destination_id AS iracing_anchor_id,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending
+  const rows = (await env.DB.prepare(`SELECT p.*,s.destination_id AS anchor_id,s.iracing_destination_id AS iracing_anchor_id,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending,e.official_schedule_status
     FROM discord_recap_publications p LEFT JOIN community_recap_settings s ON s.community_id=p.community_id LEFT JOIN events e ON e.id=p.event_id
     WHERE p.event_id NOT LIKE 'week:%' AND p.event_id<>'' AND p.closed_at IS NULL`).all()).results || [];
   const due = rows.map(row => ({...row,expiry:row.current_event_id ? eventDeletionTime(row) : row.delete_after}))
@@ -1149,7 +1149,7 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
     attempted++;
     try {
       // Configuration synchronisations cannot race this deletion; recheck the event after taking the lock.
-      const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
+      const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending,official_schedule_status FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
       await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:3});

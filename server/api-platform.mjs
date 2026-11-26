@@ -7,9 +7,27 @@ import {discordGuild} from './access.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 import {botInvite} from './api-community.mjs';
+import {syncIracingEvents} from './iracing-import.mjs';
+import {iracingSupervision, resolveIracingConflict} from './iracing-supervision.mjs';
 import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
+  if (path === '/api/platform/iracing' && ['GET','POST','PATCH'].includes(method)) {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    if (method === 'GET') return json(await iracingSupervision(env));
+    if (method === 'PATCH') {
+      const input = await body(request);
+      if (typeof input.key !== 'string' || input.key.length > 150 || !Number.isSafeInteger(input.revision))
+        fail(400, 'Conflit invalide.');
+      return json(await resolveIracingConflict(env,input.key,input.revision,input.action));
+    }
+    try {
+      const result = await syncIracingEvents(env);
+      return json(result, result.busy ? 409 : 200);
+    } catch {
+      fail(502, 'Le calendrier iRacing est momentanément indisponible. Consulte le suivi des sources.');
+    }
+  }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     return json(await discordSupervision(env));

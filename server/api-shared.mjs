@@ -37,6 +37,7 @@ export function departureById(event, departureId) {
 }
 // An official slot for pilots leaving the common "Horaire à définir" start of the same race.
 export function slotFor(event, from, departureId) {
+  if (event.official_schedule_status) fail(409, 'Le choix d’un horaire est suspendu pour cette course iRacing.');
   if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
   const target = JSON.parse(event.departures).find(d => d.id === departureId);
   if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
