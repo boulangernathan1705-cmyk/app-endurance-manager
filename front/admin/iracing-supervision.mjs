@@ -40,8 +40,13 @@ function conflictMarkup(item) {
   return `<details class="discord-diagnostic"><summary>${esc(item.name)} · ${item.registrations} inscription(s) · ${item.crews} équipage(s)</summary>
     <ul class="members-help">${changes}</ul><div class="setup-actions">
     ${item.event_id ? `<a class="secondary-button" href="/iracing/#event=${encodeURIComponent(item.event_id)}">Ouvrir la course</a>` : ''}
-    <button type="button" class="secondary-button" data-iracing-control="resolve" data-key="${esc(item.source_key)}"
-      data-revision="${item.updated_at}">Clore le signalement</button></div></details>`;
+    ${item.canApply ? `<button type="button" class="primary-button" data-iracing-control="resolve" data-decision="apply" data-key="${esc(item.source_key)}"
+      data-revision="${item.updated_at}">Appliquer les valeurs officielles</button>` : ''}
+    <button type="button" class="secondary-button" data-iracing-control="resolve" data-decision="keep" data-key="${esc(item.source_key)}"
+      data-revision="${item.updated_at}">${item.event_id ? 'Conserver les valeurs actuelles' : 'Clore le signalement'}</button>
+    <button type="button" class="secondary-button" data-iracing-control="later">Décider plus tard</button></div>
+    ${item.event_id && !item.canApply ? '<p class="members-help">Une vérification dans la fiche course est nécessaire avant d’appliquer ces changements.</p>' : ''}
+    </details>`;
 }
 
 function render(result) {
@@ -68,6 +73,7 @@ function render(result) {
 
 export function installIracingSupervision(app, api) {
   async function refresh(panel, action, button) {
+    if (action === 'later') {button.closest('details').open = false;return;}
     if (panel.dataset.busy) return;
     panel.dataset.busy = 'true';
     const status = panel.querySelector('[data-iracing-status]');
@@ -79,8 +85,8 @@ export function installIracingSupervision(app, api) {
         outcome = result.disabled ? 'Synchronisation désactivée.' : result.errors?.length ? 'Synchronisation partielle.' : 'Synchronisation terminée.';
       }
       if (action === 'resolve') {
-        await api(endpoint,'PATCH',{key:button.dataset.key,revision:Number(button.dataset.revision)});
-        outcome = 'Signalement clos pour cette version des données.';
+        await api(endpoint,'PATCH',{key:button.dataset.key,revision:Number(button.dataset.revision),action:button.dataset.decision});
+        outcome = button.dataset.decision === 'apply' ? 'Valeurs officielles appliquées.' : 'Signalement clos pour cette version des données.';
       }
     } catch (error) {
       outcome = error.message;
