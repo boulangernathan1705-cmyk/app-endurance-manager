@@ -3,7 +3,7 @@ import {gameForEvent} from '../shared/catalog.mjs';
 
 // Use the stored race duration, not the schedule (which includes practice/qualifying).
 // Hide it only when the title actually contains the same duration.
-export function enduranceDuration(event) {
+export function enduranceDuration(event, always = false) {
   const minutes = Number(event?.durationMinutes) || Number(event?.durationHours) * 60;
   if (!Number.isFinite(minutes) || minutes <= 0) return '';
   const title = String(event?.name || '').normalize('NFKC').toLowerCase();
@@ -11,7 +11,7 @@ export function enduranceDuration(event) {
   const mins = /(?:^|[^\p{L}\p{N}])(\d{1,4})\s*(?:minutes?|mins?|m)(?![\p{L}\p{N}])/gu;
   const shown = [...title.matchAll(hours)].some(m => Number(m[1])*60 + Number(m[2] || 0) === minutes)
     || (minutes < 60 && [...title.matchAll(mins)].some(m => Number(m[1]) === minutes));
-  return shown ? '' : durationLabel(minutes).toUpperCase().replace(/\s+/g,'');
+  return shown && !always ? '' : durationLabel(minutes).toUpperCase().replace(/\s+/g,'');
 }
 
 export const enduranceSim = (event, game = event?.otherGame || gameForEvent(event)) => game === 'iracing' ? 'iracing' : 'lmu';
@@ -30,9 +30,9 @@ export function endurancePreviewClass(event, game) {
   const track = String(event?.circuit || '').replace(/^iracing-/, '');
   return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
-export function enduranceHeader(event, game, previewMap = '') {
+export function enduranceHeader(event, game, previewMap = '', alwaysDuration = false) {
   const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
-  const duration = enduranceDuration(event);
+  const duration = enduranceDuration(event, alwaysDuration);
   return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${previewMap}<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
 }
 
