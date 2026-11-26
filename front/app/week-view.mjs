@@ -162,6 +162,7 @@ function block(item,now){
   const access=state.eventTdz&&solo&&!stream?(event.access==='safe'?'SAFE':'OPEN'):'';
   const kindLine=[sim,solo?kind.label:'Endurance',access].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
+  const liveStatus=live?'<span class="week-chip is-live">● En cours</span>':'';
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
@@ -172,8 +173,7 @@ function block(item,now){
     ${solo?plan.band:''}
     <span class="week-block-body">
     <span class="week-block-title">
-    ${live?'<span class="week-chip is-live">● En cours</span>':''}
-    ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:enduranceCardIdentity(event,enduSim)}
+    ${solo?`${liveStatus}<span class="week-block-kind">${esc(kindLine)}</span>`:`<span class="week-endurance-heading">${liveStatus}${enduranceCardIdentity(event,enduSim)}</span>`}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>

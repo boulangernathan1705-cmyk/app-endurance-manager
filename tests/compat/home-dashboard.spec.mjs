@@ -10,6 +10,7 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'special',capacity:30,categories:['Hypercar'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:'15:00',startsAt,availability,crews}]});
  const lmu=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',soon,[reg],[{id:'crew',name:'Apex Racing',category:'Hypercar',registrationIds:['reg-1']}]);
+ lmu.departures.unshift({...lmu.departures[0],id:'spa-live',startsAt:now-3600000,endsAt:now+3600000,availability:[],crews:[]});
  const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+24*3600000);
  await page.route('**/api/**',route=>{
   const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
@@ -38,7 +39,16 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
   await expect(badge).toHaveText(sim==='lmu'?'LMU Endurance':'iRacing Endurance');
   await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
-  await expect(card.locator('.week-endurance-schedule .endurance-start-icon')).toHaveCount(1);
+  await expect(card.locator('.week-endurance-schedule .endurance-start-icon')).toHaveCount(sim==='lmu'?2:1);
+  if(sim==='lmu'){
+   const live=card.locator('.week-endurance-heading .week-chip.is-live');
+   await expect(live).toBeVisible();
+   if(width===390){
+    const [statusBox,badgeBox]=await Promise.all([live.boundingBox(),badge.boundingBox()]);
+    expect(Math.abs(statusBox.y+statusBox.height/2-badgeBox.y-badgeBox.height/2)).toBeLessThan(1);
+    expect(statusBox.x+statusBox.width).toBeLessThanOrEqual(badgeBox.x);
+   }
+  }
   const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';
   expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
   await card.evaluate(el=>el.classList.add('is-panorama-preview'));
