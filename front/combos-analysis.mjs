@@ -294,7 +294,7 @@ export function analysisBody(sides, metric, pick, size = 450, picked = null, sor
       ${gapList(legs, b?.trace ? sides : [a], picked, sort)}</div>
       <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color, size, picked)}</div></section>`;
   })() : `<section><div class="cb-head"><h2>Analyse du tour</h2></div><p class="cb-empty">Aucun tracé valide disponible pour cette séance.</p></section>`;
-  return `${headToHead(sides)}${lap}${lapList(a)}${expert(sides)}`;
+  return `${lap}${headToHead(sides)}${lapList(a)}<details class="cb-fold" data-fold="expert"${a.expertOpen?' open':''}><summary><h2>Mesures expertes</h2></summary><div class="cb-fold-body">${expert(sides)}</div></details>`;
 }
 
 // ---------- Following the pointer ----------
