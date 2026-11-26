@@ -1,6 +1,7 @@
 // « Fiche mémo » (module Plugin SimHub; server/combos.mjs, module "combos"): what the team measured in practice on one car and one
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
+import {memoCandidates, memoRequestLabel} from './memo-links.mjs';
 import {COLORS, CONDITIONS} from '../shared/combos.mjs';
 import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration} from './combos-stats.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
@@ -78,10 +79,16 @@ async function start() {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
     view.combos = list.combos; view.link = link;
   } catch (error) { renderError(error); return; }
-  const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
-  view.combo = wanted || (!params.has('track') && !params.has('car') ? view.combos[0] : view.combos.find(item => (!params.has('track') || item.track === params.get('track')) && (!params.has('car') || item.car === params.get('car')))) || null;
-  view.requested = !view.combo && (params.has('track') || params.has('car')) ? [params.get('track'), params.get('car')].filter(Boolean).join(' · ') : '';
+  selectRequestedCombo(params);
   if (view.combo) await loadSheet(); else render();
+}
+
+function selectRequestedCombo(params) {
+  const label = memoRequestLabel(params);
+  const candidates = memoCandidates(view.combos, params);
+  view.combo = label ? (candidates.length === 1 ? candidates[0] : null) : view.combos[0] || null;
+  view.requested = !view.combo ? label : '';
+  view.candidates = view.requested ? candidates : [];
 }
 
 let sheetRequest = 0;
@@ -118,7 +125,7 @@ async function refresh() {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
     view.combos = list.combos; view.link = link;
     if (!view.combo && !view.requested) view.combo = view.combos[0] || null;
-    if (view.requested) { const q = new URLSearchParams(location.search); view.combo = view.combos.find(item => (!q.has('track') || item.track === q.get('track')) && (!q.has('car') || item.car === q.get('car'))) || null; if (view.combo) view.requested = ''; }
+    if (view.requested) selectRequestedCombo(new URLSearchParams(location.search));
   } catch (error) { view.message = error.message; }
   if (view.combo) await loadSheet(true);
   view.refreshing = false; render();
@@ -127,8 +134,8 @@ async function refresh() {
 // Another car or circuit: its own sheet, without the choices that belong to the previous one.
 async function openCombo(track, car) {
   const combo = view.combos.find(item => item.track === track && item.car === car);
-  if (!combo || comboKey(combo) === comboKey(view.combo)) { render(); return; }
-  Object.assign(view, {combo, event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null});
+  if (!combo || (view.combo && comboKey(combo) === comboKey(view.combo))) { render(); return; }
+  Object.assign(view, {combo, requested:'', candidates:[], event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null});
   view.analysis.zone = null;
   await loadSheet();
 }
@@ -519,10 +526,22 @@ function periodsCard() {
   </div></details>`;
 }
 
+function summaryCards(rows) {
+  const row = rows.find(item => item.crew) || rows[0];
+  if (!row) return '';
+  const laps = stintProjection(100,row.ve,3);
+  const data = [['Rythme moyen',lapTime(row.avg)],['Meilleur tour',lapTime(row.best)],['Énergie / tour',known(row.ve)?`${fr(row.ve)} %`:'—'],['Autonomie (réserve 3 %)',known(laps)?`${laps} tours`:'—'],['Carburant / tour',known(row.fuel)?`${fr(row.fuel)} L`:'—'],['Tours retenus',String(row.laps)]];
+  return `<section class="cb-overview" aria-label="Synthèse des données">${data.map(([label,value])=>`<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')}</section><p class="cb-src">Synthèse des pilotes affichés et des conditions choisies. Autonomie indicative, limitée ici par l’énergie.</p>`;
+}
+
 function render() {
   const message = view.message ? `<p class="cb-message" role="status">${esc(view.message)}</p>` : '';
   if (!view.combo) {
-    if (view.requested) { app.innerHTML = `${message}<p class="cb-empty">Aucune séance disponible pour ${esc(view.requested)}. <a href="/simhub.html">Voir les autres fiches</a> · <button type="button" class="cb-btn" data-action="refresh">Actualiser</button></p>${view.link?.linked ? '' : linkCard()}`; return; }
+    if (view.requested) {
+      const candidates = view.candidates || [];
+      const choices = candidates.map(item => `<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}"><b>${esc(item.car)}</b><span>${esc(item.track)} · ${item.laps} tours</span></button>`).join('');
+      app.innerHTML = `${message}<section class="cb-card"><div class="cb-head"><h2>${esc(view.requested)}</h2></div>${choices ? '<p>Choisis la voiture et le circuit exacts.</p><div class="cb-pick-cars">'+choices+'</div>' : '<p class="cb-empty">Aucune séance disponible pour cette combinaison.</p>'}<p><a href="/simhub.html">Voir les autres fiches</a> · <button type="button" class="cb-btn" data-action="refresh">Actualiser</button></p></section>${view.link?.linked ? '' : linkCard()}`; return;
+    }
     app.innerHTML = `${message}
       <p class="cb-empty">Aucune séance reçue pour l’instant. Relie SimHub et roule : la fiche de chaque voiture et de chaque circuit se remplit toute seule, avec les chiffres de chaque pilote.</p>${linkCard()}`;
     return;
@@ -545,7 +564,7 @@ function render() {
     ${toolbar()}${conditions()}
     <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}${view.moment ? ` · ${view.moment === 'night' ? 'nuit' : 'jour'}` : ''}</span><span class="cb-meta">${c.laps} tours${track}</span>
       <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours. Équipage = moyenne des pilotes affichés. <span class="cb-best-key">En violet</span> : le meilleur pilote de la colonne.</p>
-      ${c.laps ? `<div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyres()}` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
+      ${c.laps ? `${summaryCards(rows)}<div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyres()}` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
     ${pitStop()}${notes()}
     <div class="cb-foot">${periodsCard()}</div>`;
 }

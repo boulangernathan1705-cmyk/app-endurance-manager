@@ -396,3 +396,10 @@ th.an-who { color: var(--dc) !important; }
   .an-gaps-list { max-height: 360px; }
   .combos-page .an-h2h th, .combos-page .an-h2h td { padding: 5px 6px; font-size: 13px; }
 }
+
+/* Compact memo summary; the detailed tables remain available below. */
+.cb-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0;}
+.cb-overview>div{display:grid;gap:4px;min-width:0;padding:12px;border:1px solid var(--cb-line);background:var(--cb-panel);border-radius:8px;}
+.cb-overview small{font-size:12px;color:var(--muted);}
+.cb-overview strong{font-size:clamp(17px,2vw,24px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+@media(max-width:620px){.cb-overview{grid-template-columns:repeat(2,minmax(0,1fr));}.cb-overview>div{padding:9px;}}
