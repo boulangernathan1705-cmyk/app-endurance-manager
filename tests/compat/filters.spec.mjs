@@ -146,18 +146,27 @@ for(const game of ['lmu','iracing'])test(`${game}: official special filter, rese
 });
 
 test('SOLO and TDZ calendars ignore endurance-only filters and preserve their simulator choice',async({page})=>{
+  await page.clock.setFixedTime(Date.parse('2090-10-15T08:00:00Z'));
   const solo=race('lmu',{format:'solo',sim:'lmu',name:'Solo OPEN',access:'open',official:false,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],details:{type:'OPEN'},categories:[]});
   await boot(page,'lmu',[solo]);
   await page.evaluate(async()=>{
     const {state}=await import('/front/app/core.mjs');state.listFormat='solo';
     const {raceFilterKey}=await import('/front/race-filters.mjs');const key=raceFilterKey('lmu','solo',{communityId:state.community.id,userId:state.user.id});
     localStorage.setItem(key,JSON.stringify({types:['special'],communities:['beta'],categories:['GTP'],sims:['lmu'],kinds:['OPEN'],situation:'crew'}));
-    state.raceFiltersBy={};state.raceFilterOpen=true;const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
+    state.raceFiltersBy={};state.raceFilterOpen=true;const {setHomeView}=await import('/front/app/tdz-home-state.mjs');setHomeView('list');const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
   });
   await expect(page.locator('.event-card')).toHaveCount(1);
   await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');
-  await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
+  await page.getByRole('button',{name:'Semaine suivante'}).click();
+  await expect(page.locator('.event-card')).toHaveCount(0);
+  await page.getByRole('button',{name:'Semaine précédente'}).click();
+  await expect(page.locator('.event-card')).toHaveCount(1);
+  await page.getByRole('button',{name:'Semaine',exact:true}).click();
+  await expect(page.locator('.week-block')).toContainText('Solo OPEN');
+  await page.getByRole('button',{name:'Liste',exact:true}).click();
+  await expect(page.locator('.event-card')).toHaveCount(1);
+  await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};state.listFormat='solo';const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
   await expect(page.locator('.event-card')).toHaveCount(1);await expect(page.locator('[data-group="kinds"]')).toHaveCount(0);
 });
 

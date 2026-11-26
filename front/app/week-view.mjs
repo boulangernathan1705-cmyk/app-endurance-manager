@@ -282,10 +282,10 @@ function crewsBox(){
     ${button('crews-page','Voir les équipages →','','home-next-go')}</aside>`;
 }
 
-export function renderWeek(){
+export function renderWeek(message=''){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
-  if(fusedTdzHome()&&homeView()!=='week'){renderTdzCalendar();return;}
+  if(fusedTdzHome()&&homeView()!=='week'){renderTdzCalendar(message);return;}
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
@@ -314,7 +314,7 @@ export function renderWeek(){
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
   app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>${fusedTdzHome()?homeViewSwitch():''}
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
-    <div class="home-layout${box?'':' is-full'}">
+    ${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
         ${fusedTdzHome()?homeFilterBar()+advanced.button+advanced.panel:`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
         <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
