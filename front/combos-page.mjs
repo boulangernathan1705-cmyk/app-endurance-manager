@@ -252,7 +252,7 @@ function analysisSides() {
     const data = a.sessions.get(id), item = a.list?.find(entry => entry.id === id);
     if (!data || !item) return null;
     const color = colour.get(item.userId)?.color || item.color || fallback;
-    return {data, item, trace:traceOf(data), lapsOpen:a.lapsOpen, color, label:`${item.name}${item.mine ? ' (moi)' : ''} · ${dayTime(item.startedAt)}`, short:item.name};
+    return {data, item, trace:traceOf(data), lapsOpen:a.lapsOpen, expertOpen:a.expertOpen, color, label:`${item.name}${item.mine ? ' (moi)' : ''} · ${dayTime(item.startedAt)}`, short:item.name};
   };
   const mine = side(a.mine, COLORS[0]);
   let other = a.other !== 'none' ? side(a.other, COLORS[1]) : null;
@@ -685,7 +685,7 @@ function summaryCards(rows) {
   const row=rows.find(item=>item.crew)||rows[0];
   if(!row) return '<p class="cb-empty">Aucune mesure pour les pilotes et conditions sélectionnés.</p>';
   const laps=availableLaps(view.sheet.combo.capacity,row.fuel,row.ve,view.reserve);
-  const duration=known(row.avg)&&known(laps)?Math.round(row.avg*stintLaps()):null;
+  const duration=known(row.avg)&&(known(laps)||view.stint)?Math.round(row.avg*stintLaps()):null;
   const virtual=known(row.ve)&&row.ve>0;
   const items=[
     ['Rythme moyen',lapTime(row.avg),'Meilleur : '+lapTime(row.best)],
@@ -702,7 +702,7 @@ function preparation(rows) {
     <div class="cb-actions cb-no-print"><button type="button" class="cb-btn" data-action="share-prep">Partager</button><button type="button" class="cb-btn" data-action="print-prep">Imprimer</button></div></div>
     <p>${esc(view.sheet.race?.name || view.combo.track)} · ${esc(view.combo.car)} · ${COND[view.cond][0]}</p>
     ${summaryCards(rows)}<div class="cb-note-fields cb-no-print"><label>Réserve du plein (%) <input type="number" data-field="reserve" min="0" max="50" value="${reserve}"></label>
-      <label>Objectif (tours) <input type="number" data-field="prepLaps" min="1" max="60" value="${laps}"></label></div>
+      <label>Objectif (tours) <input type="number" data-field="prepLaps" min="1" max="60" value="${laps}"></label></div>${!view.stint&&!rows.some(row=>known(availableLaps(view.sheet.combo.capacity,row.fuel,row.ve,view.reserve)))?'<p class="cb-src">Objectif de 12 tours par défaut, faute de consommation exploitable. Ajuste-le avant la course.</p>':''}
     <div data-prep-results>${preparationResults(rows)}</div>
   </section>`;
 }
