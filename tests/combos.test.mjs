@@ -633,3 +633,24 @@ test('memo crew context refuses unknown crew and is gated by the optional module
  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV_COMMUNITY);
  assert.equal((await req(q,'GET',null,NATHAN)).status,404);
 });
+
+test('memo crew resolves actual members, not names, and refuses a non-member', async()=>{
+ const {req,signIn}=harness();
+ signIn(NATHAN,'Nathan',[TEAM_ROLE,ORGA_ROLE]); signIn(LUCAS,'Lucas',[TEAM_ROLE]); signIn(GUEST,'Guest',[TEAM_ROLE]);
+ const made=await req('/api/events','POST',{name:'Mémo test',categories:['Hypercar'],circuit:'spa',departures:[{date:'2090-10-15',time:'15:00'}]},NATHAN);
+ assert.equal(made.status,201);
+ const event=(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.name==='Mémo test');
+ const base='/api/events/'+event.id+'/departures/'+event.departures[0].id;
+ assert.equal((await req(base+'/registrations','POST',{name:'Nathan',category:'Hypercar',status:'whole'},NATHAN)).status,201);
+ const created=await req(base+'/crews','POST',{name:'Équipage mémo',category:'Hypercar',car:'Ferrari 499P'},NATHAN);
+ assert.equal(created.status,201);
+ const teammate=await req(base+'/registrations','POST',{name:'Lucas',category:'Hypercar',status:'whole'},LUCAS);
+ assert.equal(teammate.status,201);
+ const listing=(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.id===event.id).departures[0].crews[0];
+ const joined=await req('/api/crews/'+created.data.id+'/members','POST',{registrationId:teammate.data.id,version:listing.version,selfJoin:true},LUCAS);
+ assert.equal(joined.status,200);
+ const q='/api/combos/crew?id='+created.data.id;
+ const actual=await req(q,'GET',null,NATHAN);
+ assert.equal(actual.status,200); assert.deepEqual(actual.data.members.sort(),[NATHAN,LUCAS].sort());
+ assert.equal((await req(q,'GET',null,GUEST)).status,404);
+});

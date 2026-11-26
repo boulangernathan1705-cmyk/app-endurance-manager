@@ -144,7 +144,8 @@ async function refresh() {
   view.refreshing = true; render();
   try {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link;
+    view.combos = list.combos; view.link = link; readPrefs(list.preferenceScope);
+    if (view.crew) {try{view.crew=await call('/api/combos/crew?id='+encodeURIComponent(view.crew.id));}catch{view.crew=null;if(view.scope==='crew')view.scope='all';view.message='Équipage indisponible.';}}
     if (!view.combo && !view.requested) view.combo = view.combos[0] || null;
     if (view.requested) selectRequestedCombo(new URLSearchParams(location.search));
   } catch (error) { view.message = error.message; }
@@ -583,7 +584,7 @@ async function loadHistory() {
 }
 function historyCard() {
   const key=historyKey(), h=view.history?.key===key?view.history:null;
-  const names=people(),hidden=hiddenFor(),show=id=>!hidden.has(id);
+  const names=people(),hidden=hiddenFor(),show=id=>view.scope==='crew'?view.crew.members.includes(id):view.scope==='me'?names.get(id)?.me===true:!hidden.has(id);
   const name=id=>esc(names.get(id)?.name || 'Pilote');
   const rows=(h?.data?.stints||[]).filter(row=>show(row.pilot));
   const stops=(h?.data?.stops||[]).filter(row=>show(row.pilot));
