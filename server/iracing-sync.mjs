@@ -65,19 +65,26 @@ export async function synchronizeKnown(env, row, data, plan, at) {
 
   const accepted = baseline ? {...baseline} : {...next};
   const proposed = new Set(), issues = [];
+  // An open discrepancy from the initial migration remains actionable even after the source baseline is stored.
+  const priorIssues = row.sync_conflict ? (JSON.parse(row.sync_conflict).fields || []) : [];
   const discrepancy = (field, reason, local, previous, incoming) => issues.push({field, reason, local, previous, incoming});
   for (const field of FIELDS) {
     const local = field === 'starts' ? future(current.starts,at) : current[field];
     const before = field === 'starts' ? future(knownStarts,at) : baseline?.[field] ?? current[field];
     const incoming = field === 'starts' ? future(next.starts,at) : next[field];
     const initialPublication = field === 'starts' && plan.special && validStarts && row.schedule_pending && !current.starts.length;
-    if (field === 'starts' && !validStarts) continue;
+    if (field === 'starts' && !validStarts) {
+      issues.push(...priorIssues.filter(issue => issue.field === 'starts'));
+      continue;
+    }
     if (equal(local,incoming)) {
       if (field !== 'starts' || !equal(before,incoming) || !baseline) accepted[field] = next[field];
       continue;
     }
     if (!initialPublication && (!baseline || equal(before,incoming))) {
-      if (!baseline && !row.source_metadata) discrepancy(field,'manual',local,before,incoming);
+      const previous = priorIssues.find(issue => issue.field === field && issue.reason === 'manual');
+      if (!baseline && !row.source_metadata) discrepancy(field,'manual',local,incoming,incoming);
+      else if (previous) discrepancy(field,'manual',local,previous.previous,incoming);
       continue;
     }
     if (!initialPublication && !equal(before,local)) {
@@ -91,7 +98,7 @@ export async function synchronizeKnown(env, row, data, plan, at) {
 
   const hasDataChange = [...proposed].some(field => field !== 'starts');
   const removed = proposed.has('starts') ? old.filter(d => !d.tbd && d.startsAt > at && !next.starts.includes(d.startsAt)) : [];
-  const firstPublication = Boolean(plan.special && plan.articleStarts && row.schedule_pending && completeArticle && !issues.some(issue => issue.field === 'starts'));
+  const firstPublication = Boolean(plan.special && plan.articleStarts && row.schedule_pending && completeArticle && !['cancelled','postponed'].includes(metadata.status) && !issues.some(issue => issue.field === 'starts'));
   const provisional = old.find(d => d.tbd);
   const hasActivityCheck = hasDataChange || removed.length || (firstPublication && provisional);
   const activity = hasActivityCheck ? await env.DB.prepare(`SELECT
@@ -173,6 +180,9 @@ export async function synchronizeKnown(env, row, data, plan, at) {
       OR (SELECT revision FROM event_list_revision WHERE id=1) IS NOT ? THEN json('iracing_revision_changed') END`)
       .bind(row.id,row.version,activity.revision);
     const event = {...row,name,circuit};
+    const addedStarts = departures.departures.some(d => !d.tbd && !old.some(previous => previous.id === d.id));
+    const notification = statusChanged ? {officialStatus:status || 'confirmed'}
+      : addedStarts && !choose && !status ? {changes:['starts']} : null;
     const preconditions = [...(guard ? [guard] : []), ...(moves ? moves.statements(row.version) : [])];
     const batch = [
       ...preconditions,
@@ -187,7 +197,7 @@ export async function synchronizeKnown(env, row, data, plan, at) {
       db.prepare(`UPDATE iracing_imports SET source_snapshot=?,source_metadata=?,source_identity=COALESCE(source_identity,?),reconcile_token=?
         WHERE community_id='official' AND external_id=? AND changes()=1`)
         .bind(snapshot,sourceMetadata,plan.identity,changeToken,row.external_id),
-      ...(statusChanged && status ? [notificationStatement(env,event,{officialStatus:status},{token:changeToken})] : [])
+      ...(notification ? [notificationStatement(env,event,notification,{token:changeToken})] : [])
     ];
     try {
       const results = await db.batch(batch);
