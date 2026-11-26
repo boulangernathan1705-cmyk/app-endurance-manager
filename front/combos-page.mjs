@@ -4,7 +4,7 @@
 import {memoCandidates, memoRequestLabel, NOTE_THEMES} from '../shared/memo-links.mjs';
 import {COLORS, CONDITIONS, NIGHT_BELOW} from '../shared/combos.mjs';
 import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration, availableLaps, tyreRemaining} from './combos-stats.mjs';
-import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=8';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -993,6 +993,7 @@ app.addEventListener('toggle', event => {
   if (fold === 'history') view.historyOpen = event.target.open;
   if (fold === 'periods') view.periodsOpen = event.target.open;
   if (fold === 'side') view.sideOpen = event.target.open;
+  if (fold === 'expert') view.analysis.expertOpen = event.target.open;
   if (fold === 'laps') view.analysis.lapsOpen = event.target.open;
   if (fold === 'picker') view.pickerOpen = event.target.open;
 }, true);
