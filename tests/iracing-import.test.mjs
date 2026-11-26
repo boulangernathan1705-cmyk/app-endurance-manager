@@ -97,11 +97,11 @@ test('a special event article using the short name of the slug is found (Indy 8 
   assert.match(articleFor(two, {name:'Bathurst 1000', slug:'bathurst-1000', dateStart:'2099-10-16', dateEnd:'2099-10-18'}).title.rendered, /Bathurst/);
 });
 
-test('a special event article with another name is still found when it is the only one of the race week', async () => {
+test('an unrelated special event article is never used even when it is the only one of the race week', async () => {
   const {articleFor} = await import('../server/iracing-import.mjs');
   const posts = [{date:'2099-10-12T09:00:00', title:{rendered:'THIS WEEK: iRacing Brickyard Sprint presented by Someone | Special Event'}, content:{rendered:''}}];
   const special = {name:'8 Hours of Indianapolis', slug:'indy-8hr', dateStart:'2099-10-16', dateEnd:'2099-10-18'};
-  assert.ok(articleFor(posts, special));
+  assert.equal(articleFor(posts, special),null);
   assert.equal(articleFor([...posts, {...posts[0], title:{rendered:'THIS WEEK: Other Race | Special Event'}}], special), null, 'two articles: no guess');
   assert.equal(articleFor([{...posts[0], date:'2099-10-08T09:00:00'}], special), null, 'last week article is not taken');
 });
@@ -194,4 +194,18 @@ test('solo import requires a verified endurance series and at least 90 minutes o
   for(const minutes of [90,120])assert.equal(solo({...base,typical_session_duration_minutes:minutes}).length,1);
   assert.equal(solo({...base,name:'GT Sprint Championship',typical_session_duration_minutes:180}).length,0);
   assert.equal(solo({...base,typical_session_duration_minutes:120,weeks:[{...base.weeks[0],duration_minutes:60}]}).length,0,'race duration wins over the typical session length');
+});
+
+test('source reconciliation keeps unchanged departure IDs and historical departures',async()=>{
+  const {reconcileStarts}=await import('../server/iracing-sync.mjs');
+  const old=[{id:'past',startsAt:10},{id:'same',startsAt:30},{id:'removed',startsAt:40}];
+  const incoming=[{startsAt:30},{startsAt:50}];
+  const result=reconcileStarts(old,incoming,20);
+  assert.deepEqual(result.map(d=>d.startsAt),[10,30,50]);
+  assert.equal(result[0].id,'past');assert.equal(result[1].id,'same');
+  assert.notEqual(result[2].id,'removed');
+});
+test('invalid times in an official article are ignored',async()=>{
+  const {specialStarts}=await import('../server/iracing-import.mjs');
+  assert.deepEqual(specialStarts('Timeslot #1: Saturday at 25:00 GMT Timeslot #2: Saturday at 12:99 GMT','2099-10-16','2099-10-18'),[]);
 });
