@@ -165,7 +165,7 @@ export async function sheet(env, community, userId, combo, url, current = false)
   const scope = [community.id, combo.track, combo.car, filters.from, filters.to];
   const lapScope = [...scope, filters.setup, filters.setup, filters.moment, filters.moment, filters.trackMin, filters.trackMin, filters.trackMax, filters.trackMax];
   const where = 'community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?';
-  const [drivers, slopes, tyres, conditions, moments, setups, sample, stops, service, game, notes] = await Promise.all([
+  const [drivers, slopes, tyres, moments, setups, sample, stops, service, game, notes] = await Promise.all([
     all(env, `${CLEAN} SELECT user_id, cond, COUNT(*) AS laps, AVG(NULLIF(ve,0)) AS ve, COUNT(NULLIF(ve,0)) AS ve_laps, AVG(NULLIF(fuel,0)) AS fuel,
       AVG(t) AS avg, MIN(t) AS best, AVG(NULLIF((wear_fl+wear_fr+wear_rl+wear_rr)/4.0,0)) AS wear, COUNT(s1) AS sector_laps, AVG(s1) AS s1, AVG(s2) AS s2, AVG(s3) AS s3, MIN(s1) AS best1, MIN(s2) AS best2, MIN(s3) AS best3
       FROM clean GROUP BY user_id, cond`, ...lapScope),
@@ -174,7 +174,6 @@ export async function sheet(env, community, userId, combo, url, current = false)
       SELECT user_id, cond, SUM(x*y)/NULLIF(SUM(x*x),0) AS slope FROM centred GROUP BY user_id, cond`, ...lapScope),
     all(env, `${CLEAN} SELECT user_id, cond, compound, COUNT(*) AS laps, MIN(track_temp) AS tmin, MAX(track_temp) AS tmax, ${wheelAverages('wear')}, ${wheelAverages('temp')}, ${wheelAverages('kpa')}, ${wheelAverages('brake')}
       FROM clean GROUP BY user_id, cond, compound`, ...lapScope),
-    all(env, `${CLEAN} SELECT cond, COUNT(*) AS laps, MIN(track_temp) AS tmin, MAX(track_temp) AS tmax FROM clean GROUP BY cond`, ...lapScope),
     // Laps driven by day and by night in each condition, whatever the day/night choice: the sheet's day/night switch.
     all(env, `SELECT ${CONDITION_SQL} AS cond, SUM(light>=${NIGHT_BELOW}) AS day, SUM(light<${NIGHT_BELOW}) AS night FROM combo_laps
       WHERE ${where} AND pit=0 AND ignored=0 AND t>0 GROUP BY cond`, ...scope),
@@ -200,21 +199,25 @@ export async function sheet(env, community, userId, combo, url, current = false)
     WHERE u.id IN (SELECT value FROM json_each(?))`, community.id, community.id, JSON.stringify([...lapsOf.keys()])) : [];
   const slopeOf = new Map(slopes.map(row => [`${row.user_id}|${row.cond}`, row.slope]));
   const byCondition = Object.fromEntries(CONDITIONS.map(cond => {
-    const summary = conditions.find(row => row.cond === cond);
+    // The tyre groups partition the same clean laps, including laps without a known compound.
+    let laps = 0, tmin = null, tmax = null;
     const compounds = {};
     for (const row of tyres.filter(item => item.cond === cond)) {
       const name = row.compound || '?';
+      laps += row.laps;
       compounds[name] ||= {laps:0, trackTemp:null, drivers:[]};
       compounds[name].laps += row.laps;
       // The track temperatures this compound was driven between.
       if (row.tmin !== null) {
+        tmin = Math.min(tmin ?? row.tmin, row.tmin);
+        tmax = Math.max(tmax ?? row.tmax, row.tmax);
         const range = compounds[name].trackTemp;
         compounds[name].trackTemp = [round(Math.min(range?.[0] ?? row.tmin, row.tmin), 1), round(Math.max(range?.[1] ?? row.tmax, row.tmax), 1)];
       }
       compounds[name].drivers.push({id:row.user_id, laps:row.laps, wear:wheels(row, 'wear', 3), temp:wheels(row, 'temp', 1), kpa:wheels(row, 'kpa', 1), brake:wheels(row, 'brake', 0)});
     }
     const moment = moments.find(row => row.cond === cond);
-    return [cond, {laps:summary?.laps || 0, trackTemp:summary ? [round(summary.tmin, 1), round(summary.tmax, 1)] : null,
+    return [cond, {laps, trackTemp:laps ? [round(tmin, 1), round(tmax, 1)] : null,
       moments:{day:moment?.day || 0, night:moment?.night || 0},
       drivers:drivers.filter(row => row.cond === cond).sort((a, b) => b.laps - a.laps).map(row => ({id:row.user_id, laps:row.laps, ve:round(row.ve),
         veLaps:row.ve_laps, fuel:round(row.fuel), wear:round(row.wear), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4),
