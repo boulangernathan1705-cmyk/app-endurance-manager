@@ -24,15 +24,25 @@ async function call(path, method = 'GET') {
 
 // The wall's own tabs write their name in the address (#board, #chrono…): they belong to the « Mur des stands » tab.
 const WALL = ['mur', 'board', 'chrono', 'car', 'tele', 'map'];
-const PAGES = {memo:'/front/combos-page.mjs?v=24', wall:'/front/pit-wall.mjs?v=23'};
+const PAGES = {memo:'/front/combos-page.mjs?v=25', wall:'/front/pit-wall.mjs?v=23'};
 const loaded = new Set();
 let allowed=false;
 function show(panel, write = false) {
   if (!allowed) return;
   for (const tab of document.querySelectorAll('.sh-tabs [data-panel]')) tab.setAttribute('aria-selected', String(tab.dataset.panel === panel));
   for (const part of document.querySelectorAll('[data-sh-panel]')) part.hidden = part.dataset.shPanel !== panel;
-  if (write) history.replaceState(null, '', panel === 'wall' ? location.pathname + location.search + '#mur' : location.pathname + location.search);
-  if (!loaded.has(panel)) { loaded.add(panel); import(PAGES[panel]); }
+  if (write) history.replaceState(null, '', location.pathname + location.search + (panel === 'wall' ? '#mur' : '#memo'));
+  if (!loaded.has(panel)) {
+    loaded.add(panel);
+    import(PAGES[panel]).then(module=>{if(panel==='memo') return module.startMemo(view.link);}).catch(()=>{
+      loaded.delete(panel);
+      const section=document.querySelector(`[data-sh-panel="${panel}"]`);
+      const message=document.createElement('p');
+      message.setAttribute('role','alert');
+      message.textContent='Chargement impossible. Sélectionne à nouveau cet onglet pour réessayer.';
+      section.append(message);
+    });
+  }
   // The wall stops asking for the cars while it is hidden (front/pit-wall.mjs).
   document.dispatchEvent(new Event('sh-panel'));
 }
@@ -154,7 +164,7 @@ document.getElementById('simhub-app').addEventListener('click', async event => {
 
 async function start() {
   const opening = location.hash === '#installer';
-  if (opening) history.replaceState(null, '', location.pathname + location.search);
+
   const gate=document.getElementById('simhub-gate');
   try { view.link = await call('/api/combos/link'); }
   catch(error) {
@@ -162,6 +172,7 @@ async function start() {
     gate.innerHTML=`<section class="members-panel members-error"><p>${error.status===401?'Connecte-toi pour accéder à cet espace.':error.status===403||error.status===404?'Cet espace n’est pas disponible.':esc(error.message)}</p>${action}</section>`;
     return;
   }
+  if (opening) history.replaceState(null,'',location.pathname+location.search+'#memo');
   allowed=true; gate.hidden=true; document.getElementById('simhub-app').hidden=false;
   show(fromHash());
   view.plugin=await fetch('/downloads/simhub/v0/plugin.json',{cache:'no-store'}).then(response=>response.ok?response.json():null).catch(()=>null);

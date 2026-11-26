@@ -363,7 +363,8 @@ test('a sign-in lasts 30 days and each visit (once a day) pushes it back',async(
  assert.ok(renewed.data.user);assert.match(renewed.response.headers.get('Set-Cookie'),/__Host-em_session=[a-f0-9]{64};.*Max-Age=2592000/);
  assert.ok(expires()>=at+30*86400-5);
 });
-test('validation, closed departures, guest link rejection and free-tier rate limiting',async()=>{
+test('validation, closed departures, guest link rejection and free-tier rate limiting',async t=>{
+ t.mock.method(Date,'now',()=>Date.UTC(2026,10,26,18,5));
  const h=harness();await h.login(ADMIN,'admin');
  for(const data of [{...eventInput,name:' '},{...eventInput,categories:['LMP2']},{...eventInput,departures:[{date:'2090-02-30',time:'14:00'}]},{...eventInput,departures:[eventInput.departures[0],eventInput.departures[0]]}])assert.equal((await h.req('/api/events','POST',data,'admin')).status,400);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'a'.repeat(64)})).status,410,'no entries without an account any more');

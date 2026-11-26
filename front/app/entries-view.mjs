@@ -1,4 +1,4 @@
-import {memoHref} from '../memo-links.mjs';
+import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 import {contextHelpMarker as helpContext,carLabel} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';

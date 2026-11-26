@@ -1,4 +1,4 @@
-import {memoHref} from '../memo-links.mjs';
+import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,

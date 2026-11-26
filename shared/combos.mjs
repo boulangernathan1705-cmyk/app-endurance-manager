@@ -78,6 +78,8 @@ export function cleanTrace(input) {
     out[key] = series(input[key], range);
     if (!out[key]) return null;
   }
+  if (out.time[0] > Math.max(3,t*0.05) || out.time.at(-1) < t*0.9 || out.time.at(-1) > t*1.1 ||
+    out.time.some((value,index)=>index>0 && value<out.time[index-1]) || Math.max(...out.dist)<100) return null;
   for (const key of ['temp', 'slip']) {
     const range = key === 'temp' ? [-50, 250] : [-1, 1];
     out[key] = Array.isArray(input[key]) && input[key].length === 4 ? input[key].map(list => series(list, range)) : null;
@@ -114,9 +116,12 @@ export function cleanSession(input) {
   const stops = input.stops.slice(0, MAX_STOPS).map(stop => ({lap:finite(stop?.lap, 0, 10000) ?? 0, lane:finite(stop?.lane, 0, 600),
     stopped:finite(stop?.stopped, 0, 600), fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0,
     tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);
-  return {at, track, car, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300),
+  const trace = optional(input.trace,cleanTrace);
+  const tracedLap = trace && laps.find(lap=>lap.n===trace.n);
+  const sessionType = Number.isInteger(input.session) && input.session >= 0 && input.session <= 13 ? input.session : null;
+  return {at, track, car, sessionType, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300),
     laps, stops, service:optional(input.service, cleanService), game:optional(input.game, cleanGame),
-    expert:optional(input.expert, cleanExpert), trace:optional(input.trace, cleanTrace)};
+    expert:optional(input.expert, cleanExpert), trace:tracedLap?.t && !tracedLap.invalid && !tracedLap.pit && Math.abs(tracedLap.t-trace.t)<=1 ? trace : null};
 }
 
 // The plugin's installer as the site hands it out (page and plugin alike): the site written in, so it downloads the

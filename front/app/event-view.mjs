@@ -1,4 +1,4 @@
-import {memoHref} from '../memo-links.mjs';
+import {memoHref} from '../../shared/memo-links.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {calendarType} from './season-calendar.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';

@@ -1,4 +1,4 @@
-import {catalogForGame, simForEvent} from '../shared/catalog.mjs';
+import {catalogForGame, simForEvent} from './catalog.mjs';
 
 // Deliberately conservative: never send a pilot to a different circuit or car.
 const normal = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -16,6 +16,7 @@ export function memoHref(event, car = '', crew = '') {
   if (!event || simForEvent(event) !== 'lmu' || event.format === 'solo' || !catalogForGame('lmu').circuits.some(item => item.id === event.circuit && !item.random)) return '';
   const q = new URLSearchParams({circuit:event.circuit});
   if (car) q.set('car', car);
+  if (/^[a-f0-9-]{36}$/i.test(event.id || '')) q.set('race',event.id);
   if (/^[a-f0-9-]{36}$/i.test(crew || '')) q.set('crew', crew);
   return '/simhub.html?' + q.toString() + '#memo';
 }
@@ -30,3 +31,5 @@ export function memoRequestLabel(params) {
   const item = catalogForGame('lmu').circuits.find(c => c.id === circuit);
   return [item?.name || circuit || params.get('track'), params.get('car')].filter(Boolean).join(' · ');
 }
+
+export const NOTE_THEMES = {strategy:'Stratégie',tyres:'Pneus',consumption:'Consommation',track:'Circuit',pit:'Stands',setup:'Réglages'};

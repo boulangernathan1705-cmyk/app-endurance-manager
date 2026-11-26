@@ -8,6 +8,9 @@
 import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './core.mjs';
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
+import {OFFICIAL} from './api-shared.mjs';
+import {memoCandidates, NOTE_THEMES} from '../shared/memo-links.mjs';
+import {simForEvent} from '../shared/catalog.mjs';
 import {openLive} from './live.mjs';
 import {signPass, relaySocketUrl, RELAY_ORIGIN} from '../shared/relay-pass.mjs';
 import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, STINT_MIN, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
@@ -68,13 +71,20 @@ export async function saveSession(env, link, input) {
   try { session = cleanSession(input); } catch (error) { fail(400, error.message); }
   const result = {track:session.track, car:session.car, laps:session.laps.length, stops:session.stops.length};
   const fingerprint = await hash(JSON.stringify([session.at, session.track, session.car]));
-  if (await env.DB.prepare('SELECT 1 FROM combo_sessions WHERE user_id=? AND fingerprint=?').bind(link.user_id, fingerprint).first()) return {...result, created:false};
-  const sessionId = id();
+  const received = async () => {
+    const row = await env.DB.prepare('SELECT id,community_id,received_at FROM combo_sessions WHERE user_id=? AND fingerprint=?')
+      .bind(link.user_id,fingerprint).first();
+    if (row && row.community_id !== link.community_id) fail(409,'Cette séance est déjà enregistrée dans une autre communauté.');
+    return row && {...result,id:row.id,receivedAt:row.received_at,created:false};
+  };
+  const duplicate = await received();
+  if (duplicate) return duplicate;
+  const sessionId = id(), receivedAt = now();
   const scope = [sessionId, link.community_id, link.user_id, session.track, session.car, session.at];
-  const statements = [env.DB.prepare(`INSERT INTO combo_sessions(id,community_id,user_id,fingerprint,started_at,track,car,car_class,driver,capacity,service,game,expert,lap_count,received_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId, link.community_id, link.user_id, fingerprint, session.at, session.track, session.car,
+  const statements = [env.DB.prepare(`INSERT INTO combo_sessions(id,community_id,user_id,fingerprint,started_at,track,car,car_class,driver,capacity,service,game,expert,lap_count,received_at,session_type)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId, link.community_id, link.user_id, fingerprint, session.at, session.track, session.car,
     session.carClass, session.driver, session.capacity, session.service && JSON.stringify(session.service), session.game && JSON.stringify(session.game),
-    session.expert && JSON.stringify(session.expert), session.laps.length, now())];
+    session.expert && JSON.stringify(session.expert), session.laps.length, receivedAt, session.sessionType)];
   for (const lap of session.laps) statements.push(env.DB.prepare(LAP_INSERT).bind(...scope, lap.n, lap.t, lap.s1, lap.s2, lap.s3, lap.fuel, lap.ve,
     ...lap.wear, ...lap.temp, ...lap.kpa, ...lap.brake, lap.compound, lap.track, lap.air, lap.rain, lap.wet, lap.top, lap.invalid ? 1 : 0, lap.pit ? 1 : 0, lap.setup, lap.light));
   session.stops.forEach((stop, index) => statements.push(env.DB.prepare(STOP_INSERT).bind(...scope, index, stop.lap, stop.lane, stop.stopped,
@@ -86,8 +96,14 @@ export async function saveSession(env, link, input) {
       .bind(...scope, n, t, JSON.stringify(points)));
   }
   try { await env.DB.batch(statements); }
-  catch (error) { if (/UNIQUE/i.test(String(error?.message))) return {...result, created:false}; throw error; }
-  return {...result, created:true};
+  catch (error) {
+    if (/UNIQUE/i.test(String(error?.message))) {
+      const existing = await received();
+      if (existing) return existing;
+    }
+    throw error;
+  }
+  return {...result,id:sessionId,receivedAt,created:true};
 }
 
 // ---------- Periods: races being prepared and game versions ----------
@@ -163,8 +179,28 @@ function sheetFilters(list, combo, url, current = false) {
     moment:['day', 'night'].includes(moment) ? moment : null, trackMin:degrees('tmin'), trackMax:degrees('tmax')};
 }
 
-export async function sheet(env, community, userId, combo, url, current = false) {
-  const list = await periods(env, community);
+async function memoRace(env, community, combo, eventId) {
+  if (!/^[a-f0-9-]{36}$/i.test(eventId || '')) return null;
+  const row = await env.DB.prepare("SELECT id,name,circuit,sim FROM events WHERE id=? AND community_id IN (?,?) AND format='endurance'")
+    .bind(eventId,community.id,OFFICIAL).first();
+  if (!row?.circuit || simForEvent(row) !== 'lmu' || !memoCandidates([combo],new URLSearchParams({circuit:row.circuit})).length) return null;
+  return {id:row.id,name:row.name};
+}
+
+function noteInput(input) {
+  const text = String(input.body ?? '').trim().slice(0,NOTE_MAX);
+  if (!text) fail(400,'La note est vide.');
+  if (input.theme !== undefined && !Object.hasOwn(NOTE_THEMES,input.theme)) fail(400,'Thème de note invalide.');
+  if (input.pinned !== undefined && typeof input.pinned !== 'boolean') fail(400,'Épinglage invalide.');
+  return {text,theme:input.theme,pinned:input.pinned};
+}
+
+const canManageMemo = actor => actor.permissions.has('crews') || actor.permissions.has('admin');
+
+export async function sheet(env, community, userId, combo, url, current = false, knownPeriods = null) {
+  const [list,race] = await Promise.all([knownPeriods || periods(env,community),
+    !current && url.searchParams.has('race') ? memoRace(env,community,combo,url.searchParams.get('race')) : null]);
+  const withNotes = current || !url.searchParams.has('comparison');
   const filters = sheetFilters(list, combo, url, current);
   const scope = [community.id, combo.track, combo.car, filters.from, filters.to];
   const lapScope = [...scope, filters.setup, filters.setup, filters.moment, filters.moment, filters.trackMin, filters.trackMin, filters.trackMax, filters.trackMax];
@@ -190,9 +226,10 @@ export async function sheet(env, community, userId, combo, url, current = false)
     // The service times belong to the car, but stay within the selected period/version.
     env.DB.prepare('SELECT service FROM combo_sessions WHERE community_id=? AND car=? AND service IS NOT NULL AND started_at BETWEEN ? AND ? ORDER BY started_at DESC LIMIT 1').bind(community.id, combo.car, filters.from, filters.to).first(),
     env.DB.prepare(`SELECT game FROM combo_sessions WHERE ${where} AND game IS NOT NULL ORDER BY started_at DESC LIMIT 1`).bind(...scope).first(),
-    all(env, `SELECT n.id, n.user_id, n.body, n.created_at, n.updated_at, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
+    withNotes ? all(env, `SELECT n.id, n.user_id, n.body, n.created_at, n.updated_at, n.event_id, n.theme, n.pinned, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
       LEFT JOIN users u ON u.id=n.user_id LEFT JOIN memberships m ON m.user_id=n.user_id AND m.community_id=n.community_id
-      WHERE n.community_id=? AND n.track=? AND n.car=? ORDER BY n.created_at DESC LIMIT 200`, community.id, combo.track, combo.car)
+      WHERE n.community_id=? AND n.track=? AND n.car=? AND (n.event_id IS NULL OR n.event_id=?)
+      ORDER BY n.pinned DESC,n.created_at DESC LIMIT 200`, community.id, combo.track, combo.car,race?.id ?? null) : []
   ]);
 
   // Each pilot: his name on the community's Discord server, his colour; the most laps first.
@@ -238,7 +275,8 @@ export async function sheet(env, community, userId, combo, url, current = false)
       .sort((a, b) => lapsOf.get(b.id) - lapsOf.get(a.id) || a.name.localeCompare(b.name, 'fr')),
     conditions:byCondition,
     pit:{stops:stops?.stops || 0, laneThrough:round(stops?.lane_through ?? null, 2), service:parsed(service?.service), game:parsed(game?.game)},
-    notes:notes.map(row => ({id:row.id, author:row.author || 'Ancien pilote', body:row.body, createdAt:row.created_at, updatedAt:row.updated_at, mine:row.user_id === userId}))
+    race, notes:notes.map(row => ({id:row.id, author:row.author || 'Ancien pilote', body:row.body, createdAt:row.created_at, updatedAt:row.updated_at,
+      mine:row.user_id === userId, eventId:row.event_id, theme:row.theme, pinned:row.pinned === 1}))
   };
 }
 
@@ -274,14 +312,17 @@ async function history(env, community, combo, url) {
 // The sessions on a combo, the most recent first, each with its pilot and its best lap's trace when the plugin sent it:
 // the page opens on the pilot's own and offers the others for the comparison.
 async function analysisList(env, community, userId, combo) {
-  const rows = await all(env, `SELECT s.id, s.user_id, s.started_at, s.lap_count, s.expert IS NOT NULL AS expert, t.lap, t.lap_time,
+  const rows = await all(env, `SELECT s.id, s.user_id, s.started_at, s.lap_count, s.session_type, s.expert IS NOT NULL AS expert,
+      l.n AS lap, t.lap_time, ${CONDITION_SQL} AS cond, l.track_temp, l.light,
       COALESCE(NULLIF(m.nickname,''), u.name) AS name, c.color,
       (SELECT MIN(l.t) FROM combo_laps l WHERE l.session_id=s.id AND l.pit=0 AND l.invalid=0 AND l.ignored=0 AND l.t>0) AS best
-    FROM combo_sessions s LEFT JOIN combo_traces t ON t.session_id=s.id AND NOT EXISTS (SELECT 1 FROM combo_laps x WHERE x.session_id=t.session_id AND x.n=t.lap AND (x.ignored=1 OR x.invalid=1 OR x.pit=1)) LEFT JOIN users u ON u.id=s.user_id
+    FROM combo_sessions s LEFT JOIN combo_traces t ON t.session_id=s.id
+    LEFT JOIN combo_laps l ON l.session_id=t.session_id AND l.n=t.lap AND l.ignored=0 AND l.invalid=0 AND l.pit=0 AND ABS(l.t-t.lap_time)<=1
+    LEFT JOIN users u ON u.id=s.user_id
     LEFT JOIN memberships m ON m.user_id=s.user_id AND m.community_id=s.community_id LEFT JOIN combo_colors c ON c.user_id=s.user_id AND c.community_id=s.community_id
     WHERE s.community_id=? AND s.track=? AND s.car=? ORDER BY s.started_at DESC LIMIT 300`, community.id, combo.track, combo.car);
   return {combo, sessions:rows.map(row => ({id:row.id, userId:row.user_id, name:row.name || 'Ancien pilote', color:row.color || null, mine:row.user_id === userId,
-    startedAt:row.started_at, laps:row.lap_count, best:round(row.best), expert:row.expert === 1, trace:row.lap ? {lap:row.lap, time:row.lap_time} : null}))};
+    startedAt:row.started_at, laps:row.lap_count, best:round(row.best), expert:row.expert === 1, type:row.session_type, trace:row.lap ? {lap:row.lap, time:row.lap_time, cond:row.cond, temp:row.track_temp, light:row.light} : null}))};
 }
 
 // One session of the community: what the plugin measured wheel by wheel, the laps in figures and the best lap's trace.
@@ -296,7 +337,7 @@ async function analysisSession(env, community, userId, sessionId) {
     // Each lap with its condition and the length of its stint, as the sheet cuts them.
     all(env, `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut FROM combo_laps WHERE session_id=?),
         stints AS (SELECT *, SUM(cut) OVER (ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint FROM raw)
-      SELECT n, t, s1, s2, s3, ve, fuel, top, wear_fl, wear_fr, wear_rl, wear_rr, compound, pit, invalid, ignored, cond, SUM(pit=0 AND ignored=0 AND t>0) OVER (PARTITION BY stint) AS run
+      SELECT n, t, s1, s2, s3, ve, fuel, top, wear_fl, wear_fr, wear_rl, wear_rr, compound, pit, invalid, ignored, cond, stint, SUM(pit=0 AND ignored=0 AND t>0) OVER (PARTITION BY stint) AS run
       FROM stints ORDER BY n`, session.id),
     // The pilot's best lap on this combo in each condition: a short stint keeps it.
     all(env, `SELECT cond, MIN(t) AS best FROM (SELECT t, ${CONDITION_SQL} AS cond FROM combo_laps WHERE community_id=? AND track=? AND car=? AND user_id=?
@@ -313,13 +354,23 @@ async function analysisSession(env, community, userId, sessionId) {
   const best = times.length ? Math.min(...times) : null;
   const top = values('top');
   const traceLap = trace && list.find(lap => lap.n === trace.lap);
-  const usableTrace = traceLap && !traceLap.ignored && !traceLap.invalid && !traceLap.pit;
+  const usableTrace = traceLap && !traceLap.ignored && !traceLap.invalid && !traceLap.pit && Math.abs(traceLap.t-trace.lap_time)<=1;
+  const byCondition = Object.fromEntries(CONDITIONS.map(cond=>{
+    const laps = clean.filter(lap=>lap.cond===cond);
+    const data = key=>laps.map(lap=>lap[key]).filter(value=>Number.isFinite(value) && value>0);
+    const mean = key=>{const items=data(key);return items.length?round(items.reduce((sum,n)=>sum+n,0)/items.length):null;};
+    const times = data('t');
+    return [cond,{count:times.length,best:times.length?round(Math.min(...times)):null,avg:mean('t'),
+      spread:times.length?round(Math.max(...times)-Math.min(...times)):null,fuel:mean('fuel'),ve:mean('ve'),
+      top:data('top').length?round(Math.max(...data('top')),1):null}];
+  }));
   return {
     session:{id:session.id, userId:session.user_id, name:session.name || 'Ancien pilote', mine:session.user_id === userId, startedAt:session.started_at,
       track:session.track, car:session.car},
     laps:{count:clean.length, best:round(best), avg:round(avg('t')), spread:times.length ? round(Math.max(...times) - best) : null, fuel:round(avg('fuel', true)),
       ve:round(avg('ve', true)), top:top.length ? round(Math.max(...top), 1) : null, wear:WHEELS.map(wheel => round(avg(`wear_${wheel}`, true), 3))},
-    list:list.map(lap => ({n:lap.n, t:lap.t > 0 ? lap.t : null, s1:lap.s1, s2:lap.s2, s3:lap.s3, ve:lap.ve, fuel:lap.fuel, compound:lap.compound, out:why(lap)})),
+    byCondition,
+    list:list.map(lap => ({n:lap.n, cond:lap.cond, stint:lap.stint+1, t:lap.t > 0 ? lap.t : null, s1:lap.s1, s2:lap.s2, s3:lap.s3, ve:lap.ve, fuel:lap.fuel, compound:lap.compound, out:why(lap)})),
     expert:parsed(session.expert),
     trace:usableTrace ? {...parsed(trace.data), lap:trace.lap, lapTime:trace.lap_time} : null
   };
@@ -365,11 +416,13 @@ async function exportPage(env, community, combo, url) {
     stops:stops.filter(stop => stop.session_id === row.id).map(stop => ({lap:stop.lap, lane:stop.lane, stopped:stop.stopped, fuel:stop.fuel, ve:stop.ve,
       tyres:stop.tyres, repair:stop.repair === 1}))}));
   const last = page.at(-1);
+  const race = !cursor && url.searchParams.has('race') ? await memoRace(env,community,combo,url.searchParams.get('race')) : null;
   return {combo, exportedAt:Date.now(), sessions:out, next:sessions.length > EXPORT_PAGE ? `${last.started_at}:${last.id}` : null,
-    ...(cursor ? {} : {notes:(await all(env, `SELECT n.body, n.created_at, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
+    ...(cursor ? {} : {notes:(await all(env, `SELECT n.body, n.created_at, n.event_id, n.theme, n.pinned, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
       LEFT JOIN users u ON u.id=n.user_id LEFT JOIN memberships m ON m.user_id=n.user_id AND m.community_id=n.community_id
-      WHERE n.community_id=? AND n.track=? AND n.car=? ORDER BY n.created_at`, community.id, combo.track, combo.car))
-      .map(row => ({author:row.author || 'Ancien pilote', body:row.body, createdAt:row.created_at})), periods:await periods(env, community)})};
+      WHERE n.community_id=? AND n.track=? AND n.car=? AND (n.event_id IS NULL OR n.event_id=?)
+      ORDER BY n.created_at`,community.id,combo.track,combo.car,race?.id ?? null))
+      .map(row=>({author:row.author || 'Ancien pilote',body:row.body,createdAt:row.created_at,eventId:row.event_id,theme:row.theme,pinned:row.pinned===1})), periods:await periods(env, community)})};
 }
 
 // ---------- The plugin (no browser, no cookie: the pilot's own key) ----------
@@ -381,8 +434,9 @@ async function pluginAccess(request, env) {
   const link = await env.DB.prepare('SELECT * FROM combo_links WHERE token_hash=?').bind(await hash(raw.slice(7))).first();
   if (!link) fail(401, 'Cette liaison a été retirée. Crée un nouveau code sur le site.');
   const community = await communityById(env, link.community_id);
+  if (!combosEnabled(community)) fail(403, 'Les fiches combo ne sont pas ouvertes dans cette communauté.');
   const user = await env.DB.prepare('SELECT id, name FROM users WHERE id=?').bind(link.user_id).first();
-  if (!community || !user || !combosEnabled(community)) fail(403, 'Les fiches combo ne sont pas ouvertes dans cette communauté.');
+  if (!user) fail(403, 'Les fiches combo ne sont pas ouvertes dans cette communauté.');
   // His rights now, not when the code was made: a pilot who left the team or lost the role sends nothing more.
   const access = await communityAccess(env, {user}, community);
   if (access.status !== 'member' || !access.permissions.has('combos')) fail(403, 'Tu n’as plus accès aux fiches combo de cette communauté.');
@@ -404,8 +458,12 @@ async function pluginSheet(env, community, userId, url) {
   const filterKey = JSON.stringify([selected, list, ...['setup','moment','tmin','tmax'].map(name => url.searchParams.get(name))]);
   const key = new Request(`https://combo-sheet.invalid/${[community.id, combo.track, combo.car, rev?.rev ?? 0, userId, await hash(filterKey)].map(encodeURIComponent).join('/')}`);
   const hit = await cache.match(key);
-  if (hit) return hit;
-  const response = json(await sheet(env, community, userId, combo, url, true));
+  if (hit) {
+    const headers=new Headers(hit.headers);
+    headers.set('Cache-Control','no-store');
+    return new Response(hit.body,{status:hit.status,headers});
+  }
+  const response = json(await sheet(env, community, userId, combo, url, true,list));
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', `max-age=${SHEET_CACHE}`);
   await cache.put(key, new Response(await response.clone().arrayBuffer(), {status:response.status, headers}));
@@ -494,10 +552,10 @@ export async function combosApi(path, method, request, env, actor, community) {
     if (!/^[a-f0-9-]{36}$/i.test(crewId)) fail(404,'Équipage indisponible.');
     // Use actual Discord accounts, not display names, and never resolve a foreign community or another crew.
     const crew=await env.DB.prepare(`SELECT c.id,c.name,c.car,e.circuit FROM crews c JOIN events e ON e.id=c.event_id
-      WHERE c.id=? AND c.community_id=? AND (e.community_id=? OR e.community_id='official')
+      WHERE c.id=? AND c.community_id=? AND (e.community_id=? OR e.community_id=?)
       AND e.format='endurance' AND COALESCE(e.sim,CASE WHEN e.circuit LIKE 'iracing-%' THEN 'iracing' ELSE 'lmu' END)='lmu'
       AND EXISTS(SELECT 1 FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
-        WHERE cm.crew_id=c.id AND r.community_id=c.community_id AND r.status!='unavailable' AND p.user_id=?)`).bind(crewId,community.id,community.id,userId).first();
+        WHERE cm.crew_id=c.id AND r.community_id=c.community_id AND r.status!='unavailable' AND p.user_id=?)`).bind(crewId,community.id,community.id,OFFICIAL,userId).first();
     if (!crew) fail(404,'Équipage indisponible.');
     const members=await all(env,`SELECT DISTINCT p.user_id AS id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
       WHERE cm.crew_id=? AND r.community_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL`,crew.id,community.id);
@@ -510,7 +568,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     return openLive(request, env, community.id, {Role:'viewer', User:userId});
   }
   if (path === '/api/combos/live/pass' && method === 'GET') return relayPass(env, community.id, {Role:'viewer', User:userId});
-  if (path === '/api/combos/sheet' && method === 'GET') return json({...await sheet(env, community, userId, comboOf(url), url), canManagePeriods:actor.permissions.has('crews') || actor.permissions.has('admin'), canManageNotes:actor.permissions.has('admin')});
+  if (path === '/api/combos/sheet' && method === 'GET') return json({...await sheet(env, community, userId, comboOf(url), url), canManagePeriods:canManageMemo(actor), canManageNotes:canManageMemo(actor)});
   if (path === '/api/combos/history' && method === 'GET') return json(await history(env,community,comboOf(url),url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
   if (path === '/api/combos/outline' && method === 'GET') return json(await outline(env, community, url.searchParams.get('track')));
@@ -564,7 +622,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     return json({color:color || null});
   }
 
-  const canManagePeriods = actor.permissions.has('crews') || actor.permissions.has('admin');
+  const canManagePeriods = canManageMemo(actor);
   if (path === '/api/combos/periods') {
     if (method === 'GET') return json(await periods(env, community));
     if (method === 'POST') {
@@ -609,28 +667,41 @@ export async function combosApi(path, method, request, env, actor, community) {
   // Notes: anyone of the team writes; the author or an admin changes or removes.
   if (path === '/api/combos/notes' && method === 'POST') {
     const input = await body(request);
-    const track = label(input.track, 120), car = label(input.car, 120), text = String(input.body ?? '').trim().slice(0, NOTE_MAX);
-    if (!track || !car) fail(400, 'Circuit et voiture requis.');
-    if (!text) fail(400, 'La note est vide.');
+    const combo = {track:label(input.track,120),car:label(input.car,120)};
+    if (!combo.track || !combo.car) fail(400,'Circuit et voiture requis.');
+    const {text,theme='strategy',pinned=false} = noteInput(input);
+    if (pinned && !canManageMemo(actor)) fail(403,'Seuls les responsables peuvent épingler une note.');
+    const race = input.eventId ? await memoRace(env,community,combo,input.eventId) : null;
+    if (input.eventId && !race) fail(404,'Épreuve introuvable.');
     const noteId = id(), time = now();
-    await env.DB.prepare('INSERT INTO combo_notes(id,community_id,track,car,user_id,body,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)')
-      .bind(noteId, community.id, track, car, userId, text, time, time).run();
-    await env.DB.prepare(BUMP).bind(community.id, track, car).run();
-    return json({id:noteId, body:text, createdAt:time}, 201);
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO combo_notes(id,community_id,track,car,user_id,body,created_at,updated_at,event_id,theme,pinned) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+        .bind(noteId,community.id,combo.track,combo.car,userId,text,time,time,race?.id ?? null,theme,+pinned),
+      env.DB.prepare(BUMP).bind(community.id,combo.track,combo.car)
+    ]);
+    return json({id:noteId,body:text,createdAt:time},201);
   }
   const noteMatch = path.match(/^\/api\/combos\/notes\/([a-f0-9-]{36})$/);
-  if (noteMatch && ['PATCH', 'DELETE'].includes(method)) {
-    const row = await env.DB.prepare('SELECT * FROM combo_notes WHERE id=? AND community_id=?').bind(noteMatch[1], community.id).first();
-    if (!row) fail(404, 'Note introuvable.');
-    if (row.user_id !== userId) requirePermission(actor, 'admin', 'Seul l’auteur de la note ou un administrateur peut la changer.');
+  if (noteMatch && ['PATCH','DELETE'].includes(method)) {
+    const row = await env.DB.prepare('SELECT * FROM combo_notes WHERE id=? AND community_id=?').bind(noteMatch[1],community.id).first();
+    if (!row) fail(404,'Note introuvable.');
+    const manager = canManageMemo(actor);
+    if (row.user_id !== userId && !manager) fail(403,'Seul l’auteur ou un responsable peut modifier cette note.');
+    const bump = env.DB.prepare(BUMP).bind(community.id,row.track,row.car);
     if (method === 'DELETE') {
-      await env.DB.batch([env.DB.prepare('DELETE FROM combo_notes WHERE id=?').bind(row.id), env.DB.prepare(BUMP).bind(community.id,row.track,row.car)]);
+      await env.DB.batch([env.DB.prepare('DELETE FROM combo_notes WHERE id=?').bind(row.id),bump]);
       return json({ok:true});
     }
-    const text = String((await body(request)).body ?? '').trim().slice(0, NOTE_MAX);
-    if (!text) fail(400, 'La note est vide.');
-    await env.DB.batch([env.DB.prepare('UPDATE combo_notes SET body=?, updated_at=? WHERE id=?').bind(text, now(), row.id), env.DB.prepare(BUMP).bind(community.id,row.track,row.car)]);
-    return json({id:row.id, body:text});
+    const input = await body(request);
+    const {text,theme,pinned} = noteInput({...input,body:input.body ?? row.body});
+    if (pinned !== undefined && !manager) fail(403,'Seuls les responsables peuvent épingler une note.');
+    if (input.eventId !== undefined && input.eventId && !await memoRace(env,community,row,input.eventId)) fail(404,'Épreuve introuvable.');
+    const eventId = input.eventId === undefined ? row.event_id : input.eventId || null;
+    await env.DB.batch([
+      env.DB.prepare('UPDATE combo_notes SET body=?,theme=?,pinned=?,event_id=?,updated_at=? WHERE id=?')
+        .bind(text,theme ?? row.theme,pinned === undefined ? row.pinned : +pinned,eventId,now(),row.id),bump
+    ]);
+    return json({id:row.id,body:text});
   }
   notFound();
 }

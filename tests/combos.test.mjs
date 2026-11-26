@@ -136,8 +136,13 @@ test('the plugin sends sessions with the pilot’s key, once each, and stops whe
   assert.deepEqual((await plugin('/api/combos/plugin/status', key)).data, {pilot:'Nathan', community});
   const sent = await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000, pitAt:4}));
   assert.equal(sent.status, 201);
-  assert.deepEqual(sent.data, {track:TRACK, car:CAR, laps:8, stops:1, created:true});
-  assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000, pitAt:4}))).data.created, false);
+  const {id,receivedAt,...receipt} = sent.data;
+  assert.match(id,/^[a-f0-9-]{36}$/);
+  assert.ok(receivedAt>0);
+  assert.deepEqual(receipt, {track:TRACK, car:CAR, laps:8, stops:1, created:true});
+  const retry=await plugin('/api/combos/plugin/session',key,'POST',session({at:1_790_000_000_000,pitAt:4}));
+  assert.equal(retry.status,200);
+  assert.deepEqual(retry.data,{...sent.data,created:false});
   assert.equal(DB.db.prepare('SELECT COUNT(*) AS n FROM combo_laps').get().n, 8);
   assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', {track:TRACK})).status, 400);
   assert.ok((await req('/api/combos/link', 'GET', null, NATHAN)).data.lastSeen);
@@ -310,6 +315,8 @@ test('a lap trace is kept only whole: every measure as long as the clock, within
   assert.equal(cleanTrace({...trace(5, 210), speed:[1, 2, 3]}), null);
   assert.equal(cleanTrace({...trace(5, 210), slip:[[0]]}), null);
   assert.equal(cleanTrace(trace(5, 210, 20)), null, 'too short to be a lap');
+  assert.equal(cleanTrace({...trace(5,210),time:trace(5,210).time.reverse()}),null);
+  assert.equal(cleanSession({...session({at:1_790_000_000_000}),trace:trace(19,210)}).trace,null);
   assert.equal(cleanTrace({...trace(5, 210), speed:Array(100).fill(900)}).speed[0], 0, 'an impossible speed is not kept');
 });
 
@@ -338,13 +345,15 @@ test('« Mon analyse »: each session wheel by wheel and its best lap on the map
   const query = `track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
   const list = (await req(`/api/combos/analysis?${query}`, 'GET', null, NATHAN)).data.sessions;
   assert.deepEqual(list.map(item => [item.name, item.mine, item.expert, item.trace]),
-    [['Lucas', false, false, null], ['Lucas', false, false, {lap:4, time:209.1}], ['Nathan', true, true, {lap:5, time:210.2}]]);
+    [['Lucas', false, false, null], ['Lucas', false, false, {lap:4, time:209.1, cond:'dry', temp:30.4, light:null}], ['Nathan', true, true, {lap:5, time:210.2, cond:'dry', temp:30.5, light:null}]]);
 
   const mine = (await req(`/api/combos/analysis/session?id=${list[2].id}`, 'GET', null, NATHAN)).data;
   assert.equal(mine.session.name, 'Nathan');
   assert.deepEqual(mine.expert.tyreTemp, [88, 91, 86, 87]);
   assert.equal(mine.expert.oilMax, 104);
   assert.equal(mine.laps.count, 7);
+  assert.equal(mine.byCondition.dry.count,7);
+  assert.equal(list[2].type,2);
   assert.equal(mine.trace.lap, 5);
   assert.equal(mine.trace.lapTime, 210.2);
   assert.equal(mine.trace.time.length, 100);
@@ -641,16 +650,67 @@ test('memo crew resolves actual members, not names, and refuses a non-member', a
  assert.equal(made.status,201);
  const event=(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.name==='Mémo test');
  const base='/api/events/'+event.id+'/departures/'+event.departures[0].id;
- assert.equal((await req(base+'/registrations','POST',{name:'Nathan',category:'Hypercar',status:'whole'},NATHAN)).status,201);
+ const first=await req(base+'/registrations','POST',{name:'Nathan',category:'Hypercar',status:'whole'},NATHAN);
+ assert.equal(first.status,201);
  const created=await req(base+'/crews','POST',{name:'Équipage mémo',category:'Hypercar',car:'Ferrari 499P'},NATHAN);
  assert.equal(created.status,201);
  const teammate=await req(base+'/registrations','POST',{name:'Lucas',category:'Hypercar',status:'whole'},LUCAS);
  assert.equal(teammate.status,201);
- const listing=(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.id===event.id).departures[0].crews[0];
- const joined=await req('/api/crews/'+created.data.id+'/members','POST',{registrationId:teammate.data.id,version:listing.version,selfJoin:true},LUCAS);
+ const current=async()=>(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.id===event.id).departures[0].crews[0];
+ const members='/api/crews/'+created.data.id+'/members';
+ assert.equal((await req(members,'POST',{registrationId:first.data.id,version:(await current()).version},NATHAN)).status,200);
+ const joined=await req(members,'POST',{registrationId:teammate.data.id,version:(await current()).version,selfJoin:true},LUCAS);
  assert.equal(joined.status,200);
  const q='/api/combos/crew?id='+created.data.id;
  const actual=await req(q,'GET',null,NATHAN);
  assert.equal(actual.status,200); assert.deepEqual(actual.data.members.sort(),[NATHAN,LUCAS].sort());
  assert.equal((await req(q,'GET',null,GUEST)).status,404);
+});
+
+test('notes keep their scope, preserve data when disabled and enforce moderation', async()=>{
+  const {req,signIn,DB}=harness();
+  signIn(NATHAN,'Nathan',[TEAM_ROLE,ORGA_ROLE]); signIn(LUCAS,'Lucas',[TEAM_ROLE]); signIn(GUEST,'Guest',[TEAM_ROLE]);
+  const event=await req('/api/events','POST',{name:'Le Mans mémo',categories:['Hypercar'],circuit:'le-mans',departures:[{date:'2090-10-15',time:'15:00'}]},NATHAN);
+  assert.equal(event.status,201);
+  const eventId=event.data.id, base={track:TRACK,car:CAR,body:'Pressions',theme:'tyres'};
+  const note=await req('/api/combos/notes','POST',{...base,eventId},LUCAS);
+  assert.equal(note.status,201);
+  assert.equal((await req('/api/combos/notes','POST',{...base,theme:'unknown'},LUCAS)).status,400);
+  assert.equal((await req('/api/combos/notes','POST',{...base,eventId:'00000000-0000-4000-8000-000000000001'},LUCAS)).status,404);
+  const endpoint='/api/combos/notes/'+note.data.id;
+  assert.equal((await req(endpoint,'PATCH',{body:'Autre'},GUEST)).status,403);
+  assert.equal((await req(endpoint,'PATCH',{pinned:true},LUCAS)).status,403);
+  assert.equal((await req(endpoint,'PATCH',{pinned:true},NATHAN)).status,200);
+  const q='/api/combos/sheet?'+new URLSearchParams({track:TRACK,car:CAR});
+  assert.deepEqual((await req(q,'GET',null,LUCAS)).data.notes,[]);
+  const scoped=q+'&race='+eventId;
+  const read=(await req(scoped,'GET',null,LUCAS)).data;
+  assert.deepEqual(read.race,{id:eventId,name:'Le Mans mémo'});
+  assert.deepEqual(read.notes.map(({eventId,theme,pinned,mine})=>({eventId,theme,pinned,mine})),[{eventId,theme:'tyres',pinned:true,mine:true}]);
+  const enabled=value=>DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json(?)) WHERE id=?").run(String(value),DEV_COMMUNITY);
+  enabled(false);
+  assert.equal((await req(scoped,'GET',null,LUCAS)).status,404);
+  assert.equal((await req(endpoint,'DELETE',{},NATHAN)).status,404);
+  enabled(true);
+  assert.equal((await req(scoped,'GET',null,LUCAS)).data.notes[0].id,note.data.id);
+});
+
+test('the same pilot cannot acknowledge a receipt from another community',async()=>{
+  const {req,signIn,DB,env,plugin}=harness();
+  signIn(MANAGER,'Nathan');
+  const first=keyOf((await req('/api/combos/link','POST',{},MANAGER)).data.code);
+  const input=session({at:1_790_000_000_000});
+  assert.equal((await plugin('/api/combos/plugin/session',first,'POST',input)).status,201);
+  const other='e0a1c0de-0000-4000-8000-000000000092';
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,modules,created_at) VALUES(?,'test-second','Autre','ATE',?,0)").run(other,JSON.stringify({combos:true}));
+  env.COMMUNITY='test-second';
+  assert.deepEqual((await req('/api/combos','GET',null,MANAGER)).data.combos,[]);
+  const second=keyOf((await req('/api/combos/link','POST',{},MANAGER)).data.code);
+  const refused=await plugin('/api/combos/plugin/session',second,'POST',input);
+  assert.equal(refused.status,409);
+  assert.equal(refused.data.id,undefined);
+  assert.equal((await req('/api/combos/link','GET',null,MANAGER)).data.lastSession,null);
+  const next={...input,at:input.at+10_000};
+  assert.equal((await plugin('/api/combos/plugin/session',second,'POST',next)).status,201);
+  assert.equal((await req('/api/combos/link','GET',null,MANAGER)).data.lastSession.startedAt,next.at);
 });

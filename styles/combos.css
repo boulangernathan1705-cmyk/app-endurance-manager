@@ -405,3 +405,18 @@ th.an-who { color: var(--dc) !important; }
 @media(max-width:620px){.cb-overview{grid-template-columns:repeat(2,minmax(0,1fr));}.cb-overview>div{padding:9px;}}
 
 .cb-history{overflow-x:auto;max-width:100%;}.cb-history table{width:100%;}.cb-history td small{display:block;color:var(--muted);font-size:11px;}.cb-history td:first-child{min-width:100px;}.cb-history td{white-space:nowrap;}
+
+.cb-note-fields { display:flex; flex-wrap:wrap; gap:var(--em-space-3); align-items:end; }
+.cb-note-fields label { display:grid; min-width:0; gap:var(--em-space-1); }
+.cb-note-fields label > * { max-width:100%; }
+.cb-prep { margin-block:var(--em-space-4); }
+
+@media print {
+  body:has(.cb-prep) > :not(#combos-app),
+  #combos-app > :not(.cb-prep),
+  .cb-prep .cb-no-print { display:none !important; }
+  #simhub-app, #combos-app, .cb-prep { position:static !important; width:auto !important; max-width:none !important; }
+  .cb-prep, .cb-prep * { background:white !important; color:black !important; }
+  .cb-prep table { width:100%; min-width:0; }
+  .cb-prep tr { break-inside:avoid; }
+}
