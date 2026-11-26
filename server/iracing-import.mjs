@@ -384,7 +384,8 @@ async function importOfficial(env, plans, review, timestamp) {
   async function flush() {
     if (!pending.length) return;
     const results = await env.DB.batch(pending.splice(0));
-    summary.created += results.filter((_, i) => i%2===0).reduce((total, result) => total + (Number(result.meta.changes)||0), 0);
+    // A D1 result can include changes made by triggers. Each event insert creates at most one race.
+    summary.created += results.filter((result, index) => index % 2 === 0 && result.meta.changes > 0).length;
   }
   for (const plan of plans) {
     const key = conflictKey(plan);
