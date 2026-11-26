@@ -49,9 +49,12 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
       expect(h.width).toBeGreaterThan(a.width);
       expect(d.height).toBeLessThanOrEqual(34);
-      expect(await head.evaluate(el=>getComputedStyle(el).paddingRight)).toBe('0px');
+      const rightPadding=await head.evaluate(el=>parseFloat(getComputedStyle(el).paddingRight));
       const mapPanel=await panel.boundingBox();
-      expect(mapPanel.x).toBeGreaterThanOrEqual(t.x+t.width-1);
+      expect(rightPadding).toBeGreaterThanOrEqual(mapPanel.width);
+      expect(mapPanel.x).toBeGreaterThanOrEqual(h.x+h.width-rightPadding-1);
+      expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(t.y+1);
+      expect(t.width).toBeGreaterThanOrEqual(h.width-1);
       expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
       for(const rect of [box,drawing,picture]){
@@ -65,6 +68,28 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(await img.evaluate(node=>getComputedStyle(node).transform)).toBe('none');
     }
     expect(new Set(artworkSizes).size).toBe(1);
+  }
+});
+
+test('LMU mobile: a full ten-start weekend stays compact without hiding departures or categories',async({page})=>{
+  const departures=[[15,['12:00','20:00']],[16,['03:00','09:00','15:00','21:00']],[17,['03:00','09:00','15:00','21:00']]].flatMap(([day,times])=>times.map(time=>{
+    const date='2090-10-'+day;
+    return {...start(date+'-'+time),date,time,startsAt:Date.parse(date+'T'+time+':00+02:00')};
+  }));
+  await boot(page,'lmu',[race('lmu',{name:'Championship endurance',circuit:'le-mans',categories:['Hypercar','LMP2 WEC','GT3'],departures,durationHours:6,durationMinutes:360})]);
+  for(const width of [320,390,430]){
+    await page.setViewportSize({width,height:844});
+    const card=page.locator('button.race-card.is-endurance');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('.race-start')).toHaveCount(10);
+    await expect(card.locator('.event-category-badge')).toHaveCount(3);
+    for(const item of await card.locator('.race-start,.event-category-badge').all()){
+      await expect(item).toBeVisible();
+      expect(await item.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    }
+    const rect=await card.boundingBox();
+    expect(rect.height).toBeLessThanOrEqual(width===320?285:255);
+    expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   }
 });
 
