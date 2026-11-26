@@ -39,9 +39,9 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
       expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
       await expect(card).toHaveClass(/endurance-preview/);
-      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
-      expect(artBox.width).toBeGreaterThanOrEqual(86);
-      expect(artBox.height).toBeGreaterThanOrEqual(104);
+      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.5);
+      expect(artBox.width).toBeGreaterThanOrEqual(82);
+      expect(artBox.height).toBeGreaterThanOrEqual(82);
       expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
       artworkSizes.push(Math.round(artBox.width));
       expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
@@ -49,12 +49,13 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
       expect(h.width).toBeGreaterThan(a.width);
       expect(d.height).toBeLessThanOrEqual(34);
-      const rightPadding=await head.evaluate(el=>parseFloat(getComputedStyle(el).paddingRight));
       const mapPanel=await panel.boundingBox();
-      expect(rightPadding).toBeGreaterThanOrEqual(mapPanel.width);
-      expect(mapPanel.x).toBeGreaterThanOrEqual(h.x+h.width-rightPadding-1);
-      expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(t.y+1);
-      expect(t.width).toBeGreaterThanOrEqual(h.width-1);
+      expect(mapPanel.x).toBeGreaterThanOrEqual(a.x);
+      expect(mapPanel.x+mapPanel.width).toBeLessThanOrEqual(a.x+a.width);
+      expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(captionBox.y);
+      expect(t.y).toBeGreaterThanOrEqual(a.y+a.height);
+      expect(t.x).toBeLessThan(h.x);
+      expect(t.x+t.width).toBeGreaterThanOrEqual(h.x+h.width-9);
       expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
       const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
       for(const rect of [box,drawing,picture]){
@@ -76,7 +77,9 @@ test('LMU mobile: a full ten-start weekend stays compact without hiding departur
     const date='2090-10-'+day;
     return {...start(date+'-'+time),date,time,startsAt:Date.parse(date+'T'+time+':00+02:00')};
   }));
-  await boot(page,'lmu',[race('lmu',{name:'Championship endurance',circuit:'le-mans',categories:['Hypercar','LMP2 WEC','GT3'],departures,durationHours:6,durationMinutes:360})]);
+  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
+  await boot(page,'lmu',[race('lmu',{name:'Championnat Endurance du Mans',circuit:'le-mans',categories:['Hypercar','LMP2 WEC','GT3'],departures,durationHours:6,durationMinutes:360})]);
+  await page.evaluate(()=>document.fonts.ready);
   for(const width of [320,390,430]){
     await page.setViewportSize({width,height:844});
     const card=page.locator('button.race-card.is-endurance');
@@ -87,8 +90,12 @@ test('LMU mobile: a full ten-start weekend stays compact without hiding departur
       await expect(item).toBeVisible();
       expect(await item.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
     }
+    for(const day of await card.locator('.race-day').all()){
+      const sameRow=await day.evaluate(row=>[...row.querySelectorAll('.race-start')].every(chip=>chip.offsetTop===row.querySelector('.race-start').offsetTop));
+      expect(sameRow).toBe(true);
+    }
     const rect=await card.boundingBox();
-    expect(rect.height).toBeLessThanOrEqual(width===320?285:255);
+    expect(rect.height).toBeLessThanOrEqual(width===320?255:240);
     expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   }
 });
