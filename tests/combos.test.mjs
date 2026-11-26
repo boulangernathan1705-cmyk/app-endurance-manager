@@ -263,15 +263,20 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
   const lucas = keyOf((await req('/api/combos/link', 'POST', {}, LUCAS)).data.code);
   await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_000_000_000, light:0.93}));
   await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_100_000_000, light:0.08, track:20}));
-  // An older plugin: no daylight.
-  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_200_000_000}));
+  // An older plugin: no daylight, compound or track temperature.
+  const older = session({at:1_790_200_000_000, compound:''});
+  for (const lap of older.laps) delete lap.track;
+  await plugin('/api/combos/plugin/session', nathan, 'POST', older);
 
   const base = `/api/combos/sheet?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
   const ids = sheet => sheet.conditions.dry.drivers.map(item => item.id).sort();
   const all = (await req(base, 'GET', null, NATHAN)).data;
   assert.deepEqual(all.conditions.dry.moments, {day:7, night:7}, 'laps without daylight are neither');
   assert.equal(all.conditions.dry.laps, 21);
+  assert.deepEqual(all.conditions.dry.trackTemp, [20.2, 30.8]);
   assert.deepEqual(all.conditions.dry.compounds.Medium.trackTemp, [20.2, 30.8]);
+  assert.equal(all.conditions.dry.compounds['?'].laps, 7);
+  assert.equal(all.conditions.rain.trackTemp, null);
   const night = (await req(`${base}&moment=night`, 'GET', null, NATHAN)).data;
   assert.equal(night.filters.moment, 'night');
   assert.deepEqual(ids(night), [LUCAS]);
@@ -279,7 +284,8 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
   assert.deepEqual(ids((await req(`${base}&moment=day`, 'GET', null, NATHAN)).data), [NATHAN]);
   assert.equal((await req(`${base}&moment=dusk`, 'GET', null, NATHAN)).data.filters.moment, null);
   const warm = (await req(`${base}&tmin=25`, 'GET', null, NATHAN)).data;
-  assert.deepEqual([warm.filters.trackMin, warm.filters.trackMax, warm.conditions.dry.laps], [25, null, 14]);
+  assert.deepEqual([warm.filters.trackMin, warm.filters.trackMax, warm.conditions.dry.laps], [25, null, 7]);
+  assert.deepEqual(warm.conditions.dry.trackTemp, [30.2, 30.8]);
   assert.deepEqual(ids(warm), [NATHAN]);
   assert.deepEqual(ids((await req(`${base}&tmin=15&tmax=25`, 'GET', null, NATHAN)).data), [LUCAS]);
   assert.equal((await req(`${base}&tmax=abc`, 'GET', null, NATHAN)).data.filters.trackMax, null);
