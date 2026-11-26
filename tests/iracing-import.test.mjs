@@ -204,3 +204,18 @@ test('invalid times in an official article are ignored',async()=>{
   const {specialStarts}=await import('../server/iracing-import.mjs');
   assert.deepEqual(specialStarts('Timeslot #1: Saturday at 25:00 GMT Timeslot #2: Saturday at 12:99 GMT','2099-10-16','2099-10-18'),[]);
 });
+
+
+test('verified official supplements fill omissions but respect a live report or cancellation',async()=>{
+  const {supplementSpecialEvents}=await import('../server/iracing-import.mjs');
+  const supplemented=supplementSpecialEvents([], '2026S4');
+  assert.equal(supplemented.length,2);
+  assert.equal(supplemented.find(item=>item.slug==='992-endurance-cup').duration_minutes,720);
+  const listed={slug:'992-endurance-cup',name:'992 Endurance Cup',date_start:'2026-12-04',date_end:'2026-12-06',status:'postponed',duration_minutes:600};
+  const result=supplementSpecialEvents([listed], '2026S4');
+  assert.equal(result.filter(item=>item.slug===listed.slug).length,1);
+  assert.deepEqual(result.find(item=>item.slug===listed.slug),listed);
+  assert.deepEqual(supplementSpecialEvents([], '2027S4'),[]);
+  const pcc=supplementSpecialEvents([{slug:'pcc-vir',name:'THE Production Car Challenge @ViR',date_start:'2026-12-18',date_end:'2026-12-19'}], '2026S4');
+  assert.equal(pcc.find(item=>item.slug==='pcc-vir').duration_minutes,240);
+});
