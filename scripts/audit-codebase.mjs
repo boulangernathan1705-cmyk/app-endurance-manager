@@ -1,3 +1,5 @@
+import {CAR_BRAND_LOGOS} from '../shared/car-brands.mjs';
+import {CATEGORY_EMOJI_NAMES} from '../server/discord-weekly-format.mjs';
 import {access, readdir, readFile, stat} from 'node:fs/promises';
 import {extname, relative, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -42,7 +44,12 @@ const textRows = rows.filter(item => textExtensions.has(item.ext));
 const searchable = await Promise.all(textRows.map(async item => ({...item, content: await readFile(item.file, 'utf8')})));
 const allText = searchable.map(item => item.content).join('\n');
 const assets = rows.filter(item => assetExtensions.has(item.ext));
+const dynamicAssets = new Set([
+  ...CAR_BRAND_LOGOS.map(logo => `images/brands/${logo}.webp`),
+  ...CATEGORY_EMOJI_NAMES.map(name => `images/discord-emojis/${name.slice(3)}.png`)
+]);
 const unusedAssets = assets.filter(item => {
+  if (dynamicAssets.has(item.path) || item.path.startsWith('tests/visual/__screenshots__/')) return false;
   const relativeAsset = item.path.replace(/^images\//, '');
   const basename = relativeAsset.split('/').at(-1);
   return !allText.includes(relativeAsset) && !allText.includes(basename);
@@ -108,7 +115,8 @@ const insecureReferences = searchable
   // The local development server (wrangler dev) has no HTTPS; the Worker accepts http only for localhost too.
   .filter(item => !/^http:\/\/localhost(?::\d+)?(?:\/|$)/.test(item.url));
 for (const item of insecureReferences) warnings.push(`Référence HTTP non chiffrée : ${item.path} -> ${item.url}`);
-if (!worker.includes("scope:'identify'") && !worker.includes("scope: 'identify'")) warnings.push('Discord OAuth doit rester limité au scope identify.');
+const oauth = searchable.find(item => item.path === 'server/discord-oauth.mjs')?.content || '';
+if (!oauth.includes("scope:'identify'") && !oauth.includes("scope: 'identify'")) warnings.push('Discord OAuth doit rester limité au scope identify.');
 if (!workerCore.includes("const COOKIE_SESSION = '__Host-em_session'")) warnings.push('Le cookie de session doit conserver le préfixe __Host-.');
 if (!workerCore.includes('HttpOnly; Secure; SameSite=Lax')) warnings.push('Les cookies sensibles doivent rester HttpOnly, Secure et SameSite=Lax.');
 if (!accountMenu.includes('aucun mot de passe transmis à Endurance Manager')) warnings.push('La connexion Discord doit expliquer visiblement qu’aucun mot de passe n’est transmis au site.');
