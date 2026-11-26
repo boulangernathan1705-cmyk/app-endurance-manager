@@ -52,3 +52,14 @@ export function refuelDuration({fuel, energy, fuelRate, energyRate, connect}) {
   if (!known(fuel) || fuel < 0 || (fuel > 0 && (!known(fuelRate) || fuelRate <= 0 || !known(connect))) || !known(energyRate) || energyRate <= 0) return null;
   return Math.max(fuel > 0 ? Number(connect) + fuel / fuelRate : 0, energy / energyRate);
 }
+
+// Use all measured limits; never assume unknown fuel capacity or consumption.
+export function availableLaps(capacity, fuel, energy, reservePercent = 0) {
+  if (!known(reservePercent) || reservePercent < 0 || reservePercent >= 100) return null;
+  const values = [stintProjection(100,energy,reservePercent), known(capacity) ? stintProjection(capacity,fuel,capacity*reservePercent/100) : null].filter(known);
+  return values.length ? Math.min(...values) : null;
+}
+export function tyreRemaining(initial, wear, laps) {
+  if (![initial,wear,laps].every(known) || initial<0 || initial>100 || wear<0 || laps<0) return null;
+  return Math.max(0,initial-wear*laps);
+}

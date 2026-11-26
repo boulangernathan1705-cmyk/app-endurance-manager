@@ -3,7 +3,7 @@
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {memoCandidates, memoRequestLabel} from './memo-links.mjs';
 import {COLORS, CONDITIONS} from '../shared/combos.mjs';
-import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration} from './combos-stats.mjs';
+import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration, availableLaps, tyreRemaining} from './combos-stats.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
@@ -135,7 +135,7 @@ async function refresh() {
 async function openCombo(track, car) {
   const combo = view.combos.find(item => item.track === track && item.car === car);
   if (!combo || (view.combo && comboKey(combo) === comboKey(view.combo))) { render(); return; }
-  Object.assign(view, {combo, requested:'', candidates:[], event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null});
+  Object.assign(view, {combo, requested:'', candidates:[], event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null, tyreInitial:100, tyreRelays:1});
   view.analysis.zone = null;
   await loadSheet();
 }
@@ -395,7 +395,7 @@ function energy(rows) {
 function stintLaps() {
   if (view.stint) return view.stint;
   const crew = paceRows(view.cond)[0];
-  return known(crew?.ve) && crew.ve > 0 ? Math.max(1, Math.floor(100 / crew.ve)) : 12;
+  return Math.max(1, Math.min(60, availableLaps(view.sheet.combo.capacity,crew?.fuel,crew?.ve,0) ?? 12));
 }
 
 function tyres() {
@@ -405,16 +405,16 @@ function tyres() {
   if (!names.includes(view.compound)) view.compound = names.sort((a, b) => compounds[b].laps - compounds[a].laps)[0];
   return `<section><div class="cb-head"><h2>Pneus</h2></div>
     <div class="cb-compounds" role="group" aria-label="Gomme">${names.map(name => `<button type="button" class="cb-pill" data-compound="${esc(name)}" aria-pressed="${name === view.compound}">${esc(name)}<small>${compounds[name].laps} tours${compounds[name].trackTemp ? ` · piste ${fr(compounds[name].trackTemp[0], 0)}–${fr(compounds[name].trackTemp[1], 0)} °C` : ''}</small></button>`).join('')}</div>
-    <div class="cb-stint"><label for="cb-stint">Usure sur un relais de</label><input type="number" id="cb-stint" min="1" max="60" value="${stintLaps()}" data-field="stint"><span>tours${view.stint ? '' : ' <span class="cb-src">(ce que permet l’énergie de l’équipage)</span>'}</span></div>
-    <div class="cb-tyres" data-tyres>${tyreCards()}</div></section>`;
+    <div class="cb-stint"><label for="cb-stint">Usure sur un relais de</label><input type="number" id="cb-stint" min="1" max="60" value="${stintLaps()}" data-field="stint"><span>tours${view.stint ? '' : ' <span class="cb-src">(selon les consommations disponibles, ou 12 tours à défaut)</span>'}</span></div>
+    <div class="cb-stint"><label for="cb-tyre-initial">Gomme restante au départ (%)</label><input type="number" id="cb-tyre-initial" min="0" max="100" value="${view.tyreInitial ?? 100}" data-field="tyreInitial"><label for="cb-tyre-relays">Relais cumulés</label><select id="cb-tyre-relays" data-field="tyreRelays">${[1,2,3].map(n=>`<option value="${n}"${n===(view.tyreRelays||1)?' selected':''}>${n}</option>`).join('')}</select></div><p class="cb-src">Projection linéaire, sans changement de gomme.</p><div class="cb-tyres" data-tyres>${tyreCards()}</div></section>`;
 }
 
 function tyreCards() {
   const rows = tyreRows(view.cond, view.compound);
   // Least worn tyre at each corner; its tread left after the stint is the highest.
   const best = [0, 1, 2, 3].map(index => bestOf(rows, row => row.wear[index]));
-  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Restant après ${stintLaps()} t.</span><span class="cb-short">Reste</span> (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row, true)}${cell(row, row.wear[index], best[index], fr(row.wear[index]))}${cell(row, row.wear[index], best[index], known(row.wear[index]) ? fr(Math.max(0, 100 - row.wear[index] * stintLaps()), 1) : '—')}<td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
+  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Restant après ${stintLaps()*(view.tyreRelays||1)} t.</span><span class="cb-short">Reste</span> (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row, true)}${cell(row, row.wear[index], best[index], fr(row.wear[index]))}${cell(row, row.wear[index], best[index], known(row.wear[index]) ? fr(tyreRemaining(view.tyreInitial ?? 100,row.wear[index],stintLaps()*(view.tyreRelays||1)), 1) : '—')}<td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
 }
 
 function pace(rows) {
@@ -518,30 +518,30 @@ function notes() {
     <form class="cb-form" data-note-form><textarea maxlength="1000" placeholder="Une info utile sur ce combo (pressions, limites de piste, sortie des stands…)" data-note-body aria-label="Nouvelle note"></textarea><div><button type="submit" class="cb-btn">Ajouter la note</button></div></form>
     <div class="cb-notes">${list.map(note => view.editing === note.id
       ? `<form class="cb-note cb-form" data-note-edit="${esc(note.id)}"><textarea maxlength="1000" aria-label="Modifier la note">${esc(note.body)}</textarea><div class="cb-actions"><button type="submit" class="cb-btn">Enregistrer</button><button type="button" class="cb-btn is-quiet" data-action="cancel-note">Annuler</button></div></form>`
-      : `<div class="cb-note"><div class="cb-note-meta"><span>${esc(note.author)} · ${esc(day(seconds(note.createdAt)))}</span>${note.mine ? `<button type="button" data-action="edit-note" data-id="${esc(note.id)}">Modifier</button><button type="button" data-action="delete-note" data-id="${esc(note.id)}">Supprimer</button>` : ''}</div><p>${esc(note.body)}</p></div>`).join('') || '<p class="cb-empty">Pas encore de note.</p>'}</div></section>`;
+      : `<div class="cb-note"><div class="cb-note-meta"><span>${esc(note.author)} · ${esc(day(seconds(note.createdAt)))}</span>${note.mine || view.sheet.canManageNotes ? `<button type="button" data-action="edit-note" data-id="${esc(note.id)}">Modifier</button><button type="button" data-action="delete-note" data-id="${esc(note.id)}">Supprimer</button>` : ''}</div><p>${esc(note.body)}</p></div>`).join('') || '<p class="cb-empty">Pas encore de note.</p>'}</div></section>`;
 }
 
 // Races being prepared and game versions: a session belongs to them by its date.
 function periodsCard() {
   const {events, versions} = view.sheet.periods;
-  const item = (period, detail) => `<div class="cb-period"><span>${esc(period.name)} <small>${esc(detail)}</small></span><button type="button" class="cb-btn is-quiet" data-action="delete-period" data-id="${esc(period.id)}" aria-label="Supprimer ${esc(period.name)}">Supprimer</button></div>`;
+  const item = (period, detail) => `<div class="cb-period"><span>${esc(period.name)} <small>${esc(detail)}</small></span>${view.sheet.canManagePeriods ? `<button type="button" class="cb-btn is-quiet" data-action="delete-period" data-id="${esc(period.id)}" aria-label="Supprimer ${esc(period.name)}">Supprimer</button>` : ''}</div>`;
   return `<details class="cb-fold" data-fold="periods"${view.periodsOpen ? ' open' : ''}><summary><h2>Épreuves et versions</h2><span>${events.length} épreuve${events.length > 1 ? 's' : ''} · ${versions.length} version${versions.length > 1 ? 's' : ''}</span></summary><div class="cb-fold-body">
     <div class="cb-periods"><b>Épreuves préparées</b>${events.map(period => item(period, `${day(period.startsAt)} → ${day(period.endsAt)}${period.track ? '' : ' · tous les circuits'}`)).join('') || '<p class="cb-empty">Aucune.</p>'}
-      <form class="cb-form" data-period="event"><input type="text" maxlength="80" placeholder="24h du Mans 2026" aria-label="Nom de l’épreuve" data-name required>
+      ${view.sheet.canManagePeriods ? `<form class="cb-form" data-period="event"><input type="text" maxlength="80" placeholder="24h du Mans 2026" aria-label="Nom de l’épreuve" data-name required>
         <div class="cb-row"><label class="cb-src">Du<input type="date" data-start required></label><label class="cb-src">Au<input type="date" data-end required></label></div>
-        <label class="cb-check"><input type="checkbox" data-this-track checked> Seulement sur ${esc(view.combo.track)}</label><div><button type="submit" class="cb-btn">Ajouter l’épreuve</button></div></form></div>
+        <label class="cb-check"><input type="checkbox" data-this-track checked> Seulement sur ${esc(view.combo.track)}</label><div><button type="submit" class="cb-btn">Ajouter l’épreuve</button></div></form>` : ''}</div>
     <div class="cb-periods"><b>Versions du jeu / BoP</b>${versions.map(period => item(period, `depuis le ${day(period.startsAt)}`)).join('') || '<p class="cb-empty">Aucune.</p>'}
-      <form class="cb-form" data-period="version"><input type="text" maxlength="80" placeholder="BoP du 3 octobre" aria-label="Nom de la version" data-name required>
-        <label class="cb-src">À partir du<input type="date" data-start required></label><p class="cb-src">Une version dure jusqu’au début de la suivante.</p><div><button type="submit" class="cb-btn">Ajouter la version</button></div></form></div>
+      ${view.sheet.canManagePeriods ? `<form class="cb-form" data-period="version"><input type="text" maxlength="80" placeholder="BoP du 3 octobre" aria-label="Nom de la version" data-name required>
+        <label class="cb-src">À partir du<input type="date" data-start required></label><p class="cb-src">Une version dure jusqu’au début de la suivante.</p><div><button type="submit" class="cb-btn">Ajouter la version</button></div></form>` : ''}</div>
   </div></details>`;
 }
 
 function summaryCards(rows) {
   const row = rows.find(item => item.crew) || rows[0];
   if (!row) return '';
-  const laps = stintProjection(100,row.ve,3);
+  const laps = availableLaps(view.sheet.combo.capacity,row.fuel,row.ve,3);
   const data = [['Rythme moyen',lapTime(row.avg)],['Meilleur tour',lapTime(row.best)],['Énergie / tour',known(row.ve)?`${fr(row.ve)} %`:'—'],['Autonomie (réserve 3 %)',known(laps)?`${laps} tours`:'—'],['Carburant / tour',known(row.fuel)?`${fr(row.fuel)} L`:'—'],['Tours retenus',String(row.laps)]];
-  return `<section class="cb-overview" aria-label="Synthèse des données">${data.map(([label,value])=>`<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')}</section><p class="cb-src">Synthèse des pilotes affichés et des conditions choisies. Autonomie indicative, limitée ici par l’énergie.</p>`;
+  return `<section class="cb-overview" aria-label="Synthèse des données">${data.map(([label,value])=>`<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')}</section><p class="cb-src">Synthèse des pilotes affichés et des conditions choisies. Autonomie indicative : minimum des limites mesurées carburant et énergie, avec réserve de 3 % du plein. Une limite non mesurée n’est pas prise en compte.</p>`;
 }
 
 function render() {
@@ -676,6 +676,7 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   const field = event.target.dataset.field;
+  if (field === 'tyreRelays') { view.tyreRelays = Number(event.target.value); render(); return; }
   if (field === 'an-size') { Object.assign(view.analysis, {size:Number(event.target.value) || 450, zone:null}); render(); return; }
   if (field === 'an-mine' || field === 'an-other') {
     if (!event.target.value) return;
@@ -701,6 +702,11 @@ app.addEventListener('change', async event => {
 
 app.addEventListener('input', event => {
   const target = event.target;
+  if (target.dataset.field === 'tyreInitial') {
+    if (target.value === '') return;
+    view.tyreInitial = Math.min(100, Math.max(0, Number(target.value)));
+    const cards = app.querySelector('[data-tyres]'); if (cards) cards.innerHTML = tyreCards(); return;
+  }
   if (target.dataset.field === 'stint') {
     view.stint = Math.min(60, Math.max(1, Math.round(Number(target.value)) || stintLaps()));
     const cards = app.querySelector('[data-tyres]');

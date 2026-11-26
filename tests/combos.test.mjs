@@ -426,7 +426,7 @@ test('the plugin installer is handed out with the site written in and Windows li
 
 test('races being prepared and game versions sort the sessions by their dates', async () => {
   const {req, signIn, plugin} = harness();
-  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE, ORGA_ROLE]);
   const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000}));
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_800_000_000_000, ve:8.1}));
@@ -461,7 +461,7 @@ test('races being prepared and game versions sort the sessions by their dates', 
 
 test('the plugin reads the sheet of the race and version going on now', async () => {
   const {req, signIn, plugin} = harness();
-  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE, ORGA_ROLE]);
   const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
   const day = 86_400_000, at = Date.now();
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:at - 40 * day, ve:9}));
@@ -582,4 +582,29 @@ test('the plugin\'s sheet stays in the cache until the combo changes: a new sess
     await read();
     assert.equal(counts.puts, 3, 'laps taken out: computed again');
   } finally { delete globalThis.caches; }
+});
+
+test('memo period changes require a crew organiser; pilots still read them', async () => {
+  const {req, signIn} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE, ORGA_ROLE]);
+  const period = {kind:'event', name:'Préparation', track:TRACK, startsAt:1_799_000_000_000, endsAt:1_801_000_000_000};
+  assert.equal((await req('/api/combos/periods','POST',period,NATHAN)).status,403);
+  const made = await req('/api/combos/periods','POST',period,LUCAS);
+  assert.equal(made.status,201);
+  assert.equal((await req('/api/combos/periods','GET',null,NATHAN)).status,200);
+  assert.equal((await req('/api/combos/periods/'+made.data.id,'DELETE',{},NATHAN)).status,403);
+});
+test('mixed weather analysis uses its condition reference and matches accepted tours',async()=>{
+ const {req, signIn, plugin}=harness(); signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+ const data=session({at:1_790_000_000_000,laps:8});
+ data.laps.forEach(l=>{if(l.n>=5){l.rain=.8;l.wet=.8;l.t+=40;}});
+ await plugin('/api/combos/plugin/session',key,'POST',data);
+ const q='track='+encodeURIComponent(TRACK)+'&car='+encodeURIComponent(CAR);
+ const sheet=(await req('/api/combos/sheet?'+q,'GET',null,NATHAN)).data;
+ const id=(await req('/api/combos/analysis?'+q,'GET',null,NATHAN)).data.sessions[0].id;
+ const result=(await req('/api/combos/analysis/session?id='+id,'GET',null,NATHAN)).data;
+ assert.equal(result.laps.count,sheet.conditions.dry.laps+sheet.conditions.rain.laps);
+ assert.equal(result.list.filter(l=>!l.out).length,7);
 });

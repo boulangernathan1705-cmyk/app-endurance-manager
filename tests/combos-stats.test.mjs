@@ -41,3 +41,12 @@ test('memo projections keep the reserve and unknown refuelling times', async () 
   assert.equal(refuelDuration({fuel:null, energy:0}), 0);
   assert.equal(localDayEnd('2026-10-25'), new Date(2026,9,26).getTime() - 1);
 });
+
+test('memo autonomy uses measured fuel and energy limits, and tyres may start used', async()=>{
+ const {availableLaps,tyreRemaining}=await import('../front/combos-stats.mjs');
+ assert.equal(availableLaps(75,3,null,3),24);
+ assert.equal(availableLaps(90,4,4.2,3),21);
+ assert.equal(availableLaps(null,null,null,3),null);
+ assert.ok(Math.abs(tyreRemaining(80,1.2,46)-24.8)<1e-9);
+ assert.equal(tyreRemaining(40,2,23),0);
+});
