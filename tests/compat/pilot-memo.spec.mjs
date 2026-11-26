@@ -80,6 +80,7 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await page.emulateMedia({media:'print'});
   await expect(prep).toBeVisible();
+  await expect(prep.locator('.cb-print-context')).toHaveText('Spa-Francorchamps · Ferrari 499P · Sec');
   await expect(page.getByText('Notes de l’équipe',{exact:true})).toBeHidden();
 });
 

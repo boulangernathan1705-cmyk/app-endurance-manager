@@ -609,3 +609,11 @@ th.an-who { color: var(--dc) !important; }
   .cb-selection .is-car .cb-tile-art img {object-position:top center;padding-top:2px;}
   .cb-selection .is-car .cb-tile-art::after {background:linear-gradient(0deg,var(--em-bg),transparent 80%);}
 }
+
+.cb-print-context {display:none;}
+@media print {.cb-print-context {display:block;}}
+@media(max-width:760px){
+  .cb-dialog .cb-colors {gap:0;}
+  .cb-dialog .cb-swatch {width:32px;height:44px;min-height:44px;background:radial-gradient(circle,var(--dc) 0 9px,transparent 10px);border:0;box-shadow:none;}
+  .cb-dialog .cb-swatch[aria-pressed=true] {background:radial-gradient(circle,var(--dc) 0 8px,var(--em-text-strong) 9px 10px,transparent 11px);}
+}

@@ -711,6 +711,7 @@ function preparation(rows) {
   return `<section class="cb-card cb-prep"><div class="cb-head"><h2>Préparation de course</h2>
     <div class="cb-actions cb-no-print"><button type="button" class="cb-btn" data-action="share-prep">Partager</button><button type="button" class="cb-btn" data-action="print-prep">Imprimer</button></div></div>
     ${view.sheet.race?'<p class="cb-race-name">'+esc(view.sheet.race.name)+'</p>':''}
+    <p class="cb-print-context">${esc(view.combo.track)} · ${esc(view.combo.car)} · ${COND[view.cond][0]}</p>
     ${summaryCards(rows)}<div class="cb-note-fields cb-no-print"><label>Réserve du plein (%) <input type="number" data-field="reserve" min="0" max="50" value="${reserve}"></label>
       <label>Objectif (tours) <input type="number" data-field="prepLaps" min="1" max="60" value="${laps}"></label></div>${!view.stint&&!rows.some(row=>known(availableLaps(view.sheet.combo.capacity,row.fuel,row.ve,view.reserve)))?'<p class="cb-src">Objectif de 12 tours par défaut, faute de consommation exploitable. Ajuste-le avant la course.</p>':''}
     <div data-prep-results>${preparationResults(rows)}</div>
