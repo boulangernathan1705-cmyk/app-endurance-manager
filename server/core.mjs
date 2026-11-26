@@ -185,9 +185,17 @@ async function body(request, limit = 24000) {
 }
 async function rateLimit(request, env, kind, limit) {
   const bucket = Math.floor(now() / 600);
-  const key = await hash(`${kind}:${request.headers.get('CF-Connecting-IP') || 'local'}:${bucket}`);
-  const row = await env.DB.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count').bind(key, (bucket + 1) * 600).first();
-  if (row.count > limit) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  // Optional edge prefilter for sustained excess. The exact D1 policy remains authoritative.
+  if (env.ABUSE_PREFILTER) {
+    let allowed = true;
+    try { allowed = (await env.ABUSE_PREFILTER.limit({key: `${kind}:${ip}`})).success !== false; }
+    catch { /* The existing D1 guard remains available if the binding is unavailable. */ }
+    if (!allowed) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
+  }
+  const key = await hash(`${kind}:${ip}:${bucket}`);
+  const row = await env.DB.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE rate_limits.count < ? RETURNING count').bind(key, (bucket + 1) * 600, limit).first();
+  if (!row || row.count > limit) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
 }
 async function cleanup(env) {
   const timestamp = now();
