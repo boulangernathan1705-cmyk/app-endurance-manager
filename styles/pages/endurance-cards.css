@@ -377,6 +377,7 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
   border: 1px solid rgba(255,255,255,.18); gap: 5px;
 }
 .endurance-pano .endurance-card-caption .endurance-card-brand { color: #fff; background: #c92438; padding: 3px 5px; border-radius: 3px; }
+.endurance-pano.endurance-sim-iracing .endurance-card-caption .endurance-card-brand { background: var(--em-kind-iracing); }
 .endurance-pano .endurance-card-caption .endurance-card-duration { background: rgba(8,13,19,.8); padding: 4px 7px; border-radius: 5px; }
 html[data-game] #app .race-header.endurance-pano .endurance-detail-hero {
   grid-template-columns: minmax(0,7fr) minmax(0,3fr); grid-template-rows: auto minmax(0,1fr);
