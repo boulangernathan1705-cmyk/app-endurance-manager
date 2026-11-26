@@ -46,7 +46,12 @@ export function stintProjection(capacity, consumption, reserve = 0) {
 }
 
 // Missing rates must not look like an instantaneous pit stop.
-export function refuelDuration({fuel, energy, fuelRate, energyRate, connect}) {
+export function refuelDuration({fuel, energy, fuelRate, energyRate, connect, fuelOnly=false}) {
+  if (fuelOnly) {
+    if (!known(fuel)||fuel<0) return null;
+    if (fuel===0) return 0;
+    return known(fuelRate)&&fuelRate>0&&known(connect)?Number(connect)+fuel/fuelRate:null;
+  }
   if (!known(energy) || energy < 0) return null;
   if (energy === 0) return 0;
   if (!known(fuel) || fuel < 0 || (fuel > 0 && (!known(fuelRate) || fuelRate <= 0 || !known(connect))) || !known(energyRate) || energyRate <= 0) return null;

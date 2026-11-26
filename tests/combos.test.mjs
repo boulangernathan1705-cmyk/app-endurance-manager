@@ -608,3 +608,19 @@ test('mixed weather analysis uses its condition reference and matches accepted t
  assert.equal(result.laps.count,sheet.conditions.dry.laps+sheet.conditions.rain.laps);
  assert.equal(result.list.filter(l=>!l.out).length,7);
 });
+
+test('memo history is optional, protected and uses the same condition filters',async()=>{
+ const {req,signIn,plugin,DB}=harness(); signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+ await plugin('/api/combos/plugin/session',key,'POST',session({at:1_790_000_000_000,laps:12,pitAt:6}));
+ const q='/api/combos/history?track='+encodeURIComponent(TRACK)+'&car='+encodeURIComponent(CAR)+'&cond=dry';
+ const hist=await req(q,'GET',null,NATHAN); assert.equal(hist.status,200); assert.equal(hist.data.stints.length,2); assert.equal(hist.data.stops.length,1);
+ assert.ok(hist.data.stints.every(x=>x.pilot===NATHAN&&x.laps>0));
+ assert.equal((await req(q.replace('cond=dry','cond=rain'),'GET',null,NATHAN)).data.stints.length,0);
+ assert.equal((await req(q,'GET',null,null)).status,401);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
+ assert.equal((await req('/api/session','GET',null,NATHAN)).data.combos,false);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('true')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).data.stops.length,1);
+});

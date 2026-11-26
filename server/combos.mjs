@@ -156,12 +156,16 @@ const CLEAN = `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut
 const wheelAverages = kind => WHEELS.map(wheel => `AVG(NULLIF(${kind}_${wheel},0)) AS ${kind}_${wheel}`).join(',');
 const wheels = (row, kind, digits) => WHEELS.map(wheel => round(row[`${kind}_${wheel}`], digits));
 
-export async function sheet(env, community, userId, combo, url, current = false) {
-  const list = await periods(env, community);
+function sheetFilters(list, combo, url, current = false) {
   const degrees = name => { const value = url.searchParams.get(name); return value !== null && value !== '' && Number.isFinite(Number(value)) ? Math.max(-30, Math.min(80, Number(value))) : null; };
   const moment = url.searchParams.get('moment');
-  const filters = {...selection(list, url, combo.track, current), setup:label(url.searchParams.get('setup'), SETUP_MAX) || null,
+  return {...selection(list, url, combo.track, current), setup:label(url.searchParams.get('setup'), SETUP_MAX) || null,
     moment:['day', 'night'].includes(moment) ? moment : null, trackMin:degrees('tmin'), trackMax:degrees('tmax')};
+}
+
+export async function sheet(env, community, userId, combo, url, current = false) {
+  const list = await periods(env, community);
+  const filters = sheetFilters(list, combo, url, current);
   const scope = [community.id, combo.track, combo.car, filters.from, filters.to];
   const lapScope = [...scope, filters.setup, filters.setup, filters.moment, filters.moment, filters.trackMin, filters.trackMin, filters.trackMax, filters.trackMax];
   const where = 'community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?';
@@ -183,8 +187,8 @@ export async function sheet(env, community, userId, combo, url, current = false)
     env.DB.prepare(`SELECT COUNT(*) AS sessions, COUNT(DISTINCT user_id) AS drivers, COALESCE(SUM(lap_count),0) AS laps, MIN(started_at) AS first,
       MAX(started_at) AS last, MAX(car_class) AS car_class, MIN(capacity) AS capacity_min, MAX(capacity) AS capacity_max FROM combo_sessions WHERE ${where}`).bind(...scope).first(),
     env.DB.prepare(`SELECT COUNT(*) AS stops, AVG(lane-stopped) AS lane_through FROM combo_stops WHERE ${where} AND lane>stopped`).bind(...scope).first(),
-    // The service times belong to the car: the latest the game gave, on any track.
-    env.DB.prepare('SELECT service FROM combo_sessions WHERE community_id=? AND car=? AND service IS NOT NULL ORDER BY started_at DESC LIMIT 1').bind(community.id, combo.car).first(),
+    // The service times belong to the car, but stay within the selected period/version.
+    env.DB.prepare('SELECT service FROM combo_sessions WHERE community_id=? AND car=? AND service IS NOT NULL AND started_at BETWEEN ? AND ? ORDER BY started_at DESC LIMIT 1').bind(community.id, combo.car, filters.from, filters.to).first(),
     env.DB.prepare(`SELECT game FROM combo_sessions WHERE ${where} AND game IS NOT NULL ORDER BY started_at DESC LIMIT 1`).bind(...scope).first(),
     all(env, `SELECT n.id, n.user_id, n.body, n.created_at, n.updated_at, COALESCE(NULLIF(m.nickname,''), u.name) AS author FROM combo_notes n
       LEFT JOIN users u ON u.id=n.user_id LEFT JOIN memberships m ON m.user_id=n.user_id AND m.community_id=n.community_id
@@ -236,6 +240,33 @@ export async function sheet(env, community, userId, combo, url, current = false)
     pit:{stops:stops?.stops || 0, laneThrough:round(stops?.lane_through ?? null, 2), service:parsed(service?.service), game:parsed(game?.game)},
     notes:notes.map(row => ({id:row.id, author:row.author || 'Ancien pilote', body:row.body, createdAt:row.created_at, updatedAt:row.updated_at, mine:row.user_id === userId}))
   };
+}
+
+// Only the website asks for this bounded history, on demand. Stints use the same filtered laps as the sheet.
+// Pit stops are separately measured and scoped by session dates, not by weather inferred from another lap.
+async function history(env, community, combo, url) {
+  const filters = sheetFilters(await periods(env,community),combo,url);
+  const scope = [community.id,combo.track,combo.car,filters.from,filters.to];
+  const lapScope = [...scope,filters.setup,filters.setup,filters.moment,filters.moment,filters.trackMin,filters.trackMin,filters.trackMax,filters.trackMax];
+  const cond = url.searchParams.get('cond');
+  if (!CONDITIONS.includes(cond)) fail(400,'Conditions de piste invalides.');
+  const [runs, stops] = await Promise.all([
+    all(env,`${CLEAN} SELECT session_id,user_id,started_at,stint,MIN(n) AS first,MAX(n) AS last,MAX(run) AS timed,COUNT(*) AS laps,
+      AVG(t) AS pace,MIN(t) AS best,SUM(t) AS driving,AVG(NULLIF(ve,0)) AS ve,AVG(NULLIF(fuel,0)) AS fuel,
+      AVG(wear_fl) AS wear_fl,AVG(wear_fr) AS wear_fr,AVG(wear_rl) AS wear_rl,AVG(wear_rr) AS wear_rr,
+      SUM(CASE WHEN ve>0 THEN ve ELSE 0 END) AS energy,COUNT(NULLIF(ve,0)) AS ve_count
+      FROM clean WHERE cond=? GROUP BY session_id,user_id,started_at,stint
+      ORDER BY started_at DESC, session_id, stint DESC LIMIT 101`,...lapScope,cond),
+    all(env,`SELECT user_id,started_at,lap,lane,stopped,fuel,ve,tyres,repair FROM combo_stops
+      WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ? AND lane>=stopped
+      ORDER BY started_at DESC, session_id, idx DESC LIMIT 101`,...scope)
+  ]);
+  return {stints:runs.slice(0,100).map(row=>({session:row.session_id,pilot:row.user_id,at:row.started_at,stint:row.stint,
+    first:row.first,last:row.last,laps:row.laps,timed:row.timed,pace:round(row.pace),best:round(row.best),driving:round(row.driving),
+    ve:round(row.ve),fuel:round(row.fuel),wear:wheels(row,'wear',3),energy:row.ve_count===row.laps?round(row.energy):null})),
+    stops:stops.slice(0,100).map(row=>({pilot:row.user_id,at:row.started_at,lap:row.lap,lane:round(row.lane,1),
+      stopped:round(row.stopped,1),fuel:round(row.fuel),ve:round(row.ve),tyres:row.tyres,repair:!!row.repair})),
+    moreStints:runs.length>100,moreStops:stops.length>100};
 }
 
 // ---------- « Mon analyse »: one session, wheel by wheel, and its best lap on the map ----------
@@ -466,6 +497,7 @@ export async function combosApi(path, method, request, env, actor, community) {
   }
   if (path === '/api/combos/live/pass' && method === 'GET') return relayPass(env, community.id, {Role:'viewer', User:userId});
   if (path === '/api/combos/sheet' && method === 'GET') return json({...await sheet(env, community, userId, comboOf(url), url), canManagePeriods:actor.permissions.has('crews') || actor.permissions.has('admin'), canManageNotes:actor.permissions.has('admin')});
+  if (path === '/api/combos/history' && method === 'GET') return json(await history(env,community,comboOf(url),url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
   if (path === '/api/combos/outline' && method === 'GET') return json(await outline(env, community, url.searchParams.get('track')));
   if (path === '/api/combos/analysis' && method === 'GET') return json(await analysisList(env, community, userId, comboOf(url)));

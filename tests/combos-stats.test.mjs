@@ -50,3 +50,10 @@ test('memo autonomy uses measured fuel and energy limits, and tyres may start us
  assert.ok(Math.abs(tyreRemaining(80,1.2,46)-24.8)<1e-9);
  assert.equal(tyreRemaining(40,2,23),0);
 });
+
+test('fuel-only pit estimates do not require virtual energy',async()=>{
+ const {refuelDuration}=await import('../front/combos-stats.mjs');
+ assert.equal(refuelDuration({fuel:75,fuelRate:1.5,connect:2,fuelOnly:true}),52);
+ assert.equal(refuelDuration({fuel:75,fuelRate:null,connect:2,fuelOnly:true}),null);
+ assert.equal(refuelDuration({fuel:null,fuelRate:1.5,connect:2,fuelOnly:true}),null);
+});
