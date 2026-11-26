@@ -1,10 +1,12 @@
 import {durationLabel} from '../shared/duration.mjs';
 import {gameForEvent} from '../shared/catalog.mjs';
 
+const storedDuration = event => Number(event?.durationMinutes) || Number(event?.durationHours) * 60;
+
 // Use the stored race duration, not the schedule (which includes practice/qualifying).
 // Hide it only when the title actually contains the same duration.
 export function enduranceDuration(event, always = false) {
-  const minutes = Number(event?.durationMinutes) || Number(event?.durationHours) * 60;
+  const minutes = storedDuration(event);
   if (!Number.isFinite(minutes) || minutes <= 0) return '';
   const title = String(event?.name || '').normalize('NFKC').toLowerCase();
   const hours = /(?:^|[^\p{L}\p{N}])(\d{1,3})\s*(?:heures?|hours?|hrs?|h)(?:\s*(\d{1,2})(?:\s*(?:minutes?|mins?|m))?)?(?![\p{L}\p{N}])/gu;
@@ -30,10 +32,29 @@ export function endurancePreviewClass(event, game) {
   const track = String(event?.circuit || '').replace(/^iracing-/, '');
   return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
-export function enduranceHeader(event, game, previewMap = '', alwaysDuration = false) {
-  const sim = enduranceSim(event, game), label = sim === 'iracing' ? 'iRacing' : 'LMU';
-  const duration = enduranceDuration(event, alwaysDuration);
-  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${previewMap}<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span></span>`;
+export function enduranceArtwork(event, game, caption = '') {
+  const sim = enduranceSim(event, game);
+  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${caption}</span>`;
+}
+
+export function enduranceCardIdentity(event, game) {
+  const label = enduranceSim(event, game) === 'iracing' ? 'iRacing' : 'LMU';
+  return `<span class="endurance-card-identity"><b>${label}</b> <span>Endurance</span></span>`;
+}
+
+export function enduranceCardDuration(event) {
+  const minutes = storedDuration(event);
+  return Number.isFinite(minutes) && minutes > 0
+    ? `<b class="endurance-card-duration endurance-card-duration-pill">${durationLabel(minutes)}</b>` : '';
+}
+
+export const enduranceStartIcon = '<svg class="endurance-start-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+
+export function enduranceHeader(event, game) {
+  const label = enduranceSim(event, game) === 'iracing' ? 'iRacing' : 'LMU';
+  const duration = enduranceDuration(event);
+  const caption = `<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span>`;
+  return enduranceArtwork(event, game, caption);
 }
 
 /* Touch: first tap previews, second tap opens the normal link/button.
