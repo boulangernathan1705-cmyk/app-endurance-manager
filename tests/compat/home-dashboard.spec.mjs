@@ -33,8 +33,8 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  for (const sim of ['lmu','iracing']) {
   const card=page.locator('.week-block.is-'+sim);
   const art=card.locator('.endurance-card-head');
-  const badge=card.locator('.week-endurance-schedule .endurance-card-badge');
-  await expect(badge).toBeVisible();
+  const badge=card.locator('.week-endurance-schedule .endurance-card-identity');
+  await expect(badge).toHaveText(sim==='lmu'?'LMU Endurance':'iRacing Endurance');
   await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
   await expect(card.locator('.week-pano-map')).toBeHidden();
   await expect(card.locator('.week-endurance-schedule .endurance-start-icon')).toHaveCount(1);
@@ -57,8 +57,8 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
    expect(b.width).toBeGreaterThan(width===390?150:80);
   }
  }
- await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveText('6H');
- await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6H');
+ await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveText('6 h');
+ await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6 h');
  await expect(page.locator('.week-block.is-endurance .week-block-logo')).toHaveCount(0);
  await expect(page.locator('.week-block.is-endurance .week-block-plan:visible')).toHaveCount(2);
  await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');

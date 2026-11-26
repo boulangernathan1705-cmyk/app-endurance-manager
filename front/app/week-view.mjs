@@ -1,4 +1,4 @@
-import {enduranceArtwork, enduranceCardBadge, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
+import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
@@ -179,7 +179,7 @@ function block(item,now){
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event,starts):''}
-    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}${enduranceCardBadge(event,enduSim)}</span>`}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}<span class="week-endurance-facts">${enduranceCardIdentity(event,enduSim)}${enduranceCardDuration(event)}</span></span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

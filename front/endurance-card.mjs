@@ -1,10 +1,12 @@
 import {durationLabel} from '../shared/duration.mjs';
 import {gameForEvent} from '../shared/catalog.mjs';
 
+const storedDuration = event => Number(event?.durationMinutes) || Number(event?.durationHours) * 60;
+
 // Use the stored race duration, not the schedule (which includes practice/qualifying).
 // Hide it only when the title actually contains the same duration.
 export function enduranceDuration(event, always = false) {
-  const minutes = Number(event?.durationMinutes) || Number(event?.durationHours) * 60;
+  const minutes = storedDuration(event);
   if (!Number.isFinite(minutes) || minutes <= 0) return '';
   const title = String(event?.name || '').normalize('NFKC').toLowerCase();
   const hours = /(?:^|[^\p{L}\p{N}])(\d{1,3})\s*(?:heures?|hours?|hrs?|h)(?:\s*(\d{1,2})(?:\s*(?:minutes?|mins?|m))?)?(?![\p{L}\p{N}])/gu;
@@ -35,10 +37,15 @@ export function enduranceArtwork(event, game, previewMap = '', caption = '') {
   return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${previewMap}${caption}</span>`;
 }
 
-export function enduranceCardBadge(event, game) {
+export function enduranceCardIdentity(event, game) {
   const label = enduranceSim(event, game) === 'iracing' ? 'iRacing' : 'LMU';
-  const duration = enduranceDuration(event, true);
-  return `<span class="endurance-card-badge"><span>${label}</span>${duration ? `<b class="endurance-card-duration">${duration}</b>` : ''}</span>`;
+  return `<span class="endurance-card-identity">${label} Endurance</span>`;
+}
+
+export function enduranceCardDuration(event) {
+  const minutes = storedDuration(event);
+  return Number.isFinite(minutes) && minutes > 0
+    ? `<b class="endurance-card-duration endurance-card-duration-pill">${durationLabel(minutes)}</b>` : '';
 }
 
 export const enduranceStartIcon = '<svg class="endurance-start-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
