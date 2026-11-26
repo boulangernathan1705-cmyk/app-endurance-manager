@@ -1,4 +1,4 @@
-import {fail, id} from './core.mjs';
+import {fail, id, validateEvent} from './core.mjs';
 
 const MINUTE = 60_000;
 const DAY = 1_440 * MINUTE;
@@ -105,7 +105,94 @@ export async function clearIracingConflict(env, plan) {
   await env.DB.prepare('DELETE FROM iracing_sync_conflicts WHERE source_key=? AND resolved_at IS NULL').bind(conflictKey(plan)).run();
 }
 
-export async function resolveIracingConflict(env, key, revision) {
+const APPLICABLE_FIELDS = new Set(['name','circuit','durationMinutes','categories','rounds','driverChangeRequired','starts']);
+const sameValue = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+const localClock = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function officialDeparture(startsAt) {
+  const p = Object.fromEntries(localClock.formatToParts(new Date(startsAt)).map(part=>[part.type,part.value]));
+  return {date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`,startsAt};
+}
+function applicableIssues(details) {
+  return Array.isArray(details?.fields) && details.fields.length > 0 &&
+    details.fields.every(issue => issue.reason === 'manual' && APPLICABLE_FIELDS.has(issue.field));
+}
+
+async function applyIracingConflict(env, key, revision) {
+  const result = await withIracingLock(env, async () => {
+    const db = env.DB, at = Date.now();
+    const conflict = await db.prepare('SELECT * FROM iracing_sync_conflicts WHERE source_key=? AND updated_at=? AND resolved_at IS NULL').bind(key,revision).first();
+    if (!conflict) fail(409,'Ce conflit a changé. Actualise le suivi.');
+    const details = JSON.parse(conflict.details);
+    if (!conflict.event_id || !applicableIssues(details)) fail(409,'Ce signalement nécessite une vérification manuelle.');
+    const row = await db.prepare(`SELECT e.*,i.external_id,i.source_snapshot,
+      EXISTS(SELECT 1 FROM registrations WHERE event_id=e.id UNION ALL SELECT 1 FROM crews WHERE event_id=e.id) AS occupied
+      FROM events e JOIN iracing_imports i ON i.event_id=e.id AND i.community_id='official'
+      WHERE e.id=? AND e.community_id='official' AND e.created_by='system:iracing'`).bind(conflict.event_id).first();
+    if (!row || row.occupied || row.official_schedule_status) fail(409,'Ouvre la course pour arbitrer sans perdre les inscriptions.');
+    const old = JSON.parse(row.departures), real = old.filter(d=>!d.tbd), current = {
+      name:row.name,circuit:row.circuit,durationMinutes:Number(row.duration_minutes)||Number(row.duration_hours)*60,
+      categories:JSON.parse(row.categories),rounds:JSON.parse(row.rounds||'[]'),
+      driverChangeRequired:row.driver_change_required == null ? null : Boolean(row.driver_change_required),
+      starts:real.map(d=>d.startsAt).filter(t=>t>at).sort((a,b)=>a-b)
+    };
+    const selected = {...current};
+    const fields = new Set();
+    for (const issue of details.fields) {
+      const local = issue.field === 'starts' && Array.isArray(issue.local) ? issue.local.filter(t=>t>at) : issue.local;
+      if (!sameValue(current[issue.field],local)) fail(409,'La course a changé depuis ce signalement. Actualise le suivi.');
+      selected[issue.field] = issue.incoming;
+      fields.add(issue.field);
+    }
+    let departures = old;
+    if (fields.has('starts')) {
+      if (!Array.isArray(selected.starts) || !selected.starts.length || selected.starts.some(t=>!Number.isSafeInteger(t))) fail(409,'Les horaires officiels ne sont pas exploitables.');
+      const future = [...new Set(selected.starts.filter(t=>t>at))].sort((a,b)=>a-b);
+      if (!future.length) fail(409,'Les départs proposés sont déjà passés.');
+      const byTime = new Map(real.map(d=>[d.startsAt,d]));
+      departures = [...real.filter(d=>d.startsAt<=at),...future.map(t=>byTime.get(t)||officialDeparture(t))];
+      selected.starts = future;
+    }
+    const input = {...selected,format:row.format,sim:row.sim,eventType:row.event_type,access:row.access,capacity:row.capacity,
+      details:JSON.parse(row.details||'{}'),schedulePending:fields.has('starts')?false:Boolean(row.schedule_pending),departures};
+    const data = validateEvent(input,row,{officialImport:true});
+    // In solo, duration, track and classes derive from rounds. Never accept a conflicting combination.
+    for (const field of fields) {
+      const value = field === 'starts' ? data.departures.filter(d=>!d.tbd&&d.startsAt>at).map(d=>d.startsAt)
+        : field === 'driverChangeRequired' ? data.driverChangeRequired ?? null : data[field];
+      if (!sameValue(value,selected[field])) fail(409,'Ces valeurs doivent être arbitrées ensemble dans la fiche course.');
+    }
+    const snapshot = JSON.parse(row.source_snapshot||'{}');
+    for (const field of fields) snapshot[field] = selected[field];
+    try {
+      await db.batch([
+        db.prepare(`UPDATE events SET name=?,circuit=?,duration_hours=?,duration_minutes=?,categories=?,rounds=?,departures=?,
+          driver_change_required=?,schedule_pending=?,version=version+1 WHERE id=? AND version=?
+          AND official_schedule_status IS NULL
+          AND NOT EXISTS(SELECT 1 FROM registrations WHERE event_id=events.id)
+          AND NOT EXISTS(SELECT 1 FROM crews WHERE event_id=events.id)
+          AND EXISTS(SELECT 1 FROM iracing_sync_conflicts WHERE source_key=? AND updated_at=? AND resolved_at IS NULL)`)
+          .bind(data.name,data.circuit,data.durationHours,data.durationMinutes,JSON.stringify(data.categories),JSON.stringify(data.rounds),
+            JSON.stringify(data.departures),data.driverChangeRequired==null?null:Number(data.driverChangeRequired),data.schedulePending?1:0,
+            row.id,row.version,key,revision),
+        db.prepare("UPDATE iracing_imports SET source_snapshot=? WHERE community_id='official' AND external_id=? AND changes()=1")
+          .bind(JSON.stringify(snapshot),row.external_id),
+        db.prepare('UPDATE iracing_sync_conflicts SET resolved_at=? WHERE source_key=? AND updated_at=? AND resolved_at IS NULL AND changes()=1')
+          .bind(at,key,revision),
+        db.prepare("SELECT CASE WHEN changes()<>1 THEN json('iracing_conflict_stale') END")
+      ]);
+    } catch (error) {
+      if (/malformed JSON/i.test(error.message)) fail(409,'La course ou les inscriptions ont changé. Actualise le suivi.');
+      throw error;
+    }
+    return {ok:true,applied:true};
+  });
+  if (result.busy) fail(409,'Une synchronisation iRacing est déjà en cours.');
+  return result;
+}
+
+export async function resolveIracingConflict(env, key, revision, action = 'keep') {
+  if (action === 'apply') return applyIracingConflict(env,key,revision);
+  if (action !== 'keep') fail(400,'Décision invalide.');
   const result = await env.DB.prepare('UPDATE iracing_sync_conflicts SET resolved_at=? WHERE source_key=? AND updated_at=? AND resolved_at IS NULL')
     .bind(Date.now(), key, revision).run();
   if (!result.meta.changes) fail(409, 'Ce conflit a changé. Actualise le suivi.');
@@ -126,7 +213,7 @@ export async function iracingSupervision(env, timestamp = Date.now()) {
     env.DB.prepare("SELECT payload FROM iracing_sync_sources WHERE name='manifest'").first()
   ]);
   return {sources, history:history.map(row => ({...row, summary:JSON.parse(row.summary)})),
-    conflicts:conflicts.map(row => ({...row, details:JSON.parse(row.details)})), waiting,
+    conflicts:conflicts.map(row => {const details=JSON.parse(row.details);return {...row,details,canApply:Boolean(row.event_id && !row.registrations && !row.crews && applicableIssues(details))};}), waiting,
     seasons:manifest ? JSON.parse(manifest.payload) : null,
     lastCalendar:lastCalendar?.finished_at ?? null, lastSpecial:lastSpecial?.finished_at ?? null};
 }
