@@ -16,6 +16,16 @@ import {fail} from './core.mjs';
 import {cleanFrames, cleanPositions, cleanSnapshot, diff, ingest, mergeSnapshot, positionsOf, prune, publicFeed, raceGaps, DELTA_VERSION, LIVE_FOR} from '../shared/live.mjs';
 
 const MESSAGE_LIMIT = 256_000;
+// A per-connection budget, with a generous burst; never silently drop a delta.
+// Exported for deterministic tests; no database or storage writes on the hot path.
+export function liveBudget(previous, role, at) {
+  const rate = role === 'driver' ? 60 : 10;
+  const burst = role === 'driver' ? 120 : 40;
+  if (previous?.blocked) return previous;
+  const tokens = Math.min(burst, (previous?.tokens ?? burst) + Math.max(0, at - (previous?.at ?? at)) * rate / 1000);
+  return tokens >= 1 ? {tokens:tokens-1, at, blocked:false} : {tokens, at, blocked:true};
+}
+const LIVE_CONNECTION_LIMIT = {driver:12, viewer:32};
 const RECHECK = 4 * 3600_000;
 const SAVE_EVERY = 30_000;
 // On opening, the page gets the feeds sent to in the last half hour (the latest state of a car parked in the garage).
@@ -29,6 +39,10 @@ export async function openLive(request, env, communityId, who) {
   if (!env.LIVE) fail(503, 'Le direct n’est pas encore configuré sur ce site.');
   const headers = new Headers({Upgrade:'websocket'});
   for (const [name, value] of Object.entries(who)) headers.set(`X-Live-${name}`, encodeURIComponent(String(value ?? '')));
+  // The relay also serves production. Enable new guards only in development rooms,
+  // or through an explicit deployment setting after validation.
+  const guarded = env.LIVE_GUARDS === 'on' || env.SITE_ENV === 'development' || String(communityId).startsWith('dev:');
+  headers.set('X-Live-Guard', guarded ? '1' : '0');
   const room = env.LIVE.get(env.LIVE.idFromName(communityId));
   return room.fetch('https://live.invalid/socket', {headers});
 }
@@ -51,6 +65,8 @@ export class LiveRoom {
     this.bases = new Map();
     // Per plugin connection, the feed its quick messages belong to (known from its first snapshot).
     this.keys = new Map();
+    // In-memory only: a sleeping room has no message flood to carry over.
+    this.budgets = new WeakMap();
   }
 
   async load() {
@@ -67,9 +83,20 @@ export class LiveRoom {
     if (!wantsSocket(request)) return new Response('WebSocket attendu.', {status:426});
     const read = name => decodeURIComponent(request.headers.get(`X-Live-${name}`) || '');
     const role = read('Role') === 'driver' ? 'driver' : 'viewer';
+    const user = read('User'), guarded = request.headers.get('X-Live-Guard') === '1';
+    if (guarded && user) {
+      const at = Date.now();
+      const active = this.state.getWebSockets(role).filter(socket => {
+        const info = socket.deserializeAttachment() || {};
+        return info.user === user && info.until >= at && (socket.readyState === undefined || socket.readyState === 1);
+      });
+      if (active.length >= LIVE_CONNECTION_LIMIT[role]) {
+        return new Response('Trop de connexions simultanées.', {status:429, headers:{'Retry-After':'10'}});
+      }
+    }
     const [client, server] = Object.values(new WebSocketPair());
     this.state.acceptWebSocket(server, [role]);
-    server.serializeAttachment({role, user:read('User'), name:read('Name'), color:read('Color') || null, until:Date.now() + RECHECK,
+    server.serializeAttachment({role, user, guarded, name:read('Name'), color:read('Color') || null, until:Date.now() + RECHECK,
       conn:crypto.randomUUID(), ...(role === 'viewer' ? {watch:true, map:false} : {})});
     if (role === 'viewer') {
       await this.hello(server);
@@ -119,6 +146,13 @@ export class LiveRoom {
   async webSocketMessage(socket, message) {
     const info = socket.deserializeAttachment() || {};
     if (Date.now() > info.until) { socket.close(4001, 'Reconnexion'); return; }
+    if (info.guarded || this.env.LIVE_GUARDS === 'on' || this.env.SITE_ENV === 'development') {
+      const previous = this.budgets.get(socket);
+      if (previous?.blocked) return;
+      const budget = liveBudget(previous, info.role, Date.now());
+      this.budgets.set(socket, budget);
+      if (budget.blocked) { try { socket.close(1013, 'Réessaie dans un instant'); } catch {} return; }
+    }
     if (typeof message !== 'string' || message.length > MESSAGE_LIMIT) return;
     if (info.role === 'viewer') return this.viewerMessage(socket, info, message);
     if (info.role !== 'driver') return;
