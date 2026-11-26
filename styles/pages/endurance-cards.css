@@ -625,7 +625,7 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
 @media (max-width:760px) {
   html[data-game] #app button.race-card.is-endurance > .race-card-body {
     grid-template-columns: clamp(82px,27%,112px) minmax(0,1fr) !important;
-    gap: var(--em-space-1) var(--em-space-2) !important;
+    gap: 3px var(--em-space-2) !important;
     padding-right: 0 !important;
   }
   html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
