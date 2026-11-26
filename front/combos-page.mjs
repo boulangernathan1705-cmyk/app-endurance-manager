@@ -114,7 +114,7 @@ async function loadSheet(fresh = false) {
     if (!view.cond || (!narrowed && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
     remember();
   }
-  if (view.tab === 'analysis') await loadAnalysis(fresh); else render();
+  if (view.tab === 'analysis' && view.sheet) await loadAnalysis(fresh); else render();
 }
 
 // The new sessions without reloading the page: the list of combos, the plugin's link, then the sheet or the analysis
@@ -150,12 +150,19 @@ function remember() {
 // ---------- « Mon analyse » ----------
 
 // The combo's sessions once, then the two looked at (each kept once loaded: a trace weighs a few hundred kB).
+let analysisRequest = 0;
 async function loadAnalysis(fresh = false) {
+  const request = ++analysisRequest;
   const a = view.analysis, key = comboKey(view.combo);
+  const current = () => request === analysisRequest && view.combo && comboKey(view.combo) === key;
   try {
     if (a.key !== key) Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
     if (fresh) a.sessions.clear();
-    if (!a.list || fresh) a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
+    if (!a.list || fresh) {
+      const result = await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`);
+      if (!current()) return;
+      a.list = result.sessions;
+    }
     const list = a.list;
     const useful = item => item.trace || item.expert;
     if (!list.some(item => item.id === a.mine)) a.mine = (list.find(item => item.mine && useful(item)) || list.find(item => item.mine) || list.find(useful) || list[0])?.id || '';
@@ -166,9 +173,12 @@ async function loadAnalysis(fresh = false) {
       a.other = others[0]?.id || 'none';
     }
     a.loading = true; render();
-    await Promise.all([a.mine, a.other].filter(id => id && id !== 'none' && !a.sessions.has(id)).map(async id => a.sessions.set(id, await call(`/api/combos/analysis/session?id=${encodeURIComponent(id)}`))));
+    const entries = await Promise.all([a.mine, a.other].filter(id => id && id !== 'none' && !a.sessions.has(id)).map(async id => [id, await call(`/api/combos/analysis/session?id=${encodeURIComponent(id)}`)]));
+    if (!current()) return;
+    for (const [id, data] of entries) a.sessions.set(id, data);
     a.error = '';
   } catch (error) {
+    if (!current()) return;
     if (error.status === 401 || error.status === 403) { renderError(error); return; }
     a.error = error.message;
   }

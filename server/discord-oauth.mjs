@@ -26,7 +26,7 @@ export async function oauthCallback(request, env) {
   let back = origin(env) + '/';
   try {
     const wanted = new URL(decodeURIComponent(cookie(request, names.ret)));
-    if (wanted.origin === origin(env) || communityLabel(wanted, env)) back = wanted.origin + returnPath(wanted.pathname + wanted.hash);
+    if (wanted.origin === origin(env) || communityLabel(wanted, env)) back = wanted.origin + returnPath(wanted.pathname + wanted.search + wanted.hash);
   } catch {}
   const failed = () => redirect(new URL(back).origin + '/?auth=error', [clear, clearReturn]);
   // Why a sign-in fails is written to the Worker logs (never a code, token or secret).

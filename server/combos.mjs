@@ -511,6 +511,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     else if (!COLOR.test(color)) fail(400, 'Couleur invalide.');
     else await env.DB.prepare(`INSERT INTO combo_colors(community_id,user_id,color) VALUES(?,?,?)
       ON CONFLICT(community_id,user_id) DO UPDATE SET color=excluded.color`).bind(community.id, userId, color).run();
+    await env.DB.prepare('UPDATE combo_revisions SET rev=rev+1 WHERE community_id=?').bind(community.id).run();
     return json({color:color || null});
   }
 
@@ -562,6 +563,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     const noteId = id(), time = now();
     await env.DB.prepare('INSERT INTO combo_notes(id,community_id,track,car,user_id,body,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)')
       .bind(noteId, community.id, track, car, userId, text, time, time).run();
+    await env.DB.prepare(BUMP).bind(community.id, track, car).run();
     return json({id:noteId, body:text, createdAt:time}, 201);
   }
   const noteMatch = path.match(/^\/api\/combos\/notes\/([a-f0-9-]{36})$/);
@@ -570,12 +572,12 @@ export async function combosApi(path, method, request, env, actor, community) {
     if (!row) fail(404, 'Note introuvable.');
     if (row.user_id !== userId) requirePermission(actor, 'admin', 'Seul l’auteur de la note ou un administrateur peut la changer.');
     if (method === 'DELETE') {
-      await env.DB.prepare('DELETE FROM combo_notes WHERE id=?').bind(row.id).run();
+      await env.DB.batch([env.DB.prepare('DELETE FROM combo_notes WHERE id=?').bind(row.id), env.DB.prepare(BUMP).bind(community.id,row.track,row.car)]);
       return json({ok:true});
     }
     const text = String((await body(request)).body ?? '').trim().slice(0, NOTE_MAX);
     if (!text) fail(400, 'La note est vide.');
-    await env.DB.prepare('UPDATE combo_notes SET body=?, updated_at=? WHERE id=?').bind(text, now(), row.id).run();
+    await env.DB.batch([env.DB.prepare('UPDATE combo_notes SET body=?, updated_at=? WHERE id=?').bind(text, now(), row.id), env.DB.prepare(BUMP).bind(community.id,row.track,row.car)]);
     return json({id:row.id, body:text});
   }
   notFound();

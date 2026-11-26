@@ -11,3 +11,12 @@ test('memo links use the LMU circuit and never default to another circuit',()=>{
  assert.equal(memoCandidates(combos,new URLSearchParams('circuit=monza')).length,0);
  assert.equal(memoCandidates(combos,new URLSearchParams('circuit=spa&car=BMW')).length,0);
 });
+
+import {returnPath} from '../server/core.mjs';
+test('OAuth memo return preserves safe filters, never an external redirect',()=>{
+ assert.equal(returnPath('/simhub.html?circuit=spa&car=Ferrari+499P#memo'),'/simhub.html?circuit=spa&car=Ferrari+499P#memo');
+ assert.equal(returnPath('//other.example/simhub.html'),'/');
+ assert.equal(returnPath('/simhub.html?redirect=https://other.example'),'/');
+ assert.equal(returnPath('/simhub.html?car=%0Afoo'),'/');
+ assert.equal(returnPath('/lmu/?foo=bar'),'/');
+});
