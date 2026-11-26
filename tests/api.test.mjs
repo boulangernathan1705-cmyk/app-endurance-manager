@@ -373,6 +373,18 @@ test('validation, closed departures, guest link rejection and free-tier rate lim
  assert.equal((await h.req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',{name:'Late',status:'whole',category:'GTE'},'admin')).status,409);
  for(let i=0;i<80;i++)assert.notEqual((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
+ const counters=()=>h.DB.db.prepare('SELECT key,count FROM rate_limits ORDER BY key').all();
+ const before=counters();
+ for(let i=0;i<20;i++) assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
+ assert.deepEqual(counters(),before,'denied requests no longer increment the counters');
+ let calls=0;
+ h.env.ABUSE_PREFILTER={limit:async()=>{calls++;return {success:false};}};
+ assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'prefilter')).status,429);
+ assert.equal(calls,1);
+ assert.deepEqual(counters(),before,'edge rejection avoids D1 counter access');
+ h.env.ABUSE_PREFILTER={limit:async()=>{throw Error('binding unavailable');}};
+ assert.notEqual((await h.req('/api/guest/recover','POST',{token:'bad'},'fallback')).status,429,'D1 fallback remains available');
+ delete h.env.ABUSE_PREFILTER;
  assert.equal((await h.req('/api/events','POST',eventInput,'admin',{headers:{'Cookie':'__Host-em_session=forged'}})).status,401);
 });
 test('Paris timezone is stable across seasons and rejects ambiguous/nonexistent clock changes',async()=>{

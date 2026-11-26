@@ -23,6 +23,8 @@
     { "pattern": "dev2.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
   ],
   "workers_dev": false,
+  // A generous edge prefilter; the existing exact per-operation limits are unchanged.
+  "ratelimits": [{ "name": "ABUSE_PREFILTER", "namespace_id": "260112", "simple": { "limit": 300, "period": 60 } }],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
