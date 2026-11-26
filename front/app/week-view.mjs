@@ -1,4 +1,4 @@
-import {enduranceHeader, enduranceSim, endurancePreviewClass} from '../endurance-card.mjs';
+import {enduranceArtwork, enduranceCardBadge, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
@@ -97,7 +97,7 @@ function planOf(item){
     const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
-      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:solo?(starts.length>1?`Course ${index+1}`:name):'',
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:solo?'🏁':'',label:solo?(starts.length>1?`Course ${index+1}`:name):'',
         from:pending?'à définir':hour(start.startsAt),to:!solo||pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
@@ -105,7 +105,7 @@ function planOf(item){
   rows.sort((a,b)=>a.key-b.key);
   const time=row=>`<span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>`;
   // On a phone: one line per moment, the stream's link at the end of its own line (Nathan 2026-11-02).
-  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span${row.label?'':' aria-label="Départ"'}>${esc(row.icon)}${row.label?`<em> ${esc(row.label)}</em>`:''}</span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
+  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span${row.label?'':' aria-label="Départ"'}>${row.icon?esc(row.icon):enduranceStartIcon}${row.label?`<em> ${esc(row.label)}</em>`:''}</span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
   // On a computer (option P1): the race's times in the coloured band on top, the start big; the stream in its own
   // purple line with its link on the same line.
   const live=rows.find(row=>row.cls==='is-stream'),races=rows.filter(row=>row!==live),shown=races.length?races:[live];
@@ -167,7 +167,7 @@ function block(item,now){
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${!solo?enduranceHeader(event,enduSim,`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`,true):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceArtwork(event,enduSim,`<span class="week-pano-map" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${solo?plan.band:''}
     <span class="week-block-body">
@@ -179,7 +179,7 @@ function block(item,now){
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event,starts):''}
-    ${plan.plan}${solo?plan.live:''}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}${enduranceCardBadge(event,enduSim)}</span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

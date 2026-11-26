@@ -35,24 +35,21 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit i
       await expect(img).toHaveCount(1);
       const art=card.locator('.race-card-top > .endurance-card-head'),head=card.locator('.race-head'),date=head.locator('.race-date'),times=card.locator('.race-starts');
       await expect(art).toBeVisible();await expect(date).toHaveCount(1);
-      const caption=art.locator('.endurance-card-caption');
-      const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
-      expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
+      const badge=head.locator('.endurance-card-badge');
+      await expect(badge).toBeVisible();
+      await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
       await expect(card).toHaveClass(/endurance-preview/);
-      expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.5);
-      expect(artBox.width).toBeGreaterThanOrEqual(82);
-      expect(artBox.height).toBeGreaterThanOrEqual(82);
       expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
-      artworkSizes.push(Math.round(artBox.width));
-      expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-      const [a,h,d,t]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox()]);
+      const [a,h,d,t,mapPanel,badgeBox]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox(),panel.boundingBox(),badge.boundingBox()]);
+      artworkSizes.push(Math.round(a.width));
+      expect(a.width).toBeGreaterThanOrEqual(82);
+      expect(a.height).toBeGreaterThanOrEqual(82);
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
       expect(h.width).toBeGreaterThan(a.width);
       expect(d.height).toBeLessThanOrEqual(34);
-      const mapPanel=await panel.boundingBox();
-      expect(mapPanel.x).toBeGreaterThanOrEqual(a.x);
-      expect(mapPanel.x+mapPanel.width).toBeLessThanOrEqual(a.x+a.width);
-      expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(captionBox.y);
+      expect(badgeBox.x).toBeGreaterThanOrEqual(h.x);
+      expect(mapPanel.x).toBeGreaterThanOrEqual(d.x+d.width);
+      expect(mapPanel.y+mapPanel.height).toBeLessThanOrEqual(t.y+1);
       expect(t.y).toBeGreaterThanOrEqual(a.y+a.height);
       expect(t.x).toBeLessThan(h.x);
       expect(t.x+t.width).toBeGreaterThanOrEqual(h.x+h.width-9);
@@ -84,7 +81,7 @@ test('LMU mobile: a full ten-start weekend stays compact without hiding departur
     await page.setViewportSize({width,height:844});
     const card=page.locator('button.race-card.is-endurance');
     await expect(card).toHaveCount(1);
-    await expect(card.locator('.race-start')).toHaveCount(10);
+    await expect(card.locator('.race-start .endurance-start-icon')).toHaveCount(10);
     await expect(card.locator('.event-category-badge')).toHaveCount(3);
     for(const item of await card.locator('.race-start,.event-category-badge').all()){
       await expect(item).toBeVisible();
@@ -95,7 +92,7 @@ test('LMU mobile: a full ten-start weekend stays compact without hiding departur
       expect(sameRow).toBe(true);
     }
     const rect=await card.boundingBox();
-    expect(rect.height).toBeLessThanOrEqual(width===320?255:240);
+    expect(rect.height).toBeLessThanOrEqual(255);
     expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   }
 });

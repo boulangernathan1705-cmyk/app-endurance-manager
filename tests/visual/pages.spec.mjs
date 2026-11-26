@@ -201,7 +201,7 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
   const detailSize=await detail.boundingBox();
   const result=await page.evaluate(async({sizes})=>{
     const {GAME_CATALOGS}=await import('/shared/catalog.mjs');
-    const {enduranceHeader}=await import('/front/endurance-card.mjs');
+    const {enduranceArtwork,enduranceHeader}=await import('/front/endurance-card.mjs');
     const circuits=GAME_CATALOGS.lmu.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd'));
     const app=document.querySelector('#app'),sheet=document.createElement('div');
     sheet.id='lmu-artwork-audit';
@@ -216,7 +216,8 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
         const cell=document.createElement('div');cell.style.cssText='min-width:0;overflow:hidden;color:#fff;text-align:center;font-size:10px';
         const label=document.createElement('div');label.textContent=circuit.id;cell.append(label);
         const frame=document.createElement('div');frame.style.cssText='display:block;margin:auto;width:max-content';
-        const html=enduranceHeader({circuit:circuit.id,name:'Test',durationMinutes:360},'lmu');
+        const render=context==='detail'?enduranceHeader:enduranceArtwork;
+        const html=render({circuit:circuit.id,name:'Test',durationMinutes:360},'lmu');
         if(context==='home')frame.innerHTML='<div class="week-block is-endurance is-lmu">'+html+'</div>';
         else if(context==='list')frame.innerHTML='<button class="race-card is-endurance" type="button"><span class="race-card-top">'+html+'</span></button>';
         else frame.innerHTML='<div class="endurance-detail-hero">'+html+'<span class="circuit-visual" style="display:none"></span></div>';
