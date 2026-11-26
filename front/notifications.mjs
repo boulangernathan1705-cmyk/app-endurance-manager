@@ -25,6 +25,7 @@ function sentence(item) {
     case 'race_changed': {
       if (item.officialStatus === 'cancelled') return 'iRacing a annulé cette course';
       if (item.officialStatus === 'postponed') return 'iRacing a reporté cette course';
+      if (item.officialStatus === 'confirmed') return 'iRacing a confirmé la reprise de cette course';
       const what = (item.changes || []).map(key => CHANGES[key]).filter(Boolean);
       if (item.officialReview) return `iRacing a publié un changement à vérifier${what.length ? ` : ${esc(what.join(', '))}` : ''}`;
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
