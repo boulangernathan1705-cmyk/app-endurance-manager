@@ -4,6 +4,7 @@
 
 | Périmètre | Point d’entrée | Contrat à préserver | Vérification ciblée |
 | --- | --- | --- | --- |
+| Connexion Discord | `server/discord-oauth.mjs` | Préserver les cookies par environnement, le retour vers la communauté et l’usage unique de l’état OAuth. | `sites.test.mjs`, `api.test.mjs` |
 | Session, cache de courses | `front/app/api-client.mjs`, `front/app/race-service.mjs` | Dédupliquer et revalider les listes dans leur contexte de session. Invalider après une mutation ou un changement d’accès. | `api-client.test.mjs`, `event-refresh.test.mjs`, `week-view.test.mjs` |
 | Routes, inscriptions et départs | `server/worker.mjs`, `server/event-list.mjs`, `server/event-departures.mjs`, `server/api-shared.mjs` | Lors du retrait d’un départ, préserver les inscriptions et équipages selon les règles de report. Appliquer les écritures du report avec la version attendue de la course. | `api.test.mjs`, `event-refresh.test.mjs`, `registration-pilot-flow.test.mjs` |
 | Supervision du bot | `front/admin/discord-supervision.mjs`, `server/api-platform.mjs` | Charger le suivi à l’ouverture du panneau. La vérification d’un fil est une lecture réservée aux gestionnaires de la plateforme. | `admin-supervision.spec.mjs`, `discord-diagnostic.test.mjs` |
@@ -17,7 +18,7 @@ Les pages et le plugin passent par le Worker pour leurs API. Les requêtes méti
 
 ## Valider un lot
 
-- Lancer `npm run check` et les tests ciblés du tableau. Les tests navigateur utilisent une base locale ou des API simulées.
+- Lancer `npm run check`, qui contrôle aussi les cycles d’imports statiques, et les tests ciblés du tableau. Les tests navigateur utilisent une base locale ou des API simulées.
 - Vérifier les interfaces avec plusieurs communautés et des profils distincts. Pour une retouche CSS, garder les références visuelles et comparer la géométrie.
 - Pour D1, comparer le plan, les résultats et leur ordre avant/après. Mesurer les lignes lues par exécution et par période dans Cloudflare sur un trafic comparable. Les instructions mesurées en SQLite local ne sont pas des lignes facturées par D1.
 - Contrôler la version servie sur `dev` et `dev2` avant validation. Voir [l’usage des requêtes](REQUEST_USAGE.md) et [les permissions Discord](DISCORD_ROLES.md).
