@@ -65,7 +65,8 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.doesNotMatch(view, /départ\$\{count/);
   assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.
-  assert.match(read('front/app/race-service.mjs'), /\/api\/races\?game=\$\{otherGame\}&scope=upcoming/);
+  assert.match(read('front/app/race-service.mjs'), /\/api\/races\?game=\$\{otherGame\}&scope=\$\{scope\}/);
+  assert.match(read('front/app/race-service.mjs'), /otherGameEndurances\(view, onLoad, scope='upcoming'\)/);
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
 });
 

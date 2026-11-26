@@ -1,3 +1,5 @@
+import {fusedTdzHome,setHomeView} from './tdz-home-state.mjs';
+import {renderTdzCalendar} from './home-view.mjs';
 import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
@@ -148,14 +150,15 @@ async function perform(action,target){
       if (overlay?.returnFocus?.isConnected) overlay.returnFocus.focus();
       break;
     }
-    case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'home': if(target.dataset.list==='solo'&&fusedTdzHome()){renderWeek();break;} if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.
-    case 'cal-month': state.calendarMonth=target.dataset.month; state.calendarDay=null; renderHome(); break;
-    case 'cal-season': state.calendarShift=(state.calendarShift||0)+Number(target.dataset.shift||0); state.calendarMonth=null; state.calendarDay=null; renderHome(); break;
+    case 'tdz-home-view': if(fusedTdzHome()){setHomeView(target.dataset.view);renderWeek();}break;
+    case 'cal-month': state.calendarMonth=target.dataset.month; state.calendarDay=null; if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome(); break;
+    case 'cal-season': state.calendarShift=(state.calendarShift||0)+Number(target.dataset.shift||0); state.calendarMonth=null; state.calendarDay=null; if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome(); break;
     case 'cal-day': {
       state.calendarDay = target.dataset.day;
-      renderHome();
+      if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome();
       if (matchMedia('(max-width: 700px)').matches) {
         const dayHeading = app.querySelector('.cal-side h3');
         dayHeading?.focus({preventScroll:true});
@@ -165,14 +168,14 @@ async function perform(action,target){
       }
       break;
     }
-    case 'cal-step': state.calendarStep=Number(target.dataset.step)||0; state.calendarDay=null; renderHome(); break;
+    case 'cal-step': state.calendarStep=Number(target.dataset.step)||0; state.calendarDay=null; if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome(); break;
     case 'cal-view': setCalendarView(state.listFormat==='solo',target.dataset.view); renderHome(); break;
     case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
     case 'cal-kind': state.calendarKind=target.dataset.kind; state.calendarMine=false; renderHome(); break;
-    case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; renderHome(); break;
-    case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
-    case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
-    case 'race-filter-reset': resetRaceFilters(); renderHome(); break;
+    case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; if(fusedTdzHome()&&state.page==='week')renderTdzCalendar();else renderHome(); break;
+    case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
+    case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
+    case 'race-filter-reset': resetRaceFilters(); if(fusedTdzHome()&&state.page==='week')renderWeek();else renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': if(!state.events.some(event=>event.id===target.dataset.id)&&otherGameEvent(target.dataset.id)){location.href=`/${otherGameEvent(target.dataset.id).otherGame}/#event=${encodeURIComponent(target.dataset.id)}`;break;} state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
@@ -287,7 +290,7 @@ async function perform(action,target){
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.${inCommunity()}`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     // « Semaine »: from the bar, this week; its arrows move a week back or forward.
-    case 'week': state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
+    case 'week': if(fusedTdzHome()&&target.dataset.offset===undefined){renderWeek();break;} state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
     case 'week-done': {const day=Number(target.dataset.day),open=state.weekOpenDays||(state.weekOpenDays=new Set());if(open.has(day))open.delete(day);else open.add(day);renderWeek();break;}
     case 'week-filter': toggleWeekFilter(target.dataset.filter||'all');renderWeek();break;
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
@@ -329,7 +332,7 @@ function restoreFocus(){const selector=opener;opener=null;if(!selector)return;re
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;const action=target.dataset.action;if(!CLOSERS.has(action)&&!target.closest('[role="dialog"],[role="alertdialog"],.form-sheet'))opener=locate(target);state.busy=true;target.disabled=true;try{await perform(action,target);if(CLOSERS.has(action))restoreFocus();}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
 // The organisers' season (EVENT TDZ calendar): its first month and length.
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.matches?.('[data-season-form]'))return;event.preventDefault();if(state.busy)return;state.busy=true;
-  try{state.tdzSeason=await api('/api/community/season','PUT',{start:form.elements.seasonStart.value,months:Number(form.elements.seasonMonths.value),version:state.tdzSeason?.version||0});state.calendarSeasonOpen=false;state.calendarShift=0;state.calendarMonth=null;renderHome('Saison enregistrée.');}
+  try{state.tdzSeason=await api('/api/community/season','PUT',{start:form.elements.seasonStart.value,months:Number(form.elements.seasonMonths.value),version:state.tdzSeason?.version||0});state.calendarSeasonOpen=false;state.calendarShift=0;state.calendarMonth=null;if(fusedTdzHome()&&state.page==='week')renderTdzCalendar('Saison enregistrée.');else renderHome('Saison enregistrée.');}
   catch(error){showError(error);}finally{state.busy=false;}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='rally-event')await submitRallyEvent(form);else if(form.dataset.kind==='stream-event')await submitStreamEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
