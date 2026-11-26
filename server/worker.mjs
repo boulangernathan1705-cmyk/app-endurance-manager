@@ -1,32 +1,33 @@
 import {communitySeason} from './season.mjs';
-import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
+import {grindfestAvailable, grindfestEnabled, isGrindfest} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
+import {oauthCallback, oauthStart} from './discord-oauth.mjs';
 import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
-  LEGACY_CAR_ALIASES, DAY, HttpError, fail, now, id, token, hash, cookie, SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel,
-  baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal, registrationSelect,
-  registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, validateEvent, validateRegistration
+  HttpError, fail, now, id, token, hash, cookie, setCookie, cookieNames, siteOrigin, communityLabel,
+  baseDomain, json, jsonText, origin, administrators, identity, registrationSelect,
+  registrationParticipant, communityName, body, rateLimit, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
 import {eventListTag, matchesEventTag} from './event-revision.mjs';
 import {measureRequest} from './request-metrics.mjs';
-import {simForEvent, TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
+import {TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {
   soloRacesEnabled, currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow
 } from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {STREAM_SIM} from '../shared/stream.mjs';
-import {streamCrews} from './stream-crew.mjs';
-import {communityAccess, requirePermission, displayRole, ALL_PERMISSIONS, memberPermissions, discoverMemberships, crewOrganisers} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, ALL_PERMISSIONS, memberPermissions} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
-import {iracingSoloEnabled, iracingSoloSql} from './iracing-visibility.mjs';
+import {iracingSoloEnabled} from './iracing-visibility.mjs';
 import {communityApi} from './api-community.mjs';
 import {platformApi} from './api-platform.mjs';
-import {crewsApi, canManageCrew} from './api-crews.mjs';
-import {OFFICIAL, eventById, actingCommunity, departureById, slotFor, can} from './api-shared.mjs';
+import {crewsApi, listCrewRequests} from './api-crews.mjs';
+import {OFFICIAL, eventById, actingCommunity, departureById, slotFor, can, canManageRegistration} from './api-shared.mjs';
+import {listEvents} from './event-list.mjs';
 // « EVENT SOLO » (every community but the TDZ): no type, no SAFE access.
 const plainSoloInput = (env, community, input) => {
   if (input?.format !== 'solo' || tdzOnly(community, isDevelopment(env))) return input;
@@ -40,88 +41,7 @@ import {combosApi, combosPlugin, combosEnabled} from './combos.mjs';
 import {botRecapSettings} from './recap-discord.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-// Real starts were added next to the common "Horaire à définir" start: nobody is on it (no entry, no
-// crew), so it is not needed any more and is left out.
-async function dropEmptyCommonStart(env, eventId, data) {
-  const common = data.departures.find(departure => departure.tbd);
-  if (!common || data.departures.length < 2) return;
-  const used = eventId && await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? UNION SELECT 1 FROM crews WHERE event_id=? AND departure_id=? LIMIT 1')
-    .bind(eventId, common.id, eventId, common.id).first();
-  if (!used) data.departures = data.departures.filter(departure => departure !== common);
-}
-// Real starts removed from a race while pilots are on them: their entries and crews go to the waiting start
-// ("Horaire à définir", added when missing), where each pilot or crew picks a time again. A pilot still entered
-// on another start keeps that one (the removed entry goes); a pilot can wait only once per category.
-async function waitingMoves(env, event, data) {
-  const kept = new Set(data.departures.map(d => d.id));
-  const removed = JSON.parse(event.departures || '[]').filter(d => !d.tbd && !kept.has(d.id));
-  if (!removed.length) return null;
-  const all = async (sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
-  const gone = JSON.stringify(removed.map(d => d.id));
-  const regs = await all(`SELECT r.id, r.departure_id, r.participant_id, r.category, cm.crew_id FROM registrations r
-    LEFT JOIN crew_members cm ON cm.registration_id=r.id WHERE r.event_id=? AND r.departure_id IN (SELECT value FROM json_each(?))`, event.id, gone);
-  const crews = await all('SELECT id FROM crews WHERE event_id=? AND departure_id IN (SELECT value FROM json_each(?))', event.id, gone);
-  if (!regs.length && !crews.length) return null;
-  let waiting = data.departures.find(d => d.tbd), added = null;
-  if (!waiting) {
-    const first = [...data.departures, ...removed].sort((a, b) => a.startsAt - b.startsAt)[0];
-    waiting = added = {id:id(), date:first.date, time:first.time, startsAt:first.startsAt, tbd:true};
-    data.departures.unshift(added);
-  }
-  const others = await all(`SELECT r.id, r.departure_id, r.participant_id, r.category, cm.crew_id FROM registrations r
-    LEFT JOIN crew_members cm ON cm.registration_id=r.id WHERE r.event_id=? AND r.departure_id NOT IN (SELECT value FROM json_each(?))`, event.id, gone);
-  const key = reg => `${reg.participant_id}|${reg.category}`;
-  const waitingByKey = new Map(others.filter(reg => reg.departure_id === waiting.id).map(reg => [key(reg), reg]));
-  const elsewhere = new Set(others.filter(reg => reg.departure_id !== waiting.id && kept.has(reg.departure_id)).map(reg => reg.participant_id));
-  const move = [], drop = [], taken = new Set(waitingByKey.keys());
-  // Crew members first: their crew needs them. A plain waiting entry of the same pilot makes way.
-  for (const reg of regs.filter(item => item.crew_id)) {
-    const before = waitingByKey.get(key(reg));
-    if (!taken.has(key(reg))) { taken.add(key(reg)); move.push(reg); }
-    else if (before && !before.crew_id && !drop.includes(before.id)) { drop.push(before.id); move.push(reg); }
-    else drop.push(reg.id);
-  }
-  for (const reg of regs.filter(item => !item.crew_id)) {
-    if (taken.has(key(reg)) || elsewhere.has(reg.participant_id)) drop.push(reg.id);
-    else { taken.add(key(reg)); move.push(reg); }
-  }
-  const members = move.filter(reg => reg.crew_id), crewIds = JSON.stringify(crews.map(crew => crew.id));
-  const list = items => JSON.stringify(items);
-  return {statements:version => {
-    const same = 'EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)', at = [event.id, version];
-    return [
-      ...(added ? [env.DB.prepare("UPDATE events SET departures=json_insert(departures,'$[#]',json(?)) WHERE id=? AND version=?").bind(JSON.stringify(added), ...at)] : []),
-      env.DB.prepare(`DELETE FROM crew_members WHERE crew_id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(crewIds, ...at),
-      env.DB.prepare(`DELETE FROM registrations WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(list(drop), ...at),
-      env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(waiting.id, list(move.map(reg => reg.id)), ...at),
-      env.DB.prepare(`UPDATE crews SET departure_id=?,version=version+1 WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(waiting.id, crewIds, ...at),
-      ...members.map(reg => env.DB.prepare(`INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE ${same}`).bind(reg.id, reg.crew_id, ...at))
-    ];
-  }};
-}
-// Pilots on the waiting start, once real times exist: a crew's manager picks its time, its pilots are told,
-// a pilot without a crew picks his own. Returns the players told.
-async function askToChooseStart(env, event, waitingId) {
-  const all = async (sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
-  const crews = await all('SELECT id, name, owner_user_id, community_id FROM crews WHERE event_id=? AND departure_id=?', event.id, waitingId);
-  const told = [], organisers = new Map();
-  for (const crew of crews) {
-    // Without a manager (made by an organiser for others), the organisers of its community choose.
-    if (!crew.owner_user_id && !organisers.has(crew.community_id)) {
-      const home = await communityById(env, crew.community_id).catch(() => null);
-      organisers.set(crew.community_id, home ? (await crewOrganisers(env, home)).map(row => ({user_id:row.user_id, community_id:crew.community_id})) : []);
-    }
-    const manager = crew.owner_user_id ? [{user_id:crew.owner_user_id, community_id:crew.community_id}] : organisers.get(crew.community_id);
-    await notify(env, manager, 'choose_departure', event, {crewName:crew.name, manage:true});
-    await notify(env, await crewPilots(env, crew.id), 'choose_departure', event, {crewName:crew.name, skip:[crew.owner_user_id]});
-    told.push(...(await crewPilots(env, crew.id)).map(row => row.user_id));
-  }
-  const alone = await all(`SELECT DISTINCT p.user_id, r.community_id FROM registrations r JOIN participants p ON p.id=r.participant_id
-    WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL
-      AND NOT EXISTS(SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id)`, event.id, waitingId);
-  await notify(env, alone, 'choose_departure', event, {skip:told});
-  return [...told, ...alone.map(row => row.user_id)];
-}
+import {dropEmptyCommonStart, waitingMoves, askToChooseStart} from './event-departures.mjs';
 // "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
 // each site. A feature of the platform (not a community module): empty unless the player has several communities.
 async function myCommunities(env, actor, community, all = false) {
@@ -166,253 +86,6 @@ async function mayStream(env, who, community, actor) {
   const name = await communityName(env, actor.user.id, community.id) || actor.user.name;
   return String(name || '').trim().toLowerCase() === streamer;
 }
-function isRegistrationManager(actor) {
-  return can(actor, 'manage_registrations');
-}
-function canManageRegistration(reg, actor) {
-  return owned(reg, actor) || isRegistrationManager(actor);
-}
-function publicRegistration(reg, actor, userNames = new Map(), community = null, names = new Map(), perms = new Map(), official = new Set(), pilotNames = new Map()) {
-  let cars = [];
-  try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
-  if (!Array.isArray(cars) || !cars.length) cars = reg.car ? [reg.car] : [];
-  cars = cars.map(car => LEGACY_CAR_ALIASES.get(car) || car);
-  const participantUserId = reg.participant_user_id || reg.user_id || '';
-  const foreign = Boolean(community && reg.community_id && reg.community_id !== community.id);
-  const creatorId = reg.owner_user_id || '';
-  // Only names from communities accessible to the reader are available here.
-  // Prefer the site being read, then the entry's community, then a stable common community.
-  const knownNames = pilotNames.get(participantUserId) || [];
-  const primary = knownNames.find(item => item.communityId === community?.id)
-    || knownNames.find(item => item.communityId === reg.community_id) || knownNames[0];
-  const displayName = primary?.name || reg.participant_global_name || reg.participant_name || reg.name;
-  const otherNames = knownNames.filter(item => item.name !== displayName);
-  const createdForOther = Boolean(creatorId && creatorId !== participantUserId);
-  const canSeeCreator = createdForOther && Boolean(actor.user) && (
-    actor.user.id === creatorId || actor.user.id === participantUserId || isRegistrationManager(actor)
-  );
-  return {
-    id:reg.id,
-    participantId:reg.participant_id,
-    name:displayName,
-    ...(otherNames.length ? {otherNames} : {}),
-    category:reg.category,
-    car:cars[0] || reg.car || '',
-    cars,
-    carAny:Boolean(reg.car_any),
-    roundChoices:JSON.parse(reg.round_choices||'[]'),
-    streamerId:reg.streamer_id || null,
-    ...(reg.streamer_id ? {gameName:reg.game_name || ''} : {}),
-    status:reg.status,
-    preferredPilot:reg.preferred_pilot || '',
-    comment:reg.comment || '',
-    // A stream is told on its community's site only (its link is that community's).
-    ...(reg.stream_time && !foreign && (!community || reg.community_id === community.id) ? {streamTime:reg.stream_time, streamEnd:reg.stream_end || ''} : {}),
-    soloDriver:Boolean(reg.solo_driver),
-    version:reg.version,
-    discordLinked:Boolean(reg.participant_user_id),
-    mine:personal(reg, actor),
-    managed:owned(reg,actor)&&!personal(reg,actor),
-    canEdit:foreign ? perms.has(reg.community_id) && canManageRegistration(reg, {...actor, permissions:perms.get(reg.community_id)}) : canManageRegistration(reg, actor),
-    ...(foreign ? {foreign:true} : {}),
-    ...(official.has(reg.event_id) ? {community:names.get(reg.community_id) || null} : {}),
-    addedByName:canSeeCreator ? (userNames.get(creatorId) || '') : ''
-  };
-}
-// Archived = every start is in the past (same rule as front/schedule.mjs). "upcoming" keeps a
-// one-day margin so a race that just started stays visible, and undated races stay upcoming.
-// last_start (the latest departure's start, the far future when undated; kept by triggers, migrations 0057-0058)
-// is indexed: only the races asked for are read.
-function eventScopeFilter(scope, nowMs=Date.now()) {
-  const cutoff=Math.floor(nowMs);
-  if (scope==='upcoming') return `e.last_start>${cutoff-86400000}`;
-  if (scope==='archived') return `e.last_start<=${cutoff}`;
-  return '';
-}
-async function listEvents(env, actor, game='', scope='', community, at=Date.now()) {
-  // Bound in order: the site's community (filters), then the site's community and the player (mine). The races of the community and the official races (iRacing's ones
-  // where the community shows the iRacing calendar); on an official race, the entries and crews of every
-  // community the player is a member of, never of the others.
-  const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`, iracingSoloSql(env,community,'e.'),game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope, at), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
-  const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
-  const player = actor.user?.id || '';
-  const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
-  if (!rows.length) return [];
-  // Discord membership alone must not expose another community's crews after site access is withdrawn.
-  const otherPermissions = new Map();
-  if (player) {
-    const memberships = (await env.DB.prepare(`SELECT c.*,m.discord_roles,m.discord_admin FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member'`).bind(player).all()).results || [];
-    for (const membership of memberships) {
-      const permissions = actor.manager ? new Set(ALL_PERMISSIONS) : await memberPermissions(env, communityFromRow(membership), membership);
-      if (permissions.has('access')) otherPermissions.set(membership.id, permissions);
-    }
-  }
-  const accessible = JSON.stringify([...otherPermissions.keys()]);
-  const mine = column => `${column} IN (SELECT ? UNION SELECT value FROM json_each(?))`;
-  // The entries, crews and names of these races only, by race id (the events index, not the history), all at once:
-  // one wait for the database instead of one per query. By packs of 90 races (D1 takes at most 100 bound values).
-  const packs = [];
-  for (let start = 0; start < rows.length; start += 90) packs.push(rows.slice(start, start + 90).map(row => row.id));
-  const inPack = ids => ids.map(() => '?').join(',');
-  const byPacks = (sql, extra) => Promise.all(packs.map(ids => env.DB.prepare(sql(inPack(ids))).bind(...ids, ...extra).all()))
-    .then(parts => parts.flatMap(part => part.results || []));
-  const [registrations, crews, memberships, users, absenceRows] = await Promise.all([
-    byPacks(ids => registrationSelect+` WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')} ORDER BY COALESCE(r.streamer_order,r.created_at),r.rowid`, [community.id, accessible]),
-    byPacks(ids => `SELECT c.* FROM crews c WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`, [community.id, accessible]),
-    byPacks(ids => `SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')}`, [community.id, accessible]),
-    // Only registration creators' names are displayed (addedByName).
-    byPacks(ids => `SELECT DISTINCT u.id,${NAME_IN_COMMUNITY.replace('?', 'r.community_id')} AS name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, accessible]),
-    // « Je serai absent »: the pilots of the site's community who said they will miss the event.
-    byPacks(ids => `SELECT a.event_id,a.user_id,${NAME_IN_COMMUNITY.replace('?', 'a.community_id')} AS name FROM event_absences a JOIN users u ON u.id=a.user_id WHERE a.event_id IN (${ids}) AND a.community_id=? ORDER BY a.created_at`, [community.id])
-  ]);
-  // On official races, every entry and crew shows its community (Discord logo or short name, colour); in the
-  // player's other communities, the rights of his Discord roles there apply.
-  const official = new Set(rows.filter(row => row.community_id === OFFICIAL).map(row => row.id));
-  const names = new Map(), perms = new Map();
-  if (official.size) {
-    const shown = new Set([...registrations.filter(reg => official.has(reg.event_id)).map(reg => reg.community_id), ...crews.filter(crew => official.has(crew.event_id)).map(crew => crew.community_id)]);
-    for (const row of (await env.DB.prepare(`SELECT * FROM communities WHERE ${mine('id')}`).bind(community.id, accessible).all()).results || []) {
-      if (!shown.has(row.id)) continue;
-      const item = communityFromRow(row), look = appearanceOf(item);
-      names.set(row.id, {id:row.id, name:item.name, shortName:item.shortName, accent:look.accent, logoUrl:look.logoUrl});
-      if (row.id === community.id || !actor.user) continue;
-      if (otherPermissions.has(row.id)) perms.set(row.id, otherPermissions.get(row.id));
-    }
-  }
-  const userNames = new Map(users.map(item => [item.id,item.name]));
-  // Batch the pilots' identities, never one Discord/API/database request per inscription.
-  // The access filter also prevents leaking nicknames from another community.
-  const pilotNames = new Map();
-  const pilotIds = [...new Set(registrations.map(reg => reg.participant_user_id).filter(Boolean))];
-  for (let offset = 0; offset < pilotIds.length; offset += 90) {
-    const ids = pilotIds.slice(offset, offset + 90);
-    const identities = (await env.DB.prepare(`SELECT m.user_id, m.community_id AS communityId,
-      c.name AS communityName, COALESCE(NULLIF(m.nickname,''),u.name) AS name
-      FROM memberships m JOIN users u ON u.id=m.user_id JOIN communities c ON c.id=m.community_id
-      WHERE m.user_id IN (${inPack(ids)}) AND m.status='member' AND ${mine('m.community_id')}
-      ORDER BY c.slug,m.community_id`).bind(...ids,community.id,accessible).all()).results || [];
-    for (const identity of identities) {
-      if (!pilotNames.has(identity.user_id)) pilotNames.set(identity.user_id, []);
-      pilotNames.get(identity.user_id).push({communityId:identity.communityId, communityName:identity.communityName, name:identity.name});
-    }
-  }
-  const absences = new Map();
-  for (const item of absenceRows) {
-    if (!absences.has(item.event_id)) absences.set(item.event_id, []);
-    absences.get(item.event_id).push({name:item.name, mine:item.user_id === player});
-  }
-  const grouped = new Map();
-  for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames, community, names, perms, official, pilotNames)); }
-  const membersByCrew = new Map();
-  for (const member of memberships) {
-    if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
-    membersByCrew.get(member.crew_id).push(member.registration_id);
-  }
-  const crewsByDeparture = new Map();
-  for (const crew of crews) {
-    const key = `${crew.event_id}:${crew.departure_id}`;
-    if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
-    crewsByDeparture.get(key).push({
-      id:crew.id,
-      name:crew.name,
-      category:crew.category,
-      car:crew.car,
-      locked:Boolean(crew.locked),
-      version:crew.version,
-      registrationIds:membersByCrew.get(crew.id) || [],
-      canManage:crew.community_id===community.id ? canManageCrew(crew,actor) : perms.has(crew.community_id) && canManageCrew(crew,{...actor, permissions:perms.get(crew.community_id)}),
-      ownedByMe:Boolean(actor.user && crew.owner_user_id===actor.user.id),
-      hasOwner:Boolean(crew.owner_user_id),
-      ...(crew.community_id!==community.id ? {foreign:true} : {}),
-      ...(official.has(crew.event_id) ? {community:names.get(crew.community_id) || null} : {})
-    });
-  }
-  const crewsOfStreams = await streamCrews(env, community.id, rows);
-  return rows.map(row => {
-    const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
-    const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
-    return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row)} : {}), details:normalizeTdzDetails(JSON.parse(row.details||'{}')), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
-      ...(crewsOfStreams.has(row.id) ? {streamCrew:crewsOfStreams.get(row.id)} : {}), absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
-        const availability=grouped.get(`${row.id}:${d.id}`) || [];
-        // Solo race: entries keep their order of arrival; beyond the number of places they are on the
-        // waiting list, and the first one waiting moves up by itself when someone withdraws.
-        if (isGrindfest(row)) assignStreamerWaitlist(availability, streamersOf(row));
-        else if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
-        // Rounds with their own places: the same, round by round (a pilot skipping a round takes no place in it).
-        const rounds=format==='solo'?JSON.parse(row.rounds||'[]'):[];
-        if (!isGrindfest(row) && rounds.length>1 && rounds.some(round=>round.capacity)) {
-          const counts=rounds.map(()=>0);
-          availability.forEach(reg=>{ reg.roundWaitlist=rounds.map((round,index)=>{ if(reg.roundChoices?.[index]?.skip)return null; counts[index]++; return round.capacity&&counts[index]>round.capacity?counts[index]-round.capacity:null; }); });
-        }
-        // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
-        return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
-      })};
-  }).map(event => hidePassword(event, actor));
-}
-// Event lists expose the password only to entered pilots; editors fetch it explicitly.
-function hidePassword(event, actor) {
-  if (!event.details?.password) return event;
-  const entered = !isGrindfest(event) && event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
-  if (entered) return event;
-  const {password, ...details} = event.details;
-  return {...event, details};
-}
-async function oauthStart(request, env) {
-  requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
-  const state = token();
-  await env.DB.prepare('INSERT INTO oauth_states(state_hash,expires_at) VALUES(?,?)').bind(await hash(state), now() + 600).run();
-  const auth = new URL('https://discord.com/oauth2/authorize');
-  auth.search = new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, response_type:'code', redirect_uri:origin(env) + '/api/auth/discord/callback', scope:'identify', state}).toString();
-  // Discord knows one return address (the main one): the page to reopen afterwards, on the community site
-  // where the sign-in started, is kept in a cookie shared by the sites of the platform.
-  const back = siteOrigin(request, env) + returnPath(new URL(request.url).searchParams.get('return'));
-  const names = cookieNames(env);
-  return redirect(auth.href, [setCookie(names.state, state, 600, names.domain), setCookie(names.ret, encodeURIComponent(back), 600, names.domain)]);
-}
-async function oauthCallback(request, env) {
-  requireDiscord(env);
-  const url = new URL(request.url), state = url.searchParams.get('state');
-  const names = cookieNames(env);
-  const clear = setCookie(names.state, '', 0, names.domain), clearReturn = setCookie(names.ret, '', 0, names.domain);
-  // Back to the page (and community site) the sign-in started from; anything else: the main home page.
-  let back = origin(env) + '/';
-  try {
-    const wanted = new URL(decodeURIComponent(cookie(request, names.ret)));
-    if (wanted.origin === origin(env) || communityLabel(wanted, env)) back = wanted.origin + returnPath(wanted.pathname + wanted.hash);
-  } catch {}
-  const failed = () => redirect(new URL(back).origin + '/?auth=error', [clear, clearReturn]);
-  // Why a sign-in fails is written to the Worker logs (never a code, token or secret).
-  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, names.state)) { console.error('Discord sign-in failed: state', state ? (cookie(request, names.state) ? 'mismatch' : 'no browser cookie') : 'missing'); return failed(); }
-  const row = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING state_hash').bind(await hash(state), now()).first();
-  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) { console.error('Discord sign-in failed:', !row ? 'state expired or reused' : url.searchParams.get('error') || 'no code'); return failed(); }
-  try {
-    const response = await fetch('https://discord.com/api/oauth2/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, client_secret:env.DISCORD_CLIENT_SECRET, grant_type:'authorization_code', code:url.searchParams.get('code'), redirect_uri:origin(env) + '/api/auth/discord/callback'}), signal:AbortSignal.timeout(10000)});
-    if (!response.ok) { const detail = await response.json().catch(() => ({})); throw Error(`token ${response.status} ${String(detail.error || '').slice(0, 40)}`); }
-    const auth = await response.json();
-    const profileResponse = await fetch('https://discord.com/api/v10/users/@me', {headers:{Authorization:`Bearer ${auth.access_token}`}, signal:AbortSignal.timeout(10000)});
-    if (!profileResponse.ok) throw Error(`profile ${profileResponse.status}`);
-    const profile = await profileResponse.json();
-    if (!/^\d{15,22}$/.test(profile.id)) throw Error('identity');
-    const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 32);
-    const avatarHash = typeof profile.avatar === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(profile.avatar) ? profile.avatar : '';
-    const session = token();
-    await env.DB.batch([
-      env.DB.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').bind(profile.id, display, now()),
-      env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await hash(session), profile.id, now() + SESSION_DAYS * DAY)
-    ]);
-    await discoverMemberships(env, await allCommunities(env), profile.id).catch(error => console.error('Memberships at sign-in:', String(error?.message || '').slice(0, 80)));
-    const old = cookie(request, names.session);
-    if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(old)).run();
-    const avatarCookie = avatarHash
-      ? `em_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * DAY}`
-      : `em_discord_avatar=; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=0`;
-    return redirect(back, [clear, clearReturn, setCookie(names.session, session, SESSION_DAYS * DAY, names.domain), avatarCookie]);
-  } catch (error) {
-    console.error('Discord sign-in failed:', String(error?.message || 'unknown').slice(0, 80));
-    return failed();
-  }
-}
 async function api(request, env) {
   if (!env.DB) fail(503, 'La base partagée n’est pas encore configurée.');
   const url = new URL(request.url), path = racesPath(url.pathname), method = request.method;
@@ -442,7 +115,7 @@ async function api(request, env) {
   // Once the official Discord server is linked to it, it is the official community, like any other.
   const mainAddress = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
   const openSite = mainAddress && !community.discordGuildId;
-  const access = await communityAccess(env, actor, community, {open:openSite});
+  const access = await communityAccess(env, actor, community, {open:openSite, write:!['GET','HEAD'].includes(method)});
   actor.permissions = access.permissions;
   actor.manager = access.manager;
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
@@ -459,6 +132,7 @@ async function api(request, env) {
     communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
+    ...(url.searchParams.has('crewRequests') && access.status === 'member' && actor.user ? {crewRequests:await listCrewRequests(env, actor, community).catch(() => null)} : {}),
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null}, 200, actor.user && actor.renew ? await actor.renew().catch(() => []) : []);

@@ -2,6 +2,7 @@
 // the pilot at the wheel). Each car whose pilot shares from the SimHub plugin is a feed; the page shows one at a time:
 // the standings (session times in practice), the map, our car, and in a race the race panel (time and energy to the
 // flag, where we would rejoin after a stop, LMU's fair share, stints and stops). Raw numbers only, no advice.
+import {bindMapMarkers, moveMapMarkers} from './live-map-markers.mjs';
 import {COLORS, conditionOf} from '../shared/combos.mjs';
 import {addToPath, fairShare, isRace, lapsLeft, median, outlineLines, patch, readFeed, rejoin, stationary, LIVE_FOR} from '../shared/live.mjs';
 
@@ -381,10 +382,10 @@ function record(feed) {
   }
 }
 // Where a car is drawn now, in the game's metres.
-function placed(feed, car) {
+function placed(feed, car, now = performance.now()) {
   const motion = motions.get(feed.key), list = motion?.cars.get(car.id);
   if (!list?.length || still) return [car.x, car.z];
-  const at = performance.now() / 1000 + motion.offset - PLAYBACK_DELAY;
+  const at = now / 1000 + motion.offset - PLAYBACK_DELAY;
   const next = list.findIndex(item => item.et > at);
   if (next === -1) return [list.at(-1).x, list.at(-1).z];
   if (next === 0) return [list[0].x, list[0].z];
@@ -444,16 +445,8 @@ function mapPanel(feed) {
 // Between two redraws, only the cars move (nothing while the page is hidden or the map not shown).
 function glide() {
   requestAnimationFrame(glide);
-  if (still || document.hidden || !frame) return;
-  const box = document.querySelector('#lw-map .lw-mapbox');
-  if (!box || !box.getClientRects().length) return;
-  const {feed, minX, maxZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
-  for (const node of box.querySelectorAll('[data-car]')) {
-    const car = field.get(Number(node.dataset.car));
-    if (!car) continue;
-    const [x, z] = placed(feed, car);
-    node.setAttribute('transform', `translate(${(30 + (x - minX) * k).toFixed(1)},${(30 + (maxZ - z) * k).toFixed(1)})`);
-  }
+  if (still || document.hidden || !frame?.svg?.getClientRects().length) return;
+  moveMapMarkers(frame, placed, performance.now());
 }
 
 // What a stop of this kind costs: the lane on top of the same stretch of track (our stops this session, measured by
@@ -521,6 +514,7 @@ function racePanel(feed) {
 
 function render() {
   if (!view.started) return;
+  frame = null;
   const feed = current();
   if (!feed) {
     app.innerHTML = `${header(null)}<section class="lw-panel"><h2>Personne ne partage en ce moment</h2>
@@ -534,6 +528,7 @@ function render() {
   app.innerHTML = `${header(feed)}${carsStrip()}${tabs(race)}<div class="lw-wall${race ? '' : ' practice'}">
     <div class="lw-col">${panel('lw-board', 'board', board(feed))}${panel('lw-carpanel', 'car', carPanel(feed))}</div>
     <div class="lw-col">${panel('lw-map', 'map', mapPanel(feed))}${race ? panel('lw-race', 'race', racePanel(feed)) : ''}</div></div>`;
+  if (frame) bindMapMarkers(frame, app.querySelector('#lw-map .lw-mapbox'));
 }
 
 app.addEventListener('click', event => {
@@ -563,8 +558,8 @@ async function start() {
   view.started = true;
   render();
   connect();
-  // Clocks and ages move between two messages too.
-  setInterval(render, 1000);
+  // Connection events already render the empty state; only a selected feed needs periodic updates.
+  setInterval(() => { if (current()) render(); }, 1000);
   requestAnimationFrame(glide);
 }
 start();

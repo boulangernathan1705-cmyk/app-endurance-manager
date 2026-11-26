@@ -1,9 +1,9 @@
+import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 import {contextHelpMarker as helpContext,carLabel} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
-import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {upcomingEntries} from '../race-filters.mjs';
 import {
   app,
@@ -66,7 +66,7 @@ function soloCard({event,departure,reg}, grouped=false) {
   return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+      <span class="race-card-top"><span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span><span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
@@ -122,13 +122,13 @@ function card({event,departure,reg}, grouped=false) {
     <div class="my-entry-columns is-two">${column('Autres équipages',otherCrews.length,otherCrewsBody)}${column('Pilotes sans équipage',freePilots.length,unassignedBody)}</div></details>`;
   const body = `${next}${column('Mon équipage',members.length,ownCrewBody)}${others}`;
   if(grouped)return slotCard(departure,reg,`${(reg.groupCategories||[reg.category]).map(badge).join('')}${situation}`,body,true);
-  return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}" id="entry-${reg.id}">
+  return `<details class="native-my-entry-card race-card my-entry-race is-endurance endurance-sim-${enduranceSim(event)} event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+      <span class="race-card-top"><span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span><span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
-        <span class="race-meta">${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span></span>
+        <span class="race-meta">${esc(circuitLabel(event.circuit))}</span>
         <span class="race-badges">${eventTypeBadge(event.eventType)}${(reg.groupCategories||[reg.category]).map(badge).join('')}<span class="race-start">${esc(departureLabel(departure))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
@@ -161,12 +161,12 @@ function raceCards(list){
     if(items.length===1)return card(items[0]);
     const {event,departure,reg}=items[0],solo=isSolo(event);
     const starts=[...new Map(items.map(item=>[item.departure.id,item.departure])).values()];
-    return `<details class="native-my-entry-card race-card my-entry-race my-entry-grouped ${solo?`is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:`event-type-${event.eventType||'private'}`}" data-entry-event="${event.id}">
+    return `<details class="native-my-entry-card race-card my-entry-race my-entry-grouped ${solo?`is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}` :`is-endurance endurance-sim-${enduranceSim(event)} event-type-${event.eventType||'private'}`}" data-entry-event="${event.id}">
       <summary class="native-my-entry-header"><span class="native-my-entry-toggle" aria-hidden="true">+</span><span class="sr-only">Détails du départ</span>
-        <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+        <span class="race-card-top">${solo?departureDateBlock(departure):`<span class="endurance-card-aside">${departureDateBlock(departure)}${enduranceHeader(event)}</span>`}<span class="race-head">
           ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
           <h2 class="event-name">${esc(event.name)}</h2>
-          <span class="race-meta">${solo?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span>
+          <span class="race-meta">${solo?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>
           <span class="race-badges">${solo?accessBadge(event):eventTypeBadge(event.eventType)}${[...new Set(items.flatMap(item=>item.reg.groupCategories||[item.reg.category]))].filter(Boolean).map(badge).join('')}<span class="race-start">${starts.length} créneau${starts.length>1?'x':''}</span>${starts.map(start=>`<span class="race-start">${esc(new Date(start.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',day:'numeric',month:'short'}))} · ${esc(departureLabel(start))}</span>`).join('')}</span>
         </span>${solo?eventAccessLogo(event)||circuitVisual(event.circuit,true):circuitVisual(event.circuit,true)}</span>
         <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}">Voir ${solo?'l’événement':'la course'}</button>

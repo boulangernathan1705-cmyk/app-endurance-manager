@@ -1065,6 +1065,8 @@ test('the pilots with access are added to the race\'s thread once each, those of
   pilot('100000000000000001',[ROLE]);pilot('100000000000000002',[ROLE]);pilot('100000000000000003',[]);pilot('100000000000000004',[ROLE],'left');
   DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES('pg','Invité',?,0,?)").run(OWNER,DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('rg','race-a','start-a','guest','Invité','invite','GT3','whole',0,'pg',?)").run(DEV_COMMUNITY);
   calls.length=0;
   assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
   const message=DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id;

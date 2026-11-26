@@ -1,10 +1,11 @@
+import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
 import {calendarType} from './season-calendar.mjs';
-import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,coversHour,can,otherGameEndurances} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta,streamedStarts,mergedStream} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -17,20 +18,9 @@ import {crewStarts} from './crews-page.mjs';
 
 const DAY=86400000;
 const dateOf=day=>new Date(day*DAY);
-const OTHER={lmu:'iracing',iracing:'lmu'};
-// The endurances of the other simulator (the page only loads those of its own): read once a minute at most.
-let other={game:'',events:[],at:0,loading:null};
-// The endurance of the other sim with this id, if loaded (it opens on that sim's site).
-export const otherGameEvent=id=>other.events?.find(event=>event.id===id)||null;
-// The endurances of the other sim (loaded once a minute); onLoad: what to draw again once they come.
+export {otherGameEvent} from './core.mjs';
 export function otherEndurances(onLoad=()=>{if(state.page==='week')renderWeek();}){
-  const game=OTHER[activeGame];
-  if(other.game===game&&Date.now()-other.at<60000)return other.events;
-  other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
-    other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game).map(event=>({...event,otherGame:game})),at:Date.now(),loading:null};
-    onLoad();
-  }).catch(()=>{other.loading=null;other.at=Date.now();other.game=game;});
-  return other.game===game?other.events:[];
+  return otherGameEndurances('calendar',onLoad);
 }
 const dayName=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'long'});
 const dayShort=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'short',day:'numeric'});
@@ -88,7 +78,7 @@ function streamLine(event,starts=[]){
 }
 
 // The card's schedule on a phone (Nathan 2026-11-02, option G): one line per moment, start → end: the stream (with its
-// link), then the race, each round set or each start of an endurance. An endurance ends 30 min after its race time.
+// link), then the race, each round set or each start of an endurance, without its finish time.
 const parisMinutes=timestamp=>{const [h,m]=clock.format(timestamp).split(':').map(Number);return h*60+m;};
 const clockMinutes=time=>{const [h,m]=String(time||'').split(':').map(Number);return Number.isFinite(h)?h*60+(m||0):0;};
 const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
@@ -107,15 +97,15 @@ function planOf(item){
     const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
-      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:`${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
-        from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:solo?'🏁':'',label:solo?(starts.length>1?`Course ${index+1}`:name):'',
+        from:pending?'à définir':hour(start.startsAt),to:!solo||pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
   if(!rows.length)return {plan:'',band:'',live:''};
   rows.sort((a,b)=>a.key-b.key);
   const time=row=>`<span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>`;
   // On a phone: one line per moment, the stream's link at the end of its own line (Nathan 2026-11-02).
-  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.icon)}<em> ${esc(row.label)}</em></span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
+  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span${row.label?'':' aria-label="Départ"'}>${row.icon?esc(row.icon):enduranceStartIcon}${row.label?`<em> ${esc(row.label)}</em>`:''}</span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
   // On a computer (option P1): the race's times in the coloured band on top, the start big; the stream in its own
   // purple line with its link on the same line.
   const live=rows.find(row=>row.cls==='is-stream'),races=rows.filter(row=>row!==live),shown=races.length?races:[live];
@@ -144,9 +134,9 @@ function block(item,now){
   // many endurances apart (Nathan 2026-11-01).
   const circuit=stream?'':solo?soloCardMeta(event).replace('Circuit à préciser',''):esc(simCatalog(event.otherGame||activeGame)?.circuits.find(item=>item.id===event.circuit)?.name||'');
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
-  // An endurance shows the Endurance Manager endurance logo of its simulator, without its length (Nathan 2026-11-02).
+  // Endurances share the compact simulator/duration header; community logos stay unchanged.
   const enduSim=event.otherGame||activeGame;
-  const badge=solo?kind.label:'',logo=solo?logoOf(event):`<img class="event-access-logo" src="/images/event-access/endurance-${esc(enduSim)}.png" alt="Endurance · ${esc(SIM_NAME[enduSim]||'')}" width="300" height="300" loading="lazy" decoding="async">`;
+  const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
   // Who is there: the crews of an endurance, else its pilots (Nathan 2026-11-01, option B).
   const crews=solo?0:starts.reduce((sum,start)=>sum+(start.departure.crews||[]).length,0);
   const count=stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
@@ -164,31 +154,32 @@ function block(item,now){
   // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
   // championship endurances. Other races keep their simulator's colour.
   const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
-  const cls=`week-block is-${kind.key}${sim2}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  const panorama=solo?'':endurancePreviewClass(event,enduSim);
+  const cls=`week-block is-${kind.key}${sim2}${panorama}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
   const access=state.eventTdz&&solo&&!stream?(event.access==='safe'?'SAFE':'OPEN'):'';
   const kindLine=[sim,solo?kind.label:'Endurance',access].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
+  const liveStatus=live?'<span class="week-chip is-live">● En cours</span>':'';
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceArtwork(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
-    ${plan.band}
+    ${solo?plan.band:''}
     <span class="week-block-body">
     <span class="week-block-title">
-    ${live?'<span class="week-chip is-live">● En cours</span>':''}
-    <span class="week-block-kind">${esc(kindLine)}</span>
+    ${solo?`${liveStatus}<span class="week-block-kind">${esc(kindLine)}</span>`:`<span class="week-endurance-heading">${liveStatus}${enduranceCardIdentity(event,enduSim)}</span>`}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
-    ${streamLine(event,starts)}
-    ${plan.plan}${plan.live}
+    ${solo?streamLine(event,starts):''}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}${enduranceCardDuration(event)}</span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

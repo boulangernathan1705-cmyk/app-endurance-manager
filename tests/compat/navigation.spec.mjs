@@ -122,7 +122,7 @@ test('iRacing space opens from home', async ({page}) => {
 });
 test('the public information menu fits and its destinations can be opened', async ({page}) => {
   const session = {access:'anonymous', discordReady:true, community:{slug:'tdz', shortName:'TDZ', name:'Tondeuz Agazon'}};
-  await page.route('**/api/session', route => route.fulfill({json:session}));
+  await page.route(url=>url.pathname==='/api/session', route => route.fulfill({json:session}));
   for (const width of [340, 454, 1366]) {
     await page.setViewportSize({width,height:900});
     await page.goto('/privacy.html');
@@ -148,7 +148,7 @@ test('the standalone help offers a retry when its module cannot load', async ({p
 test('weekly multi-start cards show only one schedule at mobile and desktop widths', async ({page}) => {
   await page.goto('/');
   // Use the real bundled stylesheet with a deterministic multi-start card, without a Discord session.
-  // Check both sides of the 760px breakpoint so the desktop band remains available.
+  // Endurances use a single schedule on both sides of the breakpoint.
   await page.evaluate(() => {
     const fixture=document.createElement('div');
     fixture.id='week-schedule-regression';
@@ -158,8 +158,8 @@ test('weekly multi-start cards show only one schedule at mobile and desktop widt
   const card=page.locator('#week-schedule-regression .week-block');
   for (const width of [320,390,760,761,1366]) {
     await page.setViewportSize({width,height:900});
-    const mobile=width<=760;
-    await expect(card.locator('.week-block-band')).toHaveCSS('display',mobile?'none':'block');
-    await expect(card.locator('.week-block-plan')).toHaveCSS('display',mobile?'grid':'none');
+    await expect(card.locator('.week-block-band')).toHaveCSS('display','none');
+    await expect(card.locator('.week-block-plan')).toHaveCSS('display','grid');
+    await expect(card.locator('.week-plan-row:visible')).toHaveCount(2);
   }
 });

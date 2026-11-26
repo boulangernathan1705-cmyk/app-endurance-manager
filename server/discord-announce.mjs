@@ -3,7 +3,7 @@
 // @everyone with a stream, otherwise it is a plain message alert. Older layouts are replaced without a ping.
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
-import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
+import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly-snapshot.mjs';
 import {parisDay, raceUrl} from './discord-weekly-format.mjs';
 import {posterModel, posterHtml, posterText, renderPoster} from './discord-poster.mjs';
 import {discordRequest} from './recap-discord.mjs';

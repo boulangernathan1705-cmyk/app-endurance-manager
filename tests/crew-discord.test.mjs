@@ -106,6 +106,43 @@ const since=(calls,from)=>calls.slice(from).map(call=>`${call.method} ${call.pat
 const notifications=async (req,actor)=>(await req('/api/notifications','GET',null,actor)).data.notifications;
 const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&&call.path===`/guilds/${GUILD}/channels`);
 
+test('race reminders use the last start only as a lower bound and drain eligible departures without duplicates', async () => {
+  const {DB,login,sync,req}=harness();
+  await login(PILOT,'pilot','Alice');
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.raceReminders',json('true')) WHERE id=?").run(DEV);
+  const participant=crypto.randomUUID();
+  DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES (?,?,?,?,?,?)')
+    .run(participant,'Alice',PILOT,PILOT,0,DEV);
+  const at=RACE_MONDAY;
+  const eligible=[];
+  const addRace=(name,starts,{official=false,pending=false,provisional=false}={})=>{
+    const id=crypto.randomUUID();
+    const departures=starts.map(startsAt=>({id:crypto.randomUUID(),startsAt,tbd:provisional}));
+    DB.db.prepare(`INSERT INTO events(id,name,categories,departures,created_by,created_at,community_id,circuit,schedule_pending)
+      VALUES (?,?,'["GT3"]',?,?,0,?,'spa',?)`).run(id,name,JSON.stringify(departures),PILOT,official?'official':DEV,Number(pending));
+    for (const departure of departures) {
+      DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id)
+        VALUES (?,?,?,?,?,'alice','GT3','whole',0,?,?)`).run(crypto.randomUUID(),id,departure.id,PILOT,'Alice',participant,DEV);
+      if (!pending && !provisional && departure.startsAt>at && departure.startsAt<=at+24*HOUR) eligible.push(departure.id);
+    }
+  };
+  addRace('Archive', [at-HOUR,at]);
+  addRace('Official starts over two days', [at+HOUR,at+30*HOUR], {official:true});
+  addRace('Within the window', [at+2*HOUR,at+3*HOUR]);
+  addRace('At the upper boundary', [at+24*HOUR]);
+  addRace('Pending', [at+HOUR], {pending:true});
+  addRace('Provisional', [at+HOUR], {provisional:true});
+  assert.equal(eligible.length,4);
+  const reminders=()=>DB.db.prepare('SELECT departure_id FROM race_reminders').all().map(row=>row.departure_id);
+  await sync(at);
+  assert.equal(reminders().length,3);
+  await sync(at);
+  assert.deepEqual(reminders().sort(),eligible.sort());
+  await sync(at);
+  assert.equal(reminders().length,4);
+  assert.equal((await notifications(req,'pilot')).filter(item=>item.kind==='race_reminder').length,4);
+});
+
 test('one Cron Trigger per Worker: each minute runs at most one job',async()=>{
   // Cloudflare's free plan allows 5 Cron Triggers for the whole account, shared with other Workers.
   const crons=file=>JSON.parse(readFileSync(new URL(`../${file}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,'')).triggers.crons;

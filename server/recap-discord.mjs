@@ -5,7 +5,7 @@ import {administrators} from './core.mjs';
 import {notify} from './notifications.mjs';
 import {communityAdmins} from './access.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
-import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
+import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly-snapshot.mjs';
 import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES, nextStartsRecap} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
@@ -1070,12 +1070,14 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
   let added = 0;
   for (const thread of threads) {
     // On the server, with « Accès Endurance Manager » (a role, @everyone, or a Discord admin).
+    // Read the race's registered Discord users once. Exclude guest registrations so that
+    // membership in this set sorts as 0 or 1 for every pilot.
     const pilots = (await env.DB.prepare(`SELECT m.user_id FROM memberships m WHERE m.community_id=? AND m.status='member'
       AND NOT EXISTS (SELECT 1 FROM discord_thread_members t WHERE t.community_id=m.community_id AND t.event_id=? AND t.user_id=m.user_id)
       AND (m.discord_admin=1 OR m.user_id IN (SELECT value FROM json_each(?)) OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
         AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
         AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value IN ('access','admin'))))
-      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
+      ORDER BY (m.user_id IN (SELECT g.user_id FROM registrations g WHERE g.event_id=? AND g.user_id IS NOT NULL)) DESC, m.user_id LIMIT 50`)
       .bind(thread.community_id,thread.event_id,JSON.stringify(administrators(env)),thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
       // Discord archives a thread nobody wrote in for a week and takes it out of its members' list, for good: opening it

@@ -24,7 +24,7 @@ async function call(path, method = 'GET') {
 
 // The wall's own tabs write their name in the address (#board, #chrono…): they belong to the « Mur des stands » tab.
 const WALL = ['mur', 'board', 'chrono', 'car', 'tele', 'map'];
-const PAGES = {memo:'/front/combos-page.mjs?v=18', wall:'/front/pit-wall.mjs?v=20'};
+const PAGES = {memo:'/front/combos-page.mjs?v=18', wall:'/front/pit-wall.mjs?v=23'};
 const loaded = new Set();
 function show(panel, write = false) {
   for (const tab of document.querySelectorAll('.sh-tabs [data-panel]')) tab.setAttribute('aria-selected', String(tab.dataset.panel === panel));

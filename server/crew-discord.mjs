@@ -13,7 +13,7 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublic
 // Everything is done by the bot (DISCORD_BOT_TOKEN) through Discord's REST API, by the scheduled task and right
 // after a change on a crew, a few requests at a time (a run of the Worker may make 50).
 import {allCommunities, communityById, communityUrl} from './community.mjs';
-import {notify} from './notifications.mjs';
+import {bellReminders, BELL_REMINDER_WINDOW} from './race-bell-reminders.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
@@ -26,7 +26,7 @@ export const CLOSE_AFTER = 2 * HOUR;
 const LOCK_MS = 60_000;
 // Text channels archived by the first version: deleted 30 days after their race.
 export const KEEP_ARCHIVES = 30 * 24 * HOUR;
-export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
+export const REMINDERS = [{bit:1, before:BELL_REMINDER_WINDOW}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
 // manage channels, connect to voice channels, send messages, read the history.
 const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
@@ -668,46 +668,6 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(row.reminded, row.row_id).run();
   }
   return opened ? 'opened' : 'updated';
-}
-
-// The bell, 24 h before a start: every pilot entered there in the community, with their crew and its voice channel.
-async function bellReminders(env, timestamp, communities) {
-  if (!communities.length) return 0;
-  let told = 0;
-  // The starts of the coming 24 h with pilots of a community not reminded yet (a few per run), in one query.
-  const starts = (await env.DB.prepare(`SELECT k.value AS community_id, e.id, e.name, e.circuit, e.community_id AS event_community,
-      json_extract(j.value,'$.id') AS departure_id, json_extract(j.value,'$.startsAt') AS starts_at
-    FROM json_each(?) k, events e, json_each(e.departures) j
-    WHERE (e.community_id=k.value OR e.community_id='official') AND e.schedule_pending=0 AND COALESCE(json_extract(j.value,'$.tbd'),0)=0
-      AND json_extract(j.value,'$.startsAt') > ? AND json_extract(j.value,'$.startsAt') <= ?
-      AND EXISTS(SELECT 1 FROM registrations g WHERE g.event_id=e.id AND g.departure_id=json_extract(j.value,'$.id') AND g.community_id=k.value)
-      AND NOT EXISTS(SELECT 1 FROM race_reminders r WHERE r.event_id=e.id AND r.departure_id=json_extract(j.value,'$.id') AND r.community_id=k.value)
-    LIMIT 3`).bind(JSON.stringify(communities.map(item => item.id)), timestamp, timestamp + REMINDERS[0].before).all()).results || [];
-  for (const start of starts) {
-    // Marked first: a reminder is never sent twice, even if the run stops halfway.
-    const mark = await env.DB.prepare('INSERT OR IGNORE INTO race_reminders(event_id,departure_id,community_id,sent_at) VALUES(?,?,?,?)').bind(start.id, start.departure_id, start.community_id, timestamp).run();
-    if (!mark.meta.changes) continue;
-    const entries = (await env.DB.prepare(`SELECT DISTINCT p.user_id, c.id AS crew_id, c.name AS crew_name, d.voice_id, d.guild_id FROM registrations r
-        JOIN participants p ON p.id=r.participant_id
-        LEFT JOIN crew_members cm ON cm.registration_id=r.id LEFT JOIN crews c ON c.id=cm.crew_id
-        LEFT JOIN crew_discord d ON d.crew_id=c.id AND d.closed_at IS NULL AND d.voice_id IS NOT NULL
-      WHERE r.event_id=? AND r.departure_id=? AND r.community_id=? AND p.user_id IS NOT NULL AND r.status!='unavailable'`)
-      .bind(start.id, start.departure_id, start.community_id).all()).results || [];
-    // One notification per crew (its name and voice channel), one for the pilots without a crew.
-    const groups = new Map();
-    for (const entry of entries) {
-      const key = entry.crew_id || '';
-      if (!groups.has(key)) groups.set(key, {entry, users:[]});
-      groups.get(key).users.push(entry.user_id);
-    }
-    const event = {id:start.id, name:start.name, circuit:start.circuit, community_id:start.event_community};
-    const departure = {startsAt:Number(start.starts_at), tbd:false};
-    for (const {entry, users} of groups.values()) {
-      const data = entry.crew_id ? {crewName:entry.crew_name, ...(entry.voice_id ? {channelUrl:`https://discord.com/channels/${entry.guild_id}/${entry.voice_id}`} : {})} : {};
-      told += await notify(env, users.map(user_id => ({user_id, community_id:start.community_id})), 'race_reminder', event, {departure, ...data});
-    }
-  }
-  return told;
 }
 
 // The same, with why it cannot (shown to the admins): 'rights' (rights not given yet), 'absent' (the bot is not on

@@ -1,11 +1,13 @@
 import {helpContext} from '../context-help.mjs';
-import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from '../../shared/catalog.mjs';
+import {api,reportClientError} from './api-client.mjs';
+import {createRaceService} from './race-service.mjs';
+import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent, catalogForGame} from '../../shared/catalog.mjs';
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
 import {carBrand, carShortName} from '../../shared/car-brands.mjs';
 
-export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
+export {api,CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
 export const app = document.getElementById('app');
 export const nav = document.getElementById('navigation');
@@ -95,7 +97,9 @@ export function pilotCount(registrations) { return new Set(registrations.filter(
 export function circuitInfo(id) { return CIRCUITS.find(circuit => circuit.id === id) || null; }
 export function circuitLabel(id) { return circuitInfo(id)?.name || 'Circuit à préciser'; }
 export function circuitVisual(id, compact = false) {
-  const circuit = circuitInfo(id); if (!circuit) return '';
+  // The weekly dashboard includes races from both simulators, regardless of the active game.
+  const circuit = circuitInfo(id) || catalogForGame(gameForEvent({circuit:id})).circuits.find(item=>item.id===id);
+  if (!circuit) return '';
   const map = circuitMapConfig(id);
   const src = map ? circuitMapSource(map.file) : `/images/circuits/${circuit.file}`;
   const attrs = map ? ` data-circuit-source="commons" data-circuit-map="${esc(map.key)}" style="--circuit-scale:${map.scale};--circuit-x:${map.x}%;--circuit-y:${map.y}%;--circuit-mobile-scale:${map.mobileScale};--circuit-mobile-x:${map.mobileX}%;--circuit-mobile-y:${map.mobileY}%"` : '';
@@ -128,101 +132,9 @@ export function sortedCrews(event,departure){return [...(departure.crews||[])].s
 export function crewColorClass(crewId,index=null) { if (index != null) return `crew-palette-${index%10}`; let hash=0; for (const char of String(crewId||'')) hash=(hash*31+char.charCodeAt(0))>>>0; return `crew-palette-${hash%10}`; }
 export function coversHour(reg,index) { return reg.status === 'whole' || String(reg.status||'').split(',').includes(`h${index+1}`); }
 
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const tick = () => typeof performance !== 'undefined' ? performance.now() : Date.now();
-function networkFailure(error) {
-  return error instanceof TypeError || /networkerror|failed to fetch|load failed/i.test(String(error?.message || error || ''));
-}
-function onlineLabel() {
-  return typeof navigator === 'undefined' ? 'inconnu' : (navigator.onLine ? 'oui' : 'non');
-}
-function diagnosticMessage(path,method,stage,extra='') {
-  return `Connexion au service impossible. Diagnostic : ${method} ${path} · ${stage} · navigateur en ligne : ${onlineLabel()}${extra ? ` · ${extra}` : ''}`;
-}
-function reportClientError({kind='network',path='',method='',message='',detail=''}) {
-  try {
-    const payload=JSON.stringify({kind,page:location.pathname.slice(0,160),apiPath:String(path).slice(0,160),method:String(method).slice(0,12),message:String(message).slice(0,500),detail:String(detail).slice(0,1000),userAgent:navigator.userAgent.slice(0,500),viewport:`${innerWidth}x${innerHeight}`,online:navigator.onLine!==false});
-    // One report per error: the beacon when the browser accepts it, a keepalive fetch otherwise.
-    try { if (navigator.sendBeacon?.('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'}))) return; } catch {}
-    fetch('/telemetry/client-error',{method:'POST',credentials:'same-origin',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:payload}).catch(()=>{});
-  } catch {}
-}
-function xhrApi(path,method,data,priorDetail='') {
-  return new Promise((resolve,reject) => {
-    const started=tick();
-    const request = new XMLHttpRequest();
-    request.open(method,path,true);
-    request.withCredentials=true;
-    request.setRequestHeader('Accept','application/json');
-    if (method !== 'GET') request.setRequestHeader('Content-Type','application/json');
-    request.onload=()=>{
-      const elapsed=Math.round(tick()-started);
-      let result;
-      try { result=JSON.parse(request.responseText || '{}'); }
-      catch { const error=Error(diagnosticMessage(path,method,'réponse XHR illisible',`statut ${request.status} · ${elapsed} ms · ${request.responseText?.length||0} caractères`)); reportClientError({path,method,message:error.message,detail:`${priorDetail}; xhr status ${request.status}; ${elapsed}ms; chars ${request.responseText?.length||0}`}); reject(error); return; }
-      if (request.status < 200 || request.status >= 300) { reject(Error(result.error || `Cette action a échoué (${request.status}).`)); return; }
-      resolve(result);
-    };
-    request.onerror=()=>{const elapsed=Math.round(tick()-started);const error=Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR en échec',`statut XHR 0 · ${elapsed} ms`));reportClientError({path,method,message:error.message,detail:`${priorDetail}; xhr error status 0; ${elapsed}ms`});reject(error);};
-    request.ontimeout=()=>{const elapsed=Math.round(tick()-started);const error=Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR expiré',`délai 12 s · ${elapsed} ms`));reportClientError({path,method,message:error.message,detail:`${priorDetail}; xhr timeout; ${elapsed}ms`});reject(error);};
-    request.timeout=12000;
-    request.send(method==='GET'?null:JSON.stringify(data||{}));
-  });
-}
-export async function api(path,method='GET',data,conditional=null) {
-  const attempts=[];
-  // Only reads are tried again: a creation whose answer was lost may already be saved (no duplicate race).
-  const tries=method==='GET'?2:1;
-  for (let attempt=0;attempt<tries;attempt++) {
-    const started=tick();
-    try {
-      const headers=method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'};
-      if (method==='GET' && conditional?.tag && conditional.data) headers['If-None-Match']=conditional.tag;
-      const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers,body:method==='GET'?undefined:JSON.stringify(data||{})});
-      if (response.status===304 && conditional?.tag && conditional.data) return structuredClone(conditional.data);
-      const elapsed=Math.round(tick()-started);
-      const text=await response.text();
-      const bytes=new TextEncoder().encode(text).length;
-      let result;
-      try { result=JSON.parse(text); }
-      catch { const error=Error(`Le service partagé ne répond pas correctement (${method} ${path}, statut ${response.status}, ${bytes} octets).`);reportClientError({path,method,message:error.message,detail:`fetch ${attempt+1}; ${elapsed}ms; status ${response.status}; ${bytes} bytes; server ${response.headers.get('X-Endurance-Approx-Bytes')||'n/a'}`});throw error; }
-      if (!response.ok) throw Error(result.error || `Cette action a échoué (${response.status}).`);
-      if (conditional && method==='GET') {
-        conditional.tag=response.headers.get('ETag')||'';
-        conditional.data=conditional.tag?structuredClone(result):null;
-      }
-      return result;
-    } catch (error) {
-      const elapsed=Math.round(tick()-started);
-      if (!networkFailure(error)) throw error;
-      attempts.push(`fetch ${attempt+1}: ${elapsed}ms ${String(error?.message || error || 'erreur réseau').slice(0,90)}`);
-      if (attempt+1<tries) await wait(250);
-    }
-  }
-  const priorDetail=attempts.join(' | ');
-  if (method!=='GET') {
-    const error=Error('Connexion au service impossible : ta demande n’a peut-être pas été enregistrée. Actualise la page pour vérifier avant de réessayer.');
-    reportClientError({path,method,message:diagnosticMessage(path,method,'envoi en échec, non renvoyé'),detail:priorDetail});
-    throw error;
-  }
-  // XHR is an unconditional fallback; an older tag must never label its newer response.
-  if (conditional) { conditional.tag=''; conditional.data=null; }
-  try { return await xhrApi(path,method,data,priorDetail); }
-  catch (error) {
-    if (/Diagnostic :/.test(String(error?.message || ''))) throw error;
-    const wrapped=Error(diagnosticMessage(path,method,'secours XHR en échec',priorDetail));
-    reportClientError({path,method,message:wrapped.message,detail:priorDetail});
-    throw wrapped;
-  }
-}
-// Only two lists, in this page's memory. Never persist private event data across visits.
-const eventResponses=new Map();
-let eventSession='';
-async function fetchEvents(scope) {
-  if (!eventResponses.has(scope)) eventResponses.set(scope,{});
-  const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`,'GET',undefined,eventResponses.get(scope));
-  return (Array.isArray(result.events)?result.events:[]).filter(event => event.format === 'solo' || gameForEvent(event) === activeGame);
-}
+const races = createRaceService(activeGame);
+export const {otherGameEvent,invalidateOtherEndurances,otherGameEndurances} = races;
+
 // Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
 // everywhere; the stored time stays in departure.clock (event form).
 function markUndefinedStarts(events) {
@@ -246,14 +158,15 @@ function mergeEvents(...lists) {
 // the first time it is needed (Archivés filter, link to a past race) and then kept fresh.
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
-  const session = await api('/api/session');
+  const session = await api('/api/session?crewRequests=1');
   // Account, community settings or permissions changed: discard both private representations.
-  const sessionKey=JSON.stringify(session);
-  if (sessionKey!==eventSession) { eventResponses.clear(); eventSession=sessionKey; }
+  const {crewRequests,...accessSession}=session;
+  const sessionKey=JSON.stringify(accessSession);
+  races.setSession(sessionKey);
   const accessChanged = state.access !== session.access;
   state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null; state.elsewhere=Array.isArray(session.elsewhere)?session.elsewhere:[];
   const member = session.access === 'member';
-  const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
+  const [upcoming,archived] = member ? await Promise.all([races.fetchEvents('upcoming'), state.archiveLoaded ? races.fetchEvents('archived') : []]) : [[],[]];
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
@@ -282,22 +195,34 @@ export async function load() {
     state.participantsLoaded=true;
   }
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);
-  state.crewRequests = member && state.user ? ((await api('/api/crew-requests').catch(() => null))?.requests || []) : [];
+  state.crewRequests = member && state.user ? (crewRequests ?? ((await api('/api/crew-requests').catch(() => null))?.requests || [])) : [];
 }
 export async function loadArchive() {
   if (state.archiveLoaded) return;
-  const archived = await fetchEvents('archived');
+  const archived = await races.fetchEvents('archived');
   state.events=markUndefinedStarts(mergeEvents(state.events,archived));
   state.archiveLoaded=true;
 }
 
 export function showError(error) {
   const message = error?.message || String(error || 'Action impossible.');
-  document.querySelector('[data-ux-error-modal]')?.remove();
+  const previous = document.querySelector('[data-ux-error-modal]');
+  const returnFocus = previous?.returnFocus || document.activeElement;
+  previous?.remove();
   const overlay=document.createElement('div');
   overlay.className='ux-error-overlay'; overlay.dataset.uxErrorModal='true';
   overlay.innerHTML=`<section class="ux-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ux-error-title" aria-describedby="ux-error-message"><span class="ux-error-icon" aria-hidden="true">!</span><h2 id="ux-error-title">Action impossible</h2><p id="ux-error-message">${esc(message)}</p><button type="button" class="primary-button" data-action="dismiss-error">OK, j’ai compris</button></section>`;
-  document.body.append(overlay); overlay.querySelector('button')?.focus();
+  const closeButton = overlay.querySelector('button');
+  overlay.returnFocus = returnFocus;
+  overlay.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' && event.key !== 'Tab') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Escape') closeButton.click();
+    else closeButton.focus();
+  });
+  document.body.append(overlay);
+  closeButton.focus();
 }
 
 addEventListener('error',event=>{if(event.error||event.message)reportClientError({kind:'javascript',message:event.message||event.error?.message||'Erreur JavaScript',detail:event.error?.stack||`${event.filename||''}:${event.lineno||0}:${event.colno||0}`});});

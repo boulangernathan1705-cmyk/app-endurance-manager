@@ -18,9 +18,14 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 
 ## Charte et tests visuels
 
+La [charte et les règles de cascade](docs/DESIGN_SYSTEM.md) décrivent les fichiers de référence et les états à vérifier.
+
 Le style du site a des valeurs de référence (couleurs, tailles, arrondis, espacements) dans `styles/tokens.css`.
 Les nouveaux styles utilisent ces variables (`var(--em-…)`), jamais une valeur brute. La page `/charte` montre les
 composants avec ces valeurs.
+La cascade finale est assemblée par `styles/ux-refresh.css` dans l'ordre de ses imports. Pour une retouche,
+modifier la règle dans la feuille du composant et vérifier le rendu avant/après. Les feuilles sont toujours
+assemblées dans `app.css` au build, sans requêtes CSS supplémentaires.
 La bannière a la même taille sur toutes les pages : une bande fine, sur ordinateur (`--em-banner-height-thin`)
 comme sur téléphone (`--em-banner-height-phone`) ; seul le mur des stands garde sa bande extra-fine.
 
@@ -35,6 +40,22 @@ machine à l'autre) :
    « Références visuelles » › Run workflow sur la branche) ;
 2. le workflow refait les captures et les ajoute à la branche (commit « Références visuelles mises à jour ») ;
 3. pousser ensuite un commit sur la branche pour relancer les contrôles de la PR (un commit du bot ne les relance pas).
+
+### Comparaison locale de la cascade
+
+Le script `scripts/css-compare.mjs` utilise la base de démonstration locale (voir `CLAUDE.md`).
+Capturer le même scénario et la même base avant et après. Par exemple, dupliquer la commande avec
+`APRES.json` et un autre répertoire de captures après avoir reconstruit et redémarré le Worker local.
+
+```sh
+CSS_COMPARE_BROWSER=chromium CSS_COMPARE_VIEWPORTS=320x844,390x844,760x900,761x900,1366x900,3440x1440 \
+CSS_COMPARE_SCREENSHOTS=/tmp/em-css-avant node scripts/css-compare.mjs snap AVANT.json
+node scripts/css-compare.mjs diff AVANT.json APRES.json
+```
+
+On peut aussi utiliser `firefox` ou `webkit` après installation du navigateur Playwright correspondant.
+Comparer chaque moteur à lui-même, avec les mêmes options. Les captures locales et les fichiers JSON
+restent hors du dépôt. Un parcours manquant ou un écart de style ou de dimensions fait échouer le diff.
 
 ## Configurations Cloudflare
 

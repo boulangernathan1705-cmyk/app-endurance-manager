@@ -5,8 +5,8 @@
 //   "@everyone" included (its role id is the server id). Without any setting for "@everyone", members may
 //   enter endurances and OPEN events, but access to the site must be granted explicitly.
 // - The owner of the server and any role with Discord's "Administrator" permission have every permission.
-// - Membership and roles are checked by the bot (DISCORD_BOT_TOKEN) when the player comes, at most once a
-//   day, and by the daily task. The player's other servers are never looked at.
+// - The bot checks membership and roles periodically, with a shorter window for administrative writes.
+//   The player's other servers are never looked at.
 // - No Discord server set for the community, or the bot cannot tell: no access (fail closed).
 import {administrators, fail, now} from './core.mjs';
 import {discordFetch, botToken} from './discord-api.mjs';
@@ -36,6 +36,7 @@ export const normalizePermissions = list => [...new Set((list || []).flatMap(per
 const CHECK_EVERY = 24 * 3600; // seconds, the daily check of every member
 // The player on the site: roles asked again after 10 minutes, so a role given on Discord soon counts here.
 const VISIT_CHECK_EVERY = 10 * 60;
+const ADMIN_WRITE_CHECK_EVERY = 60;
 // Not on the server yet: asked again after a minute, so a player who has just joined gets in on their next visit.
 const NOT_MEMBER_CHECK_EVERY = 60;
 const UNKNOWN_MEMBER = 10007; // Discord: this user is not on the server (a 404 can also mean the bot is not on it)
@@ -57,7 +58,7 @@ async function guild(env, guildId) {
     icon:/^(a_)?[a-f0-9]{32}$/.test(info.data.icon || '') ? info.data.icon : '', banner:/^(a_)?[a-f0-9]{32}$/.test(info.data.banner || '') ? info.data.banner : '',
     roles:(roles.data || []).map(role => ({id:String(role.id), name:String(role.name), position:Number(role.position) || 0,
       administrator:(BigInt(role.permissions || '0') & ADMINISTRATOR) === ADMINISTRATOR}))};
-  guildCache.set(guildId, {value, until:Date.now() + 5 * 60_000});
+  guildCache.set(guildId, {value, until:Date.now() + ADMIN_WRITE_CHECK_EVERY * 1000});
   return value;
 }
 export const discordGuild = guild;
@@ -108,12 +109,13 @@ export async function checkMembership(env, community, userId) {
   return {status:'member', discord_roles:JSON.stringify(roles), discord_admin:discordAdmin, checked_at:time};
 }
 
-async function rolePermissions(env, community, roles) {
+async function rolePermissions(env, community, roles, allowAdmin = true) {
   const everyone = community.discordGuildId;
   const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
   const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
   const granted = new Set(byRole.has(everyone) ? byRole.get(everyone) : DEFAULT_EVERYONE);
   for (const role of roles) for (const permission of byRole.get(role) || []) granted.add(permission);
+  if (!allowAdmin) granted.delete('admin');
   const permissions = withImplied(new Set([...granted].filter(permission => PERMISSIONS.includes(permission))));
   // Action permissions alone never open the community. An admin always keeps access to configure roles.
   return permissions.has('access') ? permissions : new Set();
@@ -149,7 +151,7 @@ const STALE_ROLES = 7 * 24 * 3600;
 // Access of the actor to the community: {status, permissions, manager}.
 //   status: 'member' (access), 'anonymous' (not signed in), 'not-member' (not on the Discord server),
 //   'forbidden' (member without site access), 'unavailable' (the server or the bot cannot be checked).
-export async function communityAccess(env, actor, community, {open = false} = {}) {
+export async function communityAccess(env, actor, community, {open = false, write = false} = {}) {
   const none = status => ({status, permissions:new Set(), manager:false});
   const manager = Boolean(actor.user) && administrators(env).includes(actor.user.id);
   // Showcase (main address): everyone looks, signed in or not; only the platform managers change it.
@@ -160,13 +162,23 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.
   // Discord not answering: the roles known last time stay (never an error for a member already checked).
   const recheck = membership?.status === 'member' ? VISIT_CHECK_EVERY : NOT_MEMBER_CHECK_EVERY;
-  if (!membership || membership.checked_at < now() - recheck) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
+  let checked = false;
+  if (!membership || membership.checked_at < now() - recheck) {
+    checked = true;
+    membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
+  }
   if (manager) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager};
   // ...but not forever: roles nobody could check for a week (bot removed, Discord refusing) no longer open the site.
   if (!membership || membership.checked_at < now() - STALE_ROLES) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
-  if (membership.discord_admin) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager:false};
-  const permissions = await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));
+  const savedRoles = row => JSON.parse(row.discord_roles || '[]');
+  const permissionsFor = row => row.discord_admin ? new Set(ALL_PERMISSIONS) : rolePermissions(env, community, savedRoles(row));
+  let permissions = await permissionsFor(membership);
+  if (write && permissions.has('admin') && membership.checked_at < now() - ADMIN_WRITE_CHECK_EVERY) {
+    const fresh = checked ? null : await checkMembership(env, community, actor.user.id).catch(() => null);
+    if (fresh?.status === 'left') return none('not-member');
+    permissions = fresh ? await permissionsFor(fresh) : await rolePermissions(env, community, savedRoles(membership), false);
+  }
   return permissions.has('access') ? {status:'member', permissions, manager:false} : none('forbidden');
 }
 

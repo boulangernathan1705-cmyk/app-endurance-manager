@@ -1,14 +1,14 @@
+import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 import {raceFilterKey,mySituation,emptyRaceFilters,normalizeRaceFilters,filteredCalendarEvents} from '../race-filters.mjs';
 import {readFilterState,writeFilterState,setFilterDate} from '../filter-state.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
-import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,addMenu,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {calendarType,seasonCalendar} from './season-calendar.mjs';
 import {loadArchive} from './core.mjs';
 import {crewsTodoCount} from './crews-page.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
-import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
 import {isStream,streamDetails,streamPlatform} from '../../shared/stream.mjs';
@@ -35,7 +35,7 @@ export function raceStarts(event,archived){
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
   const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
-  const time=departure=>`<span class="race-start">${esc(timeLabel(departure.time))}</span>`;
+  const time=departure=>`<span class="race-start">${isSolo(event)?'':enduranceStartIcon}${esc(timeLabel(departure.time))}</span>`;
   return `<span class="race-starts">${visible.map(list=>`<span class="race-day"><em>${esc(dayLabel(list[0].startsAt))}</em>${list.map(time).join('')}</span>`).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
 // Where the current pilot stands on a race: their next start with a registration, and their crew if any.
@@ -107,7 +107,11 @@ function eventCard({event,next,archived,end}){
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(timeLabel(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
-  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  const solo=isSolo(event);
+  const calendarDate=raceDateBlock(event,archived);
+  const enduranceDate=solo?'':`<span class="race-endurance-date">${calendarDate}${enduranceCardIdentity(event)}</span>`;
+  const classification=solo?officialBadge(event)+accessBadge(event):`<span class="race-endurance-meta"><span class="race-endurance-types">${officialBadge(event)}${eventTypeBadge(event.eventType)}</span>${enduranceCardDuration(event)}</span>`;
+  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance endurance-sim-${enduranceSim(event)}${endurancePreviewClass(event)}`}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${solo?calendarDate:enduranceArtwork(event)}<span class="race-head">${enduranceDate}<span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>${classification}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 // Filters of the race list (communities, type, category, dates, situation), kept in the browser.
 const emptyFilters=emptyRaceFilters;

@@ -1,16 +1,15 @@
-import {contextHelpMarker as helpContext} from './core.mjs';
 import {timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired,SOLO_DRIVER_LIMIT_MINUTES} from '../../shared/duration.mjs';
 import {app,state,activeGame,esc,button,can,canEditRace,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
 import {renderSoloEventForm} from './solo-form.mjs';
 import {raceInfoFields,raceInfoRecap} from './race-info.mjs';
-import {renderHome} from './home-view.mjs';
-import {renderEvent} from './event-view.mjs';
 import {weekDates,addDays,bulkStarts} from '../../shared/start-times.mjs';
+import {departureFields, MINUTES, parisToday} from './event-departure-fields.mjs';
+import {formSheet} from './event-form-shell.mjs';
 
-// A start = a date (native calendar, opened on click) and a time chosen from hour / minute lists
-// (5-minute steps, 00 by default). The hidden "time" input keeps the HH:MM value submitEvent reads.
-const MINUTES=Array.from({length:12},(_,index)=>String(index*5).padStart(2,'0'));
+export {departureFields, parisToday} from './event-departure-fields.mjs';
+export {formSheet} from './event-form-shell.mjs';
+
 // Endurance duration: hours and minutes (5-minute steps), like the start time picker.
 function durationField(event){
   const total=eventMinutes(event||{durationHours:6}),hours=Math.min(24,Math.floor(total/60)),minutes=String(total%60).padStart(2,'0');
@@ -26,13 +25,6 @@ function driverChangeField(event){
 }
 export function formDurationMinutes(form){
   return Number(form.elements.eventDurationHours?.value||6)*60+Number(form.elements.eventDurationMinutes?.value||0);
-}
-export function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
-// Common start whose time is not known yet: only its day. Everyone enters there; the real starts are
-// added later by editing the race, and each crew then picks its start.
-function commonStartField(departure){
-  const id=crypto.randomUUID();
-  return `<div class="departure-field is-tbd" data-id="${esc(departure.id||'')}" data-tbd="true"><div><label class="form-label" for="date-${id}">Jour de la course</label><input id="date-${id}" name="date" type="date" value="${esc(departure.date||'')}" ${departure.id?'':`min="${parisToday()}"`} required data-date-picker></div><div class="departure-tbd-note"><span class="form-label">Heure</span><strong>À définir</strong><small>Les pilotes s’inscrivent et forment leurs équipages sur ce départ. Ajoute les vrais horaires plus tard en modifiant la course.</small></div><input type="hidden" name="time" value="${esc(departure.clock||(departure.time&&/^\d{2}:\d{2}$/.test(departure.time)?departure.time:'20:00'))}">${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;
 }
 // Several starts at once (special events: often 3 days with 5 or 6 starts each): first day, number of days,
 // and the times of each day typed in one go (« 10h 14h 18h », « 10:00, 13:30 »).
@@ -66,14 +58,6 @@ export function bulkPreview(form){
   if(preview)preview.textContent=starts.length?`${starts.length} départ${starts.length>1?'s':''} : ${days.length} jour${days.length>1?'s':''} × ${hours.length} heure${hours.length>1?'s':''}`:'Coche au moins un jour et une heure.';
   return starts;
 }
-export function departureFields(departure={}){
-  if(departure.tbd)return commonStartField(departure);
-  const id=crypto.randomUUID();
-  const [hour='00',minute='00']=String(departure.clock||departure.time||'00:00').split(':');
-  const minutes=MINUTES.includes(minute)?MINUTES:[...MINUTES,minute].sort();
-  const hours=Array.from({length:24},(_,value)=>String(value).padStart(2,'0'));
-  return `<div class="departure-field" data-id="${esc(departure.id||'')}"><div><label class="form-label" for="date-${id}">Date</label><input id="date-${id}" name="date" type="date" value="${esc(departure.date||'')}" ${departure.id?'':`min="${parisToday()}"`} required data-date-picker></div><div class="time-picker"><span class="form-label" id="time-label-${id}">Heure (Paris)</span><span class="time-picker-row" role="group" aria-labelledby="time-label-${id}"><select name="timeHour" aria-label="Heure">${hours.map(value=>`<option value="${value}" ${value===hour?'selected':''}>${value} h</option>`).join('')}</select><span aria-hidden="true">:</span><select name="timeMinute" aria-label="Minutes">${minutes.map(value=>`<option value="${value}" ${value===minute?'selected':''}>${value}</option>`).join('')}</select></span><input type="hidden" name="time" value="${esc(`${hour}:${minute}`)}"></div>${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;
-}
 if(typeof document!=='undefined'){
   document.addEventListener('change',event=>{
     const field=event.target;
@@ -87,9 +71,7 @@ if(typeof document!=='undefined'){
     }
     if(field.matches?.('[name="bulkDay"]')){const panel=field.closest('[data-bulk-departures]'),days=new Set(JSON.parse(panel.dataset.days||'[]'));field.checked?days.add(field.value):days.delete(field.value);panel.dataset.days=JSON.stringify([...days]);bulkPreview(field.form);return;}
     if(field.matches?.('[name="bulkHour"],[name="bulkMinute"]')){bulkPreview(field.form);return;}
-    if(!field.matches?.('[name="timeHour"],[name="timeMinute"]'))return;
-    const row=field.closest('.departure-field');
-    row.querySelector('[name="time"]').value=`${row.querySelector('[name="timeHour"]').value}:${row.querySelector('[name="timeMinute"]').value}`;
+
   });
   document.addEventListener('click',event=>{
     const input=event.target.closest?.('input[data-date-picker]');
@@ -138,18 +120,6 @@ export function syncDepartureStep(form){
   const help=form?.querySelector('[data-departure-help]');if(help)help.textContent=creatingPending?'Horaires à confirmer : indique seulement le jour. Tu ajouteras les horaires en modifiant la course.':'Les dates et heures sont saisies à l’heure de Paris.';
 }
 export function updateRemoveButtons(){const buttons=app.querySelectorAll('[data-action="remove-departure"]');buttons.forEach(button=>{button.disabled=buttons.length===1;});}
-// Creating or editing a race or an event: a step-by-step window over the page, as entering a race. The page
-// behind stays the list (or the event being edited); « Fermer » goes back to it. Returns where the form goes.
-export function formSheet(event,title,helpTopic='create-race'){
-  if(event&&state.events.some(item=>item.id===event.id)){state.currentEventId=event.id;renderEvent();}else renderHome();
-  state.page='form';
-  const overlay=document.createElement('section');
-  overlay.className='form-sheet-overlay';
-  overlay.innerHTML=`<div class="registration-sheet form-sheet" role="dialog" aria-modal="true" aria-labelledby="form-sheet-title"><div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="form-sheet-title" tabindex="-1">${esc(title)}</h2></div><span class="registration-workspace-actions">${helpContext(helpTopic)}${button('close-form','Fermer',event?`data-id="${event.id}" aria-label="Fermer"`:'aria-label="Fermer"','secondary-button registration-close-button')}</span></div><div class="form-sheet-body"></div></div>`;
-  app.append(overlay);
-  requestAnimationFrame(()=>overlay.querySelector('h2')?.focus({preventScroll:true}));
-  return overlay.querySelector('.form-sheet-body');
-}
 export function renderEventForm(event=null,options={}){
   if(event?!canEditRace(event):!can('create_race'))throw Error('Tu n’as pas l’autorisation de créer ou modifier cette course.');state.page='form';state.editingEvent=event?structuredClone(event):null;
   // Events of the calendar (solo format): their own short page.

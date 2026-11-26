@@ -1,7 +1,8 @@
-import {typeField,streamChoice,syncStream} from './solo-form.mjs';
+import {typeField,streamChoice,syncStream} from './solo-form-fields.mjs';
 import {streamSpan} from '../../shared/stream.mjs';
 import {app,state,esc,api,notifyRender} from './core.mjs';
-import {formSheet,departureFields} from './event-form.mjs';
+import {formSheet} from './event-form-shell.mjs';
+import {departureFields} from './event-departure-fields.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {WEATHERS} from './solo.mjs';
 
