@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {addToPath, cleanFrames, cleanPositions, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
-import {LiveRoom} from '../server/live.mjs';
+import {LiveRoom, liveBudget} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
 // A field row in the plugin's order (shared/live.mjs FIELD).
@@ -524,4 +524,46 @@ test('plugin 2.5: what LMU Drive reads (inner layer, compound per wheel, aids, h
   assert.equal(old.me.motor, null);
   assert.equal(old.sectorFlags, null);
   assert.equal(old.field[0].wcmp, null);
+});
+
+test('live guard sustains normal telemetry and generous bursts without a global room limit', () => {
+  let budget;
+  for (let i=0;i<36_000;i++) {
+    budget=liveBudget(budget,'driver',i*100);
+    assert.equal(budget.blocked,false);
+  }
+  budget=undefined;
+  for (let i=0;i<120;i++) { budget=liveBudget(budget,'driver',0); assert.equal(budget.blocked,false); }
+  assert.equal(liveBudget(budget,'driver',0).blocked,true);
+  assert.equal(liveBudget(budget,'driver',1000).blocked,false);
+  let viewer;
+  for (let i=0;i<40;i++) { viewer=liveBudget(viewer,'viewer',0); assert.equal(viewer.blocked,false); }
+  assert.equal(liveBudget(viewer,'viewer',0).blocked,true);
+});
+
+test('guarded connections close on sustained excess without affecting another driver or the unguarded room', async t => {
+  const at=Date.now();
+  t.mock.method(Date,'now',()=>at);
+  const {room,socket}=fakeRoom();
+  let received=0;
+  room.fast=()=>{received++;};
+  const driver=socket('driver',{role:'driver',guarded:true,until:at+60_000});
+  const second=socket('driver',{role:'driver',guarded:true,until:at+60_000});
+  const legacy=socket('driver',{role:'driver',until:at+60_000});
+  for(let i=0;i<125;i++) await room.webSocketMessage(driver,'{"f":1}');
+  assert.equal(received,120);
+  assert.equal(driver.closed,1013);
+  await room.webSocketMessage(second,'{"f":1}');
+  assert.equal(received,121);
+  for(let i=0;i<125;i++) await room.webSocketMessage(legacy,'{"f":1}');
+  assert.equal(received,246);
+  assert.equal(legacy.closed,null);
+});
+
+test('connection cap applies to the same user and role only in guarded rooms', async () => {
+  const {room,socket}=fakeRoom();
+  for(let i=0;i<12;i++) socket('driver',{role:'driver',user:'one',until:Date.now()+60_000});
+  const response=await room.fetch(new Request('https://live.invalid/socket',{headers:{Upgrade:'websocket','X-Live-Role':'driver','X-Live-User':'one','X-Live-Guard':'1'}}));
+  assert.equal(response.status,429);
+  assert.equal(response.headers.get('Retry-After'),'10');
 });
