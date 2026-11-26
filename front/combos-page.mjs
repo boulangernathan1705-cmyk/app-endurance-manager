@@ -429,7 +429,7 @@ function toolbar() {
     <details class="cb-filterbox" data-fold="side"${view.sideOpen?' open':''}><summary>Filtres <span>${esc(activeFilters())}</span></summary>
     <div class="cb-filterbox-body">${filters()}${conditions()}${swatches()}</div></details></div>
     ${view.scope==='crew'?'<p class="cb-src">'+esc(view.crew.name)+' · '+view.crew.members.length+' pilotes inscrits</p>':''}
-    ${view.scope==='custom'?drivers():''}</div>`;
+    ${view.scope==='custom'?drivers():''}${view.moment?`<p class="cb-src">Moment : ${view.moment==='night'?'Nuit':'Jour'}</p>`:''}</div>`;
 }
 function conditions() {
   const moments=view.sheet.conditions[view.cond].moments;
@@ -578,6 +578,11 @@ function pitSummary() {
   return `${n.fuelMode?(known(n.fuel)?`+${fr(n.fuel,1)} L`:'Carburant non mesuré'):`+${n.energyAdded} % d’énergie`} · ${view.pit.tyres ? `${view.pit.tyres} pneus` : 'sans pneus'}${known(n.total) ? ` · ${fr(n.total, 1)} s au stand` : ''}`;
 }
 
+function pitQuick() {
+  const n=pitNumbers();
+  const time=value=>known(value)?fr(value,1)+' s':'—';
+  return `<div class="cb-pit-quick"><span><small>Ravitaillement</small><strong>${time(n.refuel)}</strong></span><span><small>Immobilisation</small><strong>${time(n.stopped)}</strong></span><span><small>Durée totale</small><strong>${time(n.total)}</strong></span></div>`;
+}
 function pitStop() {
   const service = view.sheet.pit.service;
   if (!service) return '<details class="cb-fold"><summary><h2>Simulateur d’arrêt au stand</h2><span>temps de service pas encore lus</span></summary><div class="cb-fold-body"><p class="cb-empty">Le plugin lit les temps de service de la voiture quand elle est arrêtée aux stands. Ils apparaîtront après une séance avec un passage au stand.</p></div></details>';
@@ -586,7 +591,7 @@ function pitStop() {
   const s = value => `<small>${known(value) ? `${fr(value, 1)} s` : 'pas lu'}</small>`;
   const check = (field, label, time) => `<label class="cb-toggle"><input type="checkbox" data-pit-field="${field}"${p[field] ? ' checked' : ''}> ${label} ${s(time)}</label>`;
   const radios = (field, labels, times) => Object.entries(labels).map(([value, label]) => `<label class="cb-toggle"><input type="radio" name="cb-${field}" value="${value}" data-pit-field="${field}"${String(p[field]) === value ? ' checked' : ''}> ${label}${value === '' || value === '0' ? '' : ` ${s(times[value])}`}</label>`).join('');
-  return `<details class="cb-fold" data-fold="pit"${view.pitOpen ? ' open' : ''}><summary><h2>Simulateur d’arrêt au stand</h2><span data-pit-summary>${esc(pitSummary())}</span></summary><div class="cb-fold-body">
+  return `<details class="cb-fold" data-fold="pit"${view.pitOpen ? ' open' : ''}><summary class="cb-pit-heading"><div><h2>Simulateur d’arrêt au stand</h2><span data-pit-summary>${esc(pitSummary())}</span></div><div data-pit-quick>${pitQuick()}</div><span class="cb-pit-configure">Configurer</span></summary><div class="cb-fold-body">
     <form class="cb-form" data-pit>
       <label>Mode de ravitaillement <select data-field="pitMode"><option value="energy"${p.mode!=='fuel'?' selected':''}>Énergie virtuelle + carburant</option><option value="fuel"${p.mode==='fuel'?' selected':''}>Carburant seul</option></select></label>
       ${p.mode==='fuel'?`<p class="cb-src">Capacité du réservoir : ${known(view.sheet.combo.capacity)?`${fr(view.sheet.combo.capacity,1)} L`:'non mesurée'}. Pour les voitures sans énergie virtuelle.</p>`:''}
@@ -772,7 +777,7 @@ function render() {
   const rows=paceRows(view.cond);
   app.innerHTML=`${header()}${message}${view.error?'<p class="cb-message is-error">'+esc(view.error)+'</p>':''}${linked?'':linkCard()}
     ${toolbar()}
-    ${view.tab==='stats'?statistics(rows):preparation(rows)+pitStop()+notes()}`;
+    ${view.tab==='stats'?statistics(rows):preparation(rows)+`<div class="cb-prep-bottom">${pitStop()}${notes()}</div>`}`;
 }
 
 // The filters in use, for the folded panel's title.
@@ -973,6 +978,7 @@ app.addEventListener('input', event => {
   if (after && Number(after.value) !== view.pit.after) after.value = view.pit.after;
   app.querySelector('[data-pit-result]').innerHTML = pitResult();
   app.querySelector('[data-pit-summary]').textContent = pitSummary();
+  const quick=app.querySelector('[data-pit-quick]'); if(quick)quick.innerHTML=pitQuick();
 });
 
 // « Mon analyse »: the point under the pointer, on the map and along the lap.
