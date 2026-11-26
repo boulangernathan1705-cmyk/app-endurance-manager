@@ -29,8 +29,9 @@ export function endurancePanoramaClass(event, game) {
 // The compact cards share one interaction; the detail page retains its own hero.
 export function endurancePreviewClass(event, game) {
   const sim = enduranceSim(event, game);
-  const track = String(event?.circuit || '').replace(/^iracing-/, '');
-  return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
+  // Keep simulator artwork isolated, even when the real-world track is shared.
+  const track = event?.circuit;
+  return ' endurance-preview' + (sim === 'lmu' && LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
 export function enduranceArtwork(event, game, caption = '') {
   const sim = enduranceSim(event, game);
