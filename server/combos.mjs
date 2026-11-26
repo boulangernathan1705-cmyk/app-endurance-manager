@@ -165,7 +165,7 @@ const cleanSQL = (endurance=false) => `WITH raw AS (SELECT *, ${CONDITION_SQL} A
   runs AS (SELECT *, SUM(pit=0 AND ignored=0 AND t>0${endurance?' AND invalid=0':''}) OVER (PARTITION BY session_id, stint) AS run FROM stints),
   base AS (SELECT * FROM runs WHERE (? IS NULL OR setup=?)
       AND (? IS NULL OR (light IS NOT NULL AND (light<${NIGHT_BELOW})=(?='night'))) AND (? IS NULL OR track_temp>=?) AND (? IS NULL OR track_temp<=?)),
-  timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND ignored=0 AND t>0),
+  timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND ignored=0 AND t>0${endurance?` AND run>=${STINT_MIN}`:''}),
   best AS (SELECT user_id, cond, MIN(t) AS best FROM timed GROUP BY user_id, cond),
   clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond
     WHERE timed.t<=best.best*${CLEAN_RATIO} AND (timed.run>=${STINT_MIN}${endurance?'':' OR timed.t=best.best'}))`;

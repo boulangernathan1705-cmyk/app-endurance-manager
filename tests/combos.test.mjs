@@ -724,7 +724,7 @@ test('website endurance reference excludes qualifying, warmup and short best lap
     {...session({at,laps:8,t:210,ve:8}),session:2},
     {...session({at:at+100000,laps:8,t:180,ve:10}),session:5},
     {...session({at:at+200000,laps:8,t:190,ve:9}),session:9},
-    {...session({at:at+300000,laps:2,t:200,ve:10}),session:2}
+    {...session({at:at+300000,laps:2,t:175,ve:10}),session:2}
   ]) assert.equal((await plugin('/api/combos/plugin/session',key,'POST',data)).status,200);
   const query=new URLSearchParams({track:TRACK,car:CAR});
   const response=await req('/api/combos/sheet?'+query,'GET',null,NATHAN);
