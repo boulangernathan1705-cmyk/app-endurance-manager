@@ -30,3 +30,14 @@ test('the tyre summary averages each wheel independently and preserves missing d
   assert.deepEqual(crew.wear, [null, 5, 10, null]);
   assert.deepEqual(tyreStats(data, pilots, new Set(['b'])).map(row => row.id), ['a']);
 });
+
+// Memo reliability: unknown values cannot produce a confident pit estimate.
+test('memo projections keep the reserve and unknown refuelling times', async () => {
+  const {stintProjection, refuelDuration, localDayEnd} = await import('../front/combos-stats.mjs');
+  assert.equal(stintProjection(100, 4.2, 3), 23);
+  assert.equal(stintProjection(100, null, 3), null);
+  assert.equal(refuelDuration({fuel:40, energy:60, fuelRate:2, energyRate:3, connect:2}), 22);
+  assert.equal(refuelDuration({fuel:40, energy:60, fuelRate:null, energyRate:3, connect:2}), null);
+  assert.equal(refuelDuration({fuel:null, energy:0}), 0);
+  assert.equal(localDayEnd('2026-10-25'), new Date(2026,9,26).getTime() - 1);
+});

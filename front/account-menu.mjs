@@ -233,6 +233,7 @@ function activateLegacyHashAction() {
 
 // The address already names the open race (#event=…) or My entries: Discord login brings the pilot back there.
 function loginReturnPath() {
+  if (location.pathname === '/simhub.html' || location.pathname === '/fiches-combo.html') return location.pathname + location.search + location.hash;
   return location.pathname + (/^#(?:event=[a-f0-9-]{36}|inscriptions)$/.test(location.hash) ? location.hash : '');
 }
 

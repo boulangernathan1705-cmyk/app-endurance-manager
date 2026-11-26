@@ -2,7 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS} from '../shared/combos.mjs';
-import {known, paceStats, tyreStats, bestOf, isBest} from './combos-stats.mjs';
+import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration} from './combos-stats.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
@@ -41,7 +41,7 @@ async function call(path, method = 'GET', data) {
 }
 
 function renderError(error) {
-  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent('/simhub.html')}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
+  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent(location.pathname + location.search + location.hash)}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
   app.innerHTML = `<section class="members-panel members-error"><h1>Fiche mémo</h1><p>${esc(error.message)}</p>${login}</section>`;
 }
 
@@ -57,7 +57,7 @@ const sheetQuery = (event = view.event, compare = false) => {
   const query = new URLSearchParams({track:view.combo.track, car:view.combo.car});
   if (event) query.set('event', event);
   if (view.since && !compare) query.set('from', dayStart(view.since));
-  if (view.until && !compare) query.set('to', dayStart(view.until) + 86_399_999);
+  if (view.until && !compare) query.set('to', localDayEnd(view.until));
   if (view.version) query.set('version', view.version);
   if (view.setup) query.set('setup', view.setup);
   if (view.moment) query.set('moment', view.moment);
@@ -68,6 +68,7 @@ const sheetQuery = (event = view.event, compare = false) => {
 
 async function start() {
   const params = new URLSearchParams(location.search);
+  view.compareEvent = params.get('compare') || '';
   view.event = params.get('event') || ''; view.version = params.get('version') || ''; view.setup = params.get('setup') || '';
   view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
   view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
@@ -78,19 +79,27 @@ async function start() {
     view.combos = list.combos; view.link = link;
   } catch (error) { renderError(error); return; }
   const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
-  view.combo = wanted || view.combos[0] || null;
+  view.combo = wanted || (!params.has('track') && !params.has('car') ? view.combos[0] : view.combos.find(item => (!params.has('track') || item.track === params.get('track')) && (!params.has('car') || item.car === params.get('car')))) || null;
+  view.requested = !view.combo && (params.has('track') || params.has('car')) ? [params.get('track'), params.get('car')].filter(Boolean).join(' · ') : '';
   if (view.combo) await loadSheet(); else render();
 }
 
+let sheetRequest = 0;
 async function loadSheet(fresh = false) {
+  const request = ++sheetRequest;
+  view.sheetLoading = true; view.error = ''; view.sheet = null; view.compare = null;
+  render();
   try {
     const [sheet, compare] = await Promise.all([call(`/api/combos/sheet?${sheetQuery()}`),
       view.compareEvent && view.compareEvent !== view.event ? call(`/api/combos/sheet?${sheetQuery(view.compareEvent, true)}`) : null]);
+    if (request !== sheetRequest) return;
     view.sheet = sheet; view.compare = compare; view.error = ''; view.loadedAt = Date.now();
   } catch (error) {
-    if (error.status === 401 || error.status === 403) { renderError(error); return; }
+    if (request !== sheetRequest) return;
+    if (error.status === 401 || error.status === 403) { view.sheetLoading = false; renderError(error); return; }
     view.error = error.message;
   }
+  view.sheetLoading = false;
   if (view.sheet) {
     const conditions = view.sheet.conditions;
     // A condition left empty by the day/night or track temperature choice stays chosen: its frame says why it is empty.
@@ -108,7 +117,8 @@ async function refresh() {
   try {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
     view.combos = list.combos; view.link = link;
-    if (!view.combo) view.combo = view.combos[0] || null;
+    if (!view.combo && !view.requested) view.combo = view.combos[0] || null;
+    if (view.requested) { const q = new URLSearchParams(location.search); view.combo = view.combos.find(item => (!q.has('track') || item.track === q.get('track')) && (!q.has('car') || item.car === q.get('car'))) || null; if (view.combo) view.requested = ''; }
   } catch (error) { view.message = error.message; }
   if (view.combo) await loadSheet(true);
   view.refreshing = false; render();
@@ -118,7 +128,7 @@ async function refresh() {
 async function openCombo(track, car) {
   const combo = view.combos.find(item => item.track === track && item.car === car);
   if (!combo || comboKey(combo) === comboKey(view.combo)) { render(); return; }
-  Object.assign(view, {combo, setup:'', compareEvent:'', cond:null, compound:null, stint:null});
+  Object.assign(view, {combo, event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null});
   view.analysis.zone = null;
   await loadSheet();
 }
@@ -126,7 +136,8 @@ async function openCombo(track, car) {
 function remember() {
   const query = sheetQuery();
   if (view.tab === 'analysis') query.set('tab', 'analyse');
-  history.replaceState(null, '', `${location.pathname}?${query}`);
+  if (view.compareEvent) query.set('compare', view.compareEvent);
+  history.replaceState(null, '', `${location.pathname}?${query}${location.hash}`);
 }
 
 // ---------- « Mon analyse » ----------
@@ -136,6 +147,7 @@ async function loadAnalysis(fresh = false) {
   const a = view.analysis, key = comboKey(view.combo);
   try {
     if (a.key !== key) Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
+    if (fresh) a.sessions.clear();
     if (!a.list || fresh) a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
     const list = a.list;
     const useful = item => item.trace || item.expert;
@@ -280,7 +292,7 @@ function header() {
 // the most recent first. Clicking one opens its sheet.
 function picker() {
   const combo = view.combo, current = comboKey(combo);
-  const carClass = view.sheet?.combo.carClass || combo.carClass;
+  const carClass = view.sheet?.combo?.carClass || combo.carClass;
   const tracks = new Map();
   for (const item of view.combos) tracks.set(item.track, [...(tracks.get(item.track) || []), item]);
   const list = [...tracks].sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([track, cars]) => `<li><span class="cb-pick-track">${esc(track)}</span>
@@ -354,7 +366,7 @@ function energy(rows) {
   const crew = rows.find(row => row.crew) || rows[0];
   const minutes = laps => known(crew?.avg) ? `${Math.floor(laps * crew.avg / 60)} min ${String(Math.round(laps * crew.avg % 60)).padStart(2, '0')}` : '—';
   const stints = whole ? `<div class="cb-wrap"><table class="cb-stints"><thead><tr><th>Relais de</th><th>Énergie / tour à tenir (%)</th><th>Durée</th><th>Pilotes qui tiennent</th></tr></thead><tbody>${[whole - 1, whole, whole + 1, whole + 2].map(laps => {
-    const under = pilots.filter(row => row.ve <= 100 / laps);
+    const under = pilots.filter(row => stintProjection(100, row.ve, 0) >= laps);
     return `<tr><td>${laps} tours</td><td>${fr(100 / laps)}</td><td>${minutes(laps)}</td><td><div class="cb-names">${under.map(row => `<span style="--dc:${esc(row.color)}">${esc(row.name)}</span>`).join('') || '<span class="cb-src">aucun</span>'}</div></td></tr>`;
   }).join('')}</tbody></table></div>` : '';
   return `<section><div class="cb-head"><h2>Énergie virtuelle</h2></div>
@@ -437,15 +449,13 @@ function pitNumbers() {
   const crew = paceRows(view.cond)[0];
   const p = view.pit, energyAdded = Math.max(0, p.after - p.before);
   const fuel = crew && known(crew.ve) && crew.ve > 0 && known(crew.fuel) ? energyAdded / crew.ve * crew.fuel : null;
-  const fill = fuel > 0 && known(service?.fuelRate) && service.fuelRate > 0 ? (service.connect || 0) + fuel / service.fuelRate : 0;
-  const charge = known(service?.energyRate) && service.energyRate > 0 ? energyAdded / service.energyRate : 0;
-  const refuel = Math.max(fill, charge);
+  const refuel = refuelDuration({fuel, energy:energyAdded, fuelRate:service?.fuelRate, energyRate:service?.energyRate, connect:service?.connect});
   const jobs = pitJobs();
   const during = Math.max(0, ...jobs.filter(job => job.during).map(job => job.time));
   const after = jobs.filter(job => !job.during).reduce((sum, job) => sum + job.time, 0);
-  const stopped = Math.max(refuel, during) + after;
+  const stopped = known(refuel) ? Math.max(refuel, during) + after : null;
   const random = jobs.reduce((sum, job) => sum + job.random, energyAdded > 0 && known(service?.fuelRandom) ? service.fuelRandom : 0);
-  return {energyAdded, fuel, refuel, during, after, stopped, random, laneThrough, total:known(laneThrough) ? stopped + laneThrough : null};
+  return {energyAdded, fuel, refuel, during, after, stopped, random, laneThrough, total:known(laneThrough) && known(stopped) ? stopped + laneThrough : null};
 }
 
 function pitResult() {
@@ -512,10 +522,12 @@ function periodsCard() {
 function render() {
   const message = view.message ? `<p class="cb-message" role="status">${esc(view.message)}</p>` : '';
   if (!view.combo) {
+    if (view.requested) { app.innerHTML = `${message}<p class="cb-empty">Aucune séance disponible pour ${esc(view.requested)}. <a href="/simhub.html">Voir les autres fiches</a> · <button type="button" class="cb-btn" data-action="refresh">Actualiser</button></p>${view.link?.linked ? '' : linkCard()}`; return; }
     app.innerHTML = `${message}
       <p class="cb-empty">Aucune séance reçue pour l’instant. Relie SimHub et roule : la fiche de chaque voiture et de chaque circuit se remplit toute seule, avec les chiffres de chaque pilote.</p>${linkCard()}`;
     return;
   }
+  if (view.sheetLoading) { app.innerHTML = `${header()}<p class="cb-empty" role="status">Chargement de la fiche…</p>`; return; }
   if (!view.sheet) {
     app.innerHTML = `${header()}${message}<p class="cb-message is-error">${esc(view.error || 'Fiche indisponible.')}</p>${linkCard()}`;
     return;
@@ -552,7 +564,7 @@ async function act(work, success = '') {
   catch (error) { view.message = error.message; }
 }
 
-const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0).getTime() : null; };
+const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0).getTime() : null; };
 
 async function exportSheet() {
   await act(async () => {
@@ -598,6 +610,7 @@ app.addEventListener('click', async event => {
   if (target.dataset.cond) { view.cond = target.dataset.cond; render(); return; }
   if (target.dataset.combo !== undefined) { view.pickerOpen = false; await openCombo(target.dataset.track, target.dataset.car); return; }
   if (target.dataset.tab) {
+    if (!view.sheet) return;
     view.tab = target.dataset.tab; remember();
     if (view.tab === 'analysis') await loadAnalysis(); else render();
     return;
@@ -675,7 +688,7 @@ app.addEventListener('input', event => {
     const form = app.querySelector('[data-pit]'), open = view.pitOpen;
     if (form) { app.querySelector('[data-fold="pit"]').outerHTML = pitStop(); view.pitOpen = open; }
   }
-  if (pitField === 'before' && view.pit.after < view.pit.before) view.pit.after = view.pit.before;
+  if (view.pit.after < view.pit.before) view.pit.after = view.pit.before;
   for (const key of ['before', 'after']) {
     const output = app.querySelector(`[data-out="${key}"]`);
     if (output) output.textContent = `${view.pit[key]} %`;

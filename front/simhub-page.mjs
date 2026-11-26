@@ -24,12 +24,12 @@ async function call(path, method = 'GET') {
 
 // The wall's own tabs write their name in the address (#board, #chrono…): they belong to the « Mur des stands » tab.
 const WALL = ['mur', 'board', 'chrono', 'car', 'tele', 'map'];
-const PAGES = {memo:'/front/combos-page.mjs?v=18', wall:'/front/pit-wall.mjs?v=23'};
+const PAGES = {memo:'/front/combos-page.mjs?v=19', wall:'/front/pit-wall.mjs?v=23'};
 const loaded = new Set();
 function show(panel, write = false) {
   for (const tab of document.querySelectorAll('.sh-tabs [data-panel]')) tab.setAttribute('aria-selected', String(tab.dataset.panel === panel));
   for (const part of document.querySelectorAll('[data-sh-panel]')) part.hidden = part.dataset.shPanel !== panel;
-  if (write) history.replaceState(null, '', panel === 'wall' ? '#mur' : location.pathname + location.search);
+  if (write) history.replaceState(null, '', panel === 'wall' ? location.pathname + location.search + '#mur' : location.pathname + location.search);
   if (!loaded.has(panel)) { loaded.add(panel); import(PAGES[panel]); }
   // The wall stops asking for the cars while it is hidden (front/pit-wall.mjs).
   document.dispatchEvent(new Event('sh-panel'));
@@ -67,7 +67,7 @@ function pillMarkup() {
 function pluginCard() {
   const link = view.link || {};
   const state = link.linked
-    ? `<span class="sh-dot is-on" aria-hidden="true"></span><b>SimHub relié</b><span>${link.lastSeen ? `dernier contact le ${esc(dayTime(link.lastSeen))}` : 'en attente de la première séance'}</span>`
+    ? `<span class="sh-dot is-on" aria-hidden="true"></span><b>SimHub relié</b><span>${link.lastSeen ? `dernier contact le ${esc(dayTime(link.lastSeen))}` : 'en attente du premier contact'}</span>`
     : '<span class="sh-dot" aria-hidden="true"></span><b>SimHub pas encore relié</b>';
   const version = view.plugin ? String(view.plugin.version) : '';
   const beta = version.startsWith('0.');
@@ -77,7 +77,7 @@ function pluginCard() {
   const code = view.code ? `<div class="sh-code"><div class="cb-code"><input type="text" readonly value="${esc(view.code)}" aria-label="Ton code de liaison" data-code><button type="button" class="cb-btn" data-action="copy">Copier le code</button></div>
     <p class="${view.copied ? 'cb-ok' : 'cb-src'}">${view.copied ? 'Code copié. Ouvre le plugin dans SimHub : il le trouve tout seul.' : 'Copie ce code, puis colle-le dans le plugin.'} Il ne s’affiche qu’une fois.</p></div>` : '';
   return `<section class="sh-card" aria-label="Ton plugin">
-    <div class="sh-install"><div class="sh-state">${state}</div>${get}</div>
+    <div class="sh-install"><div class="sh-state">${state}${link.lastSession ? `<span>Dernière séance reçue : ${esc(dayTime(link.lastSession.receivedAt))} · ${esc(link.lastSession.track)} · ${esc(link.lastSession.car)} · ${Number(link.lastSession.laps)} tours</span>` : '<span>Aucune séance reçue.</span>'}</div>${get}</div>
     <ol class="sh-steps">
       <li><span>Double-clique sur l’installeur. Il relance SimHub.</span></li>
       <li><span><button type="button" class="sh-link" data-action="code"${view.busy ? ' disabled' : ''}>${link.linked ? 'Crée un nouveau code' : 'Crée ton code'}</button> : il est copié tout seul.</span></li>

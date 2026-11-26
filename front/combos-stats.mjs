@@ -33,3 +33,22 @@ export function bestOf(rows, get, lower = true) {
   return lower ? Math.min(...values) : Math.max(...values);
 }
 export const isBest = (row, value, best) => !row.crew && known(value) && known(best) && Math.abs(Number(value) - best) < 1e-9;
+
+// Calendar bounds must use the next local midnight, including DST changes.
+export function localDayEnd(value) {
+  const [year, month, day] = String(value).split('-').map(Number);
+  return new Date(year, month - 1, day + 1).getTime() - 1;
+}
+
+export function stintProjection(capacity, consumption, reserve = 0) {
+  if (![capacity, consumption, reserve].every(known) || capacity <= 0 || consumption <= 0 || reserve < 0 || reserve >= capacity) return null;
+  return Math.floor((capacity - reserve) / consumption);
+}
+
+// Missing rates must not look like an instantaneous pit stop.
+export function refuelDuration({fuel, energy, fuelRate, energyRate, connect}) {
+  if (!known(energy) || energy < 0) return null;
+  if (energy === 0) return 0;
+  if (!known(fuel) || fuel < 0 || (fuel > 0 && (!known(fuelRate) || fuelRate <= 0 || !known(connect))) || !known(energyRate) || energyRate <= 0) return null;
+  return Math.max(fuel > 0 ? Number(connect) + fuel / fuelRate : 0, energy / energyRate);
+}

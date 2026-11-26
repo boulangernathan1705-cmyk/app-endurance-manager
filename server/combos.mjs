@@ -352,7 +352,8 @@ async function pluginAccess(request, env) {
   // His rights now, not when the code was made: a pilot who left the team or lost the role sends nothing more.
   const access = await communityAccess(env, {user}, community);
   if (access.status !== 'member' || !access.permissions.has('combos')) fail(403, 'Tu n’as plus accès aux fiches combo de cette communauté.');
-  await env.DB.prepare('UPDATE combo_links SET last_seen=? WHERE token_hash=?').bind(now(), link.token_hash).run();
+  const seenAt = now();
+  if (!link.last_seen || seenAt - link.last_seen >= 60) await env.DB.prepare('UPDATE combo_links SET last_seen=? WHERE token_hash=?').bind(seenAt, link.token_hash).run();
   return {link, community, user};
 }
 
@@ -364,7 +365,10 @@ async function pluginSheet(env, community, userId, url) {
   const combo = comboOf(url), cache = globalThis.caches?.default;
   if (!cache) return json(await sheet(env, community, userId, combo, url, true));
   const rev = await env.DB.prepare('SELECT rev FROM combo_revisions WHERE community_id=? AND track=? AND car=?').bind(community.id, combo.track, combo.car).first();
-  const key = new Request(`https://combo-sheet.invalid/${[community.id, combo.track, combo.car, rev?.rev ?? 0, userId].map(encodeURIComponent).join('/')}`);
+  const list = await periods(env, community);
+  const selected = selection(list, url, combo.track, true);
+  const filterKey = JSON.stringify([selected, list, ...['setup','moment','tmin','tmax'].map(name => url.searchParams.get(name))]);
+  const key = new Request(`https://combo-sheet.invalid/${[community.id, combo.track, combo.car, rev?.rev ?? 0, userId, await hash(filterKey)].map(encodeURIComponent).join('/')}`);
   const hit = await cache.match(key);
   if (hit) return hit;
   const response = json(await sheet(env, community, userId, combo, url, true));
@@ -468,7 +472,8 @@ export async function combosApi(path, method, request, env, actor, community) {
   if (path === '/api/combos/link') {
     if (method === 'GET') {
       const row = await env.DB.prepare('SELECT created_at, last_seen FROM combo_links WHERE user_id=? AND community_id=?').bind(userId, community.id).first();
-      return json({linked:Boolean(row), createdAt:row?.created_at ?? null, lastSeen:row?.last_seen ?? null});
+      const last = await env.DB.prepare('SELECT track, car, lap_count, received_at, started_at FROM combo_sessions WHERE user_id=? AND community_id=? ORDER BY received_at DESC, started_at DESC LIMIT 1').bind(userId, community.id).first();
+      return json({linked:Boolean(row), createdAt:row?.created_at ?? null, lastSeen:row?.last_seen ?? null, lastSession:last ? {track:last.track, car:last.car, laps:last.lap_count, receivedAt:last.received_at, startedAt:last.started_at} : null});
     }
     if (method === 'POST') {
       const key = token();
