@@ -357,3 +357,24 @@ test('a missing circuit is repaired only on untouched system imports',async()=>{
   assert.equal((await syncIracingEvents(env,{fetchImpl})).repaired,undefined);
   assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-tbd','manual edit is retained');
 });
+
+test('source changes update an empty race, preserve its ID and protect local edits',async()=>{
+  const {DB,env}=harness();
+  const season=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+  const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4'}:season));
+  const timestamp=Date.parse('2099-09-28T12:00:00Z');
+  await syncIracingEvents(env,{timestamp,fetchImpl});
+  const get=()=>DB.db.prepare("SELECT * FROM events WHERE name='IMSA Endurance Series' AND circuit='iracing-long-beach'").get();
+  const before=get();assert.ok(before);
+  const series=season.championships.find(s=>s.name.includes('IMSA Endurance Series'));
+  const week=series.weeks.find(w=>w.track_name.toLowerCase().includes('long beach'));
+  week.duration_minutes=180;
+  const result=await syncIracingEvents(env,{timestamp,fetchImpl});
+  assert.ok(result.updated>=1);
+  const after=get();assert.equal(after.id,before.id);assert.equal(after.duration_minutes,180);
+  assert.deepEqual(JSON.parse(after.departures),JSON.parse(before.departures));
+  DB.db.prepare('UPDATE events SET duration_minutes=200,duration_hours=4,version=version+1 WHERE id=?').run(after.id);
+  week.duration_minutes=190;
+  const conflict=await syncIracingEvents(env,{timestamp,fetchImpl});
+  assert.ok(conflict.conflicts>=1);assert.equal(get().duration_minutes,200);
+});
