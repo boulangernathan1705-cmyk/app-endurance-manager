@@ -50,7 +50,7 @@ export async function waitingMoves(env, event, data) {
   }
   const members = move.filter(reg => reg.crew_id), crewIds = JSON.stringify(crews.map(crew => crew.id));
   const list = items => JSON.stringify(items);
-  return {statements:version => {
+  return {lossy:drop.length > 0, statements:version => {
     const same = 'EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)', at = [event.id, version];
     return [
       ...(added ? [env.DB.prepare("UPDATE events SET departures=json_insert(departures,'$[#]',json(?)) WHERE id=? AND version=?").bind(JSON.stringify(added), ...at)] : []),

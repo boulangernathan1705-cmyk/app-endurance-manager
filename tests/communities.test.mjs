@@ -334,14 +334,14 @@ test('the real 2026 S4 snapshot imports every future race once within the D1 bud
   const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2026S4'}:SEASON_S4));
   const timestamp=Date.parse('2026-10-15T15:00:00Z');
   const result=await syncIracingEvents(env,{timestamp,fetchImpl});
-  assert.equal(result.created,36);
+  assert.equal(result.created,34);
   assert.ok(counter.calls<30,`${counter.calls} database calls`);
   const rows=DB.db.prepare('SELECT * FROM events').all();
   assert.equal(rows.filter(row=>row.format==='solo').length,8);
-  assert.equal(rows.reduce((sum,row)=>sum+JSON.parse(row.departures).length,0),115);
+  assert.equal(rows.reduce((sum,row)=>sum+JSON.parse(row.departures).length,0),113);
   assert.ok(rows.every(row=>row.circuit!=='iracing-tbd'),'all future circuits are identified');
   assert.equal((await syncIracingEvents(env,{timestamp,fetchImpl})).created,0);
-  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM events').get().n,36);
+  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM events').get().n,34);
 });
 
 
@@ -349,10 +349,10 @@ test('a missing circuit is repaired only on untouched system imports',async()=>{
   const {DB,env}=harness();const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
   const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
   await syncIracingEvents(env,{fetchImpl});
-  const event=DB.db.prepare("SELECT id FROM events WHERE name='992 Endurance Cup'").get();
+  const event=DB.db.prepare("SELECT id FROM events WHERE name='8 Hours of Indianapolis'").get();
   DB.db.prepare("UPDATE events SET circuit='iracing-tbd',version=1 WHERE id=?").run(event.id);
   const result=await syncIracingEvents(env,{fetchImpl});assert.equal(result.repaired,1);
-  assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-spa');
+  assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-indianapolis');
   DB.db.prepare("UPDATE events SET circuit='iracing-tbd',version=3 WHERE id=?").run(event.id);
   assert.equal((await syncIracingEvents(env,{fetchImpl})).repaired,undefined);
   assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-tbd','manual edit is retained');
@@ -377,4 +377,140 @@ test('source changes update an empty race, preserve its ID and protect local edi
   week.duration_minutes=190;
   const conflict=await syncIracingEvents(env,{timestamp,fetchImpl});
   assert.ok(conflict.conflicts>=1);assert.equal(get().duration_minutes,200);
+});
+
+const syncFixture = () => JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+const fixtureFetch = season => async url => new Response(JSON.stringify(String(url).includes('wp-json') ? []
+  : String(url).endsWith('manifest.json') ? {current:'2099S4'} : season));
+const syncAt = Date.parse('2099-10-10T12:00:00Z');
+
+test('stable season identity survives a source rename and a change of race week dates',async()=>{
+  const {DB,env}=harness(),season=syncFixture();
+  const series=season.championships[0];
+  series.link_url='https://members-ng.iracing.com/web/racing/official/series-list/6486/go-racing';
+  const synchronize=()=>syncIracingEvents(env,{timestamp:syncAt,fetchImpl:fixtureFetch(season)});
+  await synchronize();
+  const row=DB.db.prepare("SELECT e.* FROM events e JOIN iracing_imports i ON i.event_id=e.id WHERE i.source_identity='series:2099S4:6486:2'").get();
+  assert.ok(row);
+  series.name='IMS Endurance International';
+  series.weeks[1].date_start='2099-10-24';
+  series.weeks[1].date_end='2099-10-30';
+  const result=await synchronize();
+  assert.equal(result.created,0);
+  assert.ok(result.updated);
+  const after=DB.db.prepare('SELECT * FROM events WHERE id=?').get(row.id);
+  assert.equal(after.name,series.name);
+  assert.ok(JSON.parse(after.departures).every(d=>d.date>='2099-10-24'));
+});
+
+test('a removed occupied start preserves crew identity, membership, preferences and Discord association',async()=>{
+  const {DB,env,req,login}=harness();
+  await login(ADMIN,'admin');await login(PILOT,'pilot');
+  DB.db.exec("UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true')) WHERE slug='commu-dev'");
+  const season=syncFixture(), synchronize=()=>syncIracingEvents(env,{timestamp:syncAt,fetchImpl:fixtureFetch(season)});
+  await synchronize();
+  const row=DB.db.prepare("SELECT * FROM events WHERE name='IMSA Endurance Series' AND circuit='iracing-long-beach'").get();
+  const [removed,unchanged]=JSON.parse(row.departures);
+  const entry=await req(`/api/events/${row.id}/departures/${removed.id}/registrations`,'POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot');
+  assert.equal(entry.status,201);
+  const crew=await req(`/api/events/${row.id}/departures/${removed.id}/crews`,'POST',{name:'Team',category:'GT3'},'admin');
+  assert.equal(crew.status,201);
+  assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:entry.data.id,version:1},'admin')).status,200);
+  DB.db.prepare('INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at) VALUES(?,?,?,?,0)').run(crew.data.id,DEV,'123','456');
+  const before=DB.db.prepare('SELECT * FROM registrations WHERE id=?').get(entry.data.id);
+  season.championships[0].session_times_by_day['5']=['03:00','07:00','18:00'];
+  assert.ok((await synchronize()).updated);
+  const result=DB.db.prepare('SELECT departures FROM events WHERE id=?').get(row.id);
+  const starts=JSON.parse(result.departures), waiting=starts.find(d=>d.tbd);
+  assert.ok(waiting);
+  assert.ok(starts.some(d=>d.id===unchanged.id));
+  assert.ok(!starts.some(d=>d.id===removed.id));
+  const after=DB.db.prepare('SELECT * FROM registrations WHERE id=?').get(entry.data.id);
+  assert.deepEqual({...after},{...before, departure_id:waiting.id,version:before.version+1});
+  assert.equal(DB.db.prepare('SELECT departure_id FROM crews WHERE id=?').get(crew.data.id).departure_id,waiting.id);
+  assert.equal(DB.db.prepare('SELECT crew_id FROM crew_members WHERE registration_id=?').get(entry.data.id).crew_id,crew.data.id);
+  assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord WHERE crew_id=?').get(crew.data.id).voice_id,'456');
+  const notices=()=>DB.db.prepare("SELECT count(*) AS n FROM notifications WHERE event_id=? AND kind='choose_departure'").get(row.id).n;
+  assert.ok(notices());
+  const count=notices();
+  await synchronize();
+  assert.equal(notices(),count);
+});
+
+test('partially rewritten Special Event article keeps confirmed departures and supports subsequent additions',async()=>{
+  const {DB,env}=harness(),season=syncFixture();
+  const published='2099-10-12T09:00:00';
+  const article=content=>[{id:34,date:published,title:{rendered:'THIS WEEK: iRacing Indy 8 Hour | Special Event'},content:{rendered:content}}];
+  const first='Timeslot #1: Friday at 22:00 GMT', second='Timeslot #2: Saturday at 12:00 GMT';
+  let posts=article(`${first}<br>${second}`);
+  const fetchImpl=async url=>String(url).includes('wp-json') ? new Response(JSON.stringify(posts)) : fixtureFetch(season)(url);
+  const synchronize=()=>syncIracingEvents(env,{timestamp:Date.parse('2099-10-13T12:00:00Z'),fetchImpl});
+  await synchronize();
+  const race=()=>DB.db.prepare("SELECT * FROM events WHERE name='8 Hours of Indianapolis'").get();
+  const before=race();
+  assert.equal(before.schedule_pending,0);
+  posts=article(first);
+  await synchronize();
+  assert.equal(race().departures,before.departures);
+  const conflict=DB.db.prepare("SELECT details FROM iracing_sync_conflicts WHERE event_id=?").get(before.id);
+  assert.match(conflict.details,/"partial"/);
+  posts=article(`${first}<br>${second}<br>Timeslot #3: Sunday at 15:00 GMT`);
+  await synchronize();
+  const after=JSON.parse(race().departures);
+  assert.equal(after.length,3);
+  assert.deepEqual(after.slice(0,2),JSON.parse(before.departures));
+});
+
+test('concurrent runs, conditional requests and bad responses protect the last validated calendar',async()=>{
+  const {DB,env}=harness(),season=syncFixture();
+  let release, started;
+  const arrived=new Promise(resolve=>{started=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  const first=syncIracingEvents(env,{timestamp:syncAt,fetchImpl:async url=>{
+    if (String(url).endsWith('manifest.json')) {started();await gate;}
+    const response=await fixtureFetch(season)(url);
+    return new Response(response.body,{headers:{ETag:'"fixture"'}});
+  }});
+  await arrived;
+  assert.deepEqual(await syncIracingEvents(env,{timestamp:syncAt,fetchImpl:fixtureFetch(season)}),{busy:true});
+  release();
+  assert.ok((await first).created);
+  const before=DB.db.prepare('SELECT id,version,departures FROM events ORDER BY id').all();
+  const checked=[];
+  const unchanged=await syncIracingEvents(env,{timestamp:syncAt+1000,fetchImpl:async (url, options)=>{
+    checked.push(options.headers['If-None-Match']);
+    return new Response(null,{status:304});
+  }});
+  assert.ok(checked.every(etag=>etag==='"fixture"'));
+  assert.equal(unchanged.updated,0);
+  assert.deepEqual(DB.db.prepare('SELECT id,version,departures FROM events ORDER BY id').all(),before);
+  const corrupt=syncFixture();corrupt.championships=[];
+  await assert.rejects(syncIracingEvents(env,{timestamp:syncAt+2000,fetchImpl:fixtureFetch(corrupt)}),/calendrier incomplet/);
+  assert.deepEqual(DB.db.prepare('SELECT id,version,departures FROM events ORDER BY id').all(),before);
+  assert.match(DB.db.prepare("SELECT payload FROM iracing_sync_sources WHERE name='season:2099S4'").get().payload,/IMSA Endurance/);
+});
+
+test('explicit cancellation keeps history, freezes entries and only notifies affected pilots once',async()=>{
+  const {DB,env,req,login}=harness(),season=syncFixture();
+  await login(ADMIN,'admin');await login(PILOT,'pilot');
+  DB.db.exec("UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true')) WHERE slug='commu-dev'");
+  const synchronize=()=>syncIracingEvents(env,{timestamp:syncAt,fetchImpl:fixtureFetch(season)});
+  await synchronize();
+  const row=DB.db.prepare("SELECT * FROM events WHERE name='IMSA Endurance Series' AND circuit='iracing-long-beach'").get();
+  const [slot]=JSON.parse(row.departures), path=`/api/events/${row.id}/departures/${slot.id}/registrations`;
+  const entry=await req(path,'POST',{name:'Pilot',category:'GT3',status:'whole'},'pilot');
+  assert.equal(entry.status,201);
+  season.championships[0].weeks[1].status='cancelled';
+  await synchronize();
+  assert.equal((await req(path,'POST',{name:'Admin',category:'GT3',status:'whole'},'admin')).status,409);
+  const saved=DB.db.prepare('SELECT * FROM events WHERE id=?').get(row.id);
+  assert.equal(saved.official_schedule_status,'cancelled');
+  assert.equal(saved.departures,row.departures);
+  assert.ok(DB.db.prepare('SELECT id FROM registrations WHERE id=?').get(entry.data.id));
+  await synchronize();
+  assert.deepEqual(DB.db.prepare("SELECT user_id FROM notifications WHERE event_id=? AND json_extract(data,'$.officialStatus')='cancelled'").all(row.id).map(r=>r.user_id),[PILOT]);
+  assert.equal((await req('/api/platform/iracing','GET',null,'pilot')).status,403);
+  const supervision=await req('/api/platform/iracing','GET',null,'admin');
+  assert.equal(supervision.status,200);
+  assert.ok(supervision.data.conflicts.some(item=>item.event_id===row.id));
 });

@@ -331,6 +331,7 @@ async function api(request, env) {
   const departureMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/registrations$/);
   if (departureMatch && method === 'POST') {
     const event = await eventById(env, departureMatch[1], community);
+    if (event.official_schedule_status) fail(409, 'Les inscriptions sont suspendues pour cette course iRacing.');
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
     // Real times known: a new entry goes on one of them, not on the waiting start.

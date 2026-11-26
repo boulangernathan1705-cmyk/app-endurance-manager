@@ -82,7 +82,7 @@ function startOf(row) {
   const startsAt = Number(departure?.startsAt);
   if (!departure || !Number.isFinite(startsAt)) return null;
   const minutes = Number(row.duration_minutes) || (Number(row.duration_hours) || 0) * 60;
-  return {startsAt, endsAt:raceFinishAt(startsAt, minutes), minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
+  return {startsAt, endsAt:raceFinishAt(startsAt, minutes), minutes, pending:Boolean(row.schedule_pending || row.official_schedule_status) || departure.tbd === true};
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
@@ -147,7 +147,7 @@ const discordIds = pilots => [...new Set(pilots.map(pilot => pilot.user_id).filt
 
 // The crews with their race (rows of crew_discord, or crews about to get one).
 const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id, c.locked, c.owner_user_id,
-  e.name AS event_name, e.details AS event_details, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
+  e.name AS event_name, e.details AS event_details, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending, e.official_schedule_status`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
   -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
@@ -301,6 +301,7 @@ function voiceParent(row, setting) {
 // Whether a row has anything to do on Discord now (most of them have not).
 async function needsWork(env, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
+  if (row.official_schedule_status === 'postponed' && start && community) return false;
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) return true;
   // Voices turned off (or everything taken off): the voice channel goes.
   if (community.modules?.crewChannels !== true || !setting) return Boolean(row.voice_id);
@@ -561,6 +562,7 @@ async function sortVoices(env, budget, row, parent) {
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
   const members = [...new Set([...JSON.parse(row.members || '[]'), ...discordIds(pilots)])];
+  if (row.official_schedule_status === 'postponed' && start && community) return null;
   // Crew, race or start gone: closed now; 2 h after the planned end: closed once the voice channel is empty.
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) {
     // A failed DELETE is still pending, regardless of the age of the crew or race.

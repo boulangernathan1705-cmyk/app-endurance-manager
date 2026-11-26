@@ -58,14 +58,12 @@ test('names, tracks and classes of the schedule match the site catalog', () => {
   assert.deepEqual(weekStarts({date_start:'2026-10-17', date_end:'2026-10-18'}, {'5':['10:00']}), [Date.parse('2026-10-17T10:00:00Z')]);
 });
 
-test('special events missing from the schedule data are added, with their official duration', () => {
+test('the feed does not invent a special event or an unknown duration', () => {
   const plans = planIracingEvents({championships:[], special_events:[
     {slug:'pcc-vir', name:'THE Production Car Challenge @ViR', date_start:'2099-12-18', date_end:'2099-12-19', track_name:'ViR Grand Course', car_class:'Production Car Challenge Cars'}
   ]}, NOW);
-  assert.equal(plans.find(plan => plan.externalId.startsWith('special:pcc-vir')).input.durationMinutes, 240);
-  const cup = plans.find(plan => plan.externalId.startsWith('special:992-endurance-cup'));
-  assert.equal(cup.input.durationMinutes, 720);
-  assert.deepEqual(cup.input.categories, ['Porsche Cup']);
+  assert.deepEqual(plans.map(plan=>plan.input.name), ['THE Production Car Challenge @ViR']);
+  assert.equal(plans[0].input.durationMinutes, null);
 });
 
 test('special event time slots are read from the iracing.com article of the race week', async () => {
@@ -106,7 +104,7 @@ test('an unrelated special event article is never used even when it is the only 
   assert.equal(articleFor([{...posts[0], date:'2099-10-08T09:00:00'}], special), null, 'last week article is not taken');
 });
 
-test('a lap race whose schedule entry gives a few minutes keeps a real duration (Bathurst 1000)', () => {
+test('a lap race whose schedule only gives a session placeholder has no verified duration', () => {
   const HALF_HOURS = Array.from({length:48}, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
   const plans = planIracingEvents({
     championships:[{name:'2026 Bathurst 1000 AU Presented by Next Level Racing', category:'SPORTS CAR', typical_session_duration_minutes:15,
@@ -116,8 +114,7 @@ test('a lap race whose schedule entry gives a few minutes keeps a real duration 
   }, NOW);
   const bathurst = plans.filter(plan => plan.externalId.startsWith('special:bathurst-1000'));
   assert.equal(bathurst.length, 1, 'one race, not one per schedule entry');
-  assert.equal(bathurst[0].input.durationMinutes, 360);
-  assert.ok(validateEvent(bathurst[0].input));
+  assert.equal(bathurst[0].input.durationMinutes, null);
 });
 
 test('a special event listed as a series with real-looking times still gives one race', () => {
@@ -180,9 +177,7 @@ test('invalid source clock values are ignored and duplicate slots do not drop a 
   assert.deepEqual(starts,[Date.parse('2099-10-17T04:00:00Z')]);
 });
 
-test('992 Endurance Cup uses the officially announced Spa circuit and Creventic classes omit TCR',()=>{
-  const plan=planIracingEvents({championships:[],special_events:[]},NOW).find(p=>p.input.name==='992 Endurance Cup');
-  assert.equal(plan.input.circuit,'iracing-spa');
+test('Creventic classes retain the verified catalogue',()=>{
   assert.deepEqual(categoriesFor('Creventic Endurance Series'),['GT3','Porsche Cup','GT4']);
 });
 

@@ -165,7 +165,7 @@ function multiRounds(event,departure,rounds,editor){
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
-  if(departure.startsAt<=Date.now())return '';
+  if(departure.startsAt<=Date.now()||event.officialScheduleStatus)return '';
   const own=ownRegistration(departure),crewAction=crewButton(event,departure),canCreateCrew=Boolean(crewAction);
   const crewTips={organiser:'Ouvre la page « Équipages » sur ce départ.',builder:'Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.',request:'Propose ton équipage : les organisateurs le vérifient et le créent.'};
   const createCrewAction=crewAction?`<button type="button" class="link-button ux-summary-create-crew" ${crewAction.attrs} data-tip="${esc(crewTips[crewAction.kind])}">${esc(crewAction.label)}${crewAction.kind==='organiser'?' →':''}</button>`:'';

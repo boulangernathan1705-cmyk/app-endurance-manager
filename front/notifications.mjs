@@ -3,7 +3,7 @@
 import {isIdle, onWake} from './idle.mjs';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const REFRESH_MS = 60000;
-const CHANGES = {starts:'horaires', circuit:'circuit', duration:'durée', name:'nom'};
+const CHANGES = {starts:'horaires', circuit:'circuit', duration:'durée', name:'nom', categories:'catégories', rounds:'format', driverChangeRequired:'règles d’équipage'};
 let wrap = null, items = [], unread = 0, loading = false;
 
 const b = value => `<strong>${esc(value)}</strong>`;
@@ -23,7 +23,10 @@ function sentence(item) {
     case 'withdrawn': return `${b(item.pilot)} s’est désinscrit : une place se libère dans ton équipage ${crew}`;
     case 'removed_by': return `${item.by ? b(item.by) : 'Un admin'} a retiré ton inscription`;
     case 'race_changed': {
+      if (item.officialStatus === 'cancelled') return 'iRacing a annulé cette course';
+      if (item.officialStatus === 'postponed') return 'iRacing a reporté cette course';
       const what = (item.changes || []).map(key => CHANGES[key]).filter(Boolean);
+      if (item.officialReview) return `iRacing a publié un changement à vérifier${what.length ? ` : ${esc(what.join(', '))}` : ''}`;
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
     }
     case 'choose_departure': return item.manage ? `Choisis l’horaire de ton équipage ${crew}` : item.crewName ? `Ton équipage ${crew} doit choisir son horaire` : 'Choisis ton horaire pour compléter ton inscription';
