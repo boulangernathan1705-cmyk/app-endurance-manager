@@ -196,7 +196,7 @@ export async function synchronizeKnown(env, row, data, plan, at) {
       if (/malformed JSON/i.test(error.message)) return {conflicts:1};
       throw error;
     }
-    if (choose && nextReal) await askToChooseStart(env,event,choose.id);
+    if (choose && nextReal) await askToChooseStart(env,event,choose.id,published ? null : moves);
   } else if (snapshot !== row.source_snapshot || sourceMetadata !== row.source_metadata || (plan.identity && !row.source_identity)) {
     await env.DB.prepare(`UPDATE iracing_imports SET source_snapshot=?,source_metadata=?,source_identity=COALESCE(source_identity,?)
       WHERE community_id='official' AND external_id=? AND source_snapshot IS ?`)
