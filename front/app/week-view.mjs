@@ -1,3 +1,5 @@
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter} from './tdz-home-state.mjs';
+import {renderTdzCalendar} from './home-view.mjs';
 import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
@@ -206,8 +208,9 @@ const FILTERS_KEY='em_week_filters';
 const kindKey=item=>item.kind.key==='endurance'?simOf(item.event):'event';
 // A streamed endurance (« Je streame ce départ ») is also a stream: « Events » keeps it (Nathan, 2026-11-08).
 const streamedItem=item=>item.kind.key==='endurance'&&item.starts.some(start=>(start.departure.availability||[]).some(reg=>reg.streamTime&&reg.status!=='unavailable'));
-const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item))||(chosen.has('event')&&streamedItem(item)));
+const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item))||(chosen.has('event')&&streamedItem(item))||(chosen.has('stream')&&(item.kind.key==='stream'||streamedItem(item)||Boolean(item.event.details?.streamTime))));
 export function weekFilters(){
+  if(fusedTdzHome())return homeFilters();
   if(!(state.weekFilters instanceof Set)){
     let saved=[];try{saved=JSON.parse(localStorage.getItem(FILTERS_KEY)||'[]');}catch{}
     state.weekFilters=new Set((Array.isArray(saved)?saved:[]).filter(key=>FILTERS.some(([known])=>known===key&&key!=='all')));
@@ -215,6 +218,7 @@ export function weekFilters(){
   return state.weekFilters;
 }
 export function toggleWeekFilter(key){
+  if(fusedTdzHome()){selectHomeFilter(key);return;}
   const chosen=weekFilters();
   if(key==='all')chosen.clear();else if(chosen.has(key))chosen.delete(key);else chosen.add(key);
   try{localStorage.setItem(FILTERS_KEY,JSON.stringify([...chosen]));}catch{}
@@ -281,6 +285,7 @@ function crewsBox(){
 export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
+  if(fusedTdzHome()&&homeView()!=='week'){renderTdzCalendar();return;}
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
@@ -306,11 +311,11 @@ export function renderWeek(){
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
   const create=can('create_race')&&state.soloRaces?`<div class="home-create">${addMenu([['create','🏁 Événement','data-format="solo"'],['create-stream','🎙 Stream']])}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
-  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
+  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>${fusedTdzHome()?homeViewSwitch():''}
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
     <div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
-        <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
+        ${fusedTdzHome()?homeFilterBar():`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
         <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
       </section>
       ${box}
