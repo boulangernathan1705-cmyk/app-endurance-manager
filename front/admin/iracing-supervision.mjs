@@ -9,7 +9,7 @@ const fields = {name:'Nom',circuit:'Circuit',layout:'Tracé',duration:'Durée',d
 const reasons = {manual:'Correction locale',occupied:'Course avec inscrits',cancelled:'Annulation officielle',postponed:'Report officiel',
   partial:'Publication partielle',unknown:'Valeur inconnue',circuit:'Circuit non reconnu',configuration:'Nouveau tracé',
   unverified:'Durée officielle à confirmer',duration:'Durée officielle à confirmer',capacity:'Limite de départs',catalogue:'Catalogue à vérifier',
-  series:'Série à vérifier',categories:'Catégories à vérifier',invalid:'Course invalide',starts:'Départs à vérifier',absent:'Course absente de la dernière source'};
+  series:'Série à vérifier',categories:'Catégories à vérifier',invalid:'Course invalide',starts:'Départs à vérifier',absent:'Course absente de la dernière source','official-article':'Annonce officielle sans course associée'};
 const sourceLabel = name => name === 'manifest' ? 'Liste des saisons' : name === 'articles' ? 'Articles officiels' : name.replace('season:', 'Calendrier ');
 const value = (field, v) => {
   if (v == null) return '—';
