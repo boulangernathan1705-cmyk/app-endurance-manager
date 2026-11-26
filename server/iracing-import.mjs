@@ -338,7 +338,9 @@ function articleDetails(article, special) {
 }
 
 function addArticleToPlan(plan, article, timestamp, stale) {
-  if (!article) return;
+  // Cached news is retained for diagnostics only: a failed request must not change status,
+  // circuit, duration or starts, even if the cached article contained a cancellation.
+  if (!article || stale) return;
   const details = articleDetails(article, plan.special);
   const {input, metadata} = plan;
   if (details.status) metadata.status = details.status;
@@ -348,7 +350,7 @@ function addArticleToPlan(plan, article, timestamp, stale) {
     metadata.layout = details.layout;
   }
   const starts = details.starts.filter(start => start > timestamp);
-  if (!starts.length || starts.length > MAX_DEPARTURES || stale) return;
+  if (!starts.length || starts.length > MAX_DEPARTURES) return;
   plan.articleStarts = starts;
   plan.articleComplete = details.complete;
   plan.articleCount = details.starts.length;
