@@ -19,7 +19,7 @@ export async function platformApi({path, method, request, env, actor, community,
       const input = await body(request);
       if (typeof input.key !== 'string' || input.key.length > 150 || !Number.isSafeInteger(input.revision))
         fail(400, 'Conflit invalide.');
-      return json(await resolveIracingConflict(env,input.key,input.revision));
+      return json(await resolveIracingConflict(env,input.key,input.revision,input.action));
     }
     try {
       const result = await syncIracingEvents(env);
