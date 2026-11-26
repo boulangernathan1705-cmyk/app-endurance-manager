@@ -1,5 +1,6 @@
 import {validateEvent, id, now} from './core.mjs';
 import {sourceSnapshot, synchronizeKnown} from './iracing-sync.mjs';
+import {OFFICIAL_SPECIAL_SUPPLEMENTS} from './iracing-special-supplements.mjs';
 import {readIracingSource, runIracingSync, recordIracingConflict, conflictKey} from './iracing-supervision.mjs';
 
 const OFFICIAL = 'official';
@@ -153,10 +154,29 @@ const seriesId = series => /^\d+$/.test(String(series.series_id ?? '')) ? String
 // Special event slot when its times are not known yet: its first day, 20h in Paris (to be confirmed).
 const PENDING_TIME = '20:00';
 
+// Fill only verified omissions, without overriding a live date, status or known field.
+export function supplementSpecialEvents(events, code) {
+  const result = (events || []).map(event => ({...event}));
+  if (!/^\d{4}S[1-4]$/.test(code || '')) return result;
+  for (const extra of OFFICIAL_SPECIAL_SUPPLEMENTS) {
+    const month = Number(extra.date_start.slice(5,7));
+    if (extra.date_start.slice(0,4) !== code.slice(0,4) || Math.ceil(month/3) !== Number(code.slice(-1))) continue;
+    const match = result.find(event => event.date_start?.slice(0,4) === extra.date_start.slice(0,4) &&
+      (slug(event.slug) === extra.slug || compactName(event.name) === compactName(extra.name) || includesName(event.name,extra.name)));
+    if (!match) result.push({...extra});
+    else if (match.date_start === extra.date_start) {
+      for (const field of ['track_name','car_class','duration_minutes']) if (!match[field]) match[field] = extra[field];
+      match.official_source = extra.official_source;
+      match.verified_at = extra.verified_at;
+    }
+  }
+  return result;
+}
+
 // Races to create from one season file of the schedule, from `now` on.
-export function planIracingEvents(season, timestamp = Date.now(), {code = season?.season?.code, review = []} = {}) {
+export function planIracingEvents(season, timestamp = Date.now(), {code = season?.season?.code, review = [], supplement = false} = {}) {
   const plans = [];
-  const specials = (season?.special_events || []).filter(event =>
+  const specials = (supplement ? supplementSpecialEvents(season?.special_events,code) : season?.special_events || []).filter(event =>
     isEnduranceClass(event.car_class) && !EXCLUDED_SPECIALS.test(`${event.name} ${event.car_class}`) &&
     validWindow(event.date_start, event.date_end || event.date_start));
   const detailsFromSeries = new Map();
@@ -230,7 +250,7 @@ export function planIracingEvents(season, timestamp = Date.now(), {code = season
       externalId:`special:${eventSlug}:${dateStart}`,
       identity:`special:${dateStart.slice(0, 4)}:${eventSlug}`,
       special, metadata:{...special, layout:details.track || event.track_name || null,
-        status:sourceStatus(event.status), carClass:event.car_class},
+        status:sourceStatus(event.status), carClass:event.car_class, officialSource:event.official_source || null, verifiedAt:event.verified_at || null},
       input:{name:cleanName(event.name), format:'endurance',
         durationMinutes:minutesFor(event.duration_minutes) || details.duration || minutesFor(Number(hours) * 60),
         eventType:'special', circuit:circuitFor(details.track, event.track_name, event.name),
@@ -458,10 +478,10 @@ export function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetc
     const specialCutoff = timestamp + 10 * DAY_MS;
     const plans = [], validSeasons = [];
     if (specialOnly) {
-      const {results} = await env.DB.prepare(`SELECT payload FROM iracing_sync_sources WHERE name IN (
+      const {results} = await env.DB.prepare(`SELECT name,payload FROM iracing_sync_sources WHERE name IN (
         'season:' || (SELECT json_extract(payload,'$.current') FROM iracing_sync_sources WHERE name='manifest'),
         'season:' || (SELECT json_extract(payload,'$.next') FROM iracing_sync_sources WHERE name='manifest'))`).all();
-      for (const row of results) plans.push(...planIracingEvents(JSON.parse(row.payload), timestamp)
+      for (const row of results) plans.push(...planIracingEvents(JSON.parse(row.payload), timestamp,{code:row.name.slice(7),supplement:true})
         .filter(plan => plan.special && Date.parse(plan.special.dateStart) <= specialCutoff));
       if (!plans.length) return {idle:true};
     } else {
@@ -473,7 +493,7 @@ export function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetc
         const result = await readIracingSource(env, key, `${IRACING_FEED}${code.slice(0,4)}_s${code.slice(5)}.json`, fetchImpl, seasonValidator(code), timestamp);
         if (observe(key, result) && !result.error) {
           validSeasons.push(code);
-          plans.push(...planIracingEvents(result.data, timestamp, {code, review}));
+          plans.push(...planIracingEvents(result.data, timestamp, {code, review,supplement:true}));
         }
       }
     }
