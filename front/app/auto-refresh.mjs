@@ -30,15 +30,17 @@ function openSections(){
 // A newer version of the site is online: the page reloads itself (only when the pilot is not busy), so a
 // phone that keeps the page open does not stay on the old one.
 const build=document.querySelector('meta[name="em-build"]')?.content;
-async function newVersionOnline(){
+async function reloadIfNewVersion(){
   if(!build)return false;
   try{
     const response=await fetch('/front/version.json',{cache:'no-store'});
     const online=response.ok?(await response.json()).build:build;
-    if(online===build)return false;
+    if(typeof online!=='string'||!online||online===build)return false;
+    if(document.hidden||isIdle()||pilotIsBusy())return false;
     // Never twice for the same version (a page still served old would reload in a loop).
     if(sessionStorage.getItem('em_reloaded_for')===online)return false;
     sessionStorage.setItem('em_reloaded_for',online);
+    location.reload();
     return true;
   }catch{return false;}
 }
@@ -47,7 +49,7 @@ async function refreshInBackground(refresh){
   if(running||document.hidden||isIdle()||pilotIsBusy())return;
   running=true;
   try{
-    if(await newVersionOnline()&&!pilotIsBusy()){location.reload();return;}
+    if(await reloadIfNewVersion())return;
     if(pilotIsBusy())return;
     const sections=openSections(),scroll=scrollY;
     await refresh();
