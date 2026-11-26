@@ -250,6 +250,7 @@ async function importOfficial(env, plans, {timestamp, fetchImpl}) {
   const rows=(await env.DB.prepare('SELECT i.external_id,i.source_snapshot,e.* FROM iracing_imports i LEFT JOIN events e ON e.id=i.event_id WHERE i.community_id=?').bind(community.id).all()).results;
   const known=new Map(rows.map(row=>[row.external_id,row]));
   let created=0,repaired=0,skipped=0,updated=0,conflicts=0,initialized=0,pending=[],kinds=[];
+  const conflictIds=[];
   // New races are written 10 at a time: each batch is one call to the database (at most 50 per run).
   const flush = async () => {
     if(pending.length){const results=await env.DB.batch(pending);results.forEach((result,index)=>{if(kinds[index]==='create')created+=Number(result.meta.changes)||0;if(kinds[index]==='repair')repaired+=Number(result.meta.changes)||0;if(kinds[index]==='initialize')initialized+=Number(result.meta.changes)||0;});}
@@ -273,6 +274,7 @@ async function importOfficial(env, plans, {timestamp, fetchImpl}) {
         }else{
           const result=await synchronizeKnown(env,saved,data,timestamp,{special:Boolean(plan.special)});
           updated+=result.updated||0;conflicts+=result.conflicts||0;
+          if(result.conflicts){conflictIds.push(plan.externalId);console.warn('iRacing source conflict',plan.externalId);}
         }
       }
       continue;
@@ -290,7 +292,7 @@ async function importOfficial(env, plans, {timestamp, fetchImpl}) {
   }
   await flush();
   const completed = await completeSpecialTimes(env, {timestamp, fetchImpl, community});
-  return {created,completed,updated,conflicts,initialized,...(repaired?{repaired}:{}),...(skipped?{skipped}:{})};
+  return {created,completed,updated,conflicts,initialized,...(conflictIds.length?{conflictIds}:{}),...(repaired?{repaired}:{}),...(skipped?{skipped}:{})};
 }
 
 export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';
