@@ -59,3 +59,15 @@ Sources : [catalogue iRacing](https://www.iracing.com/tracks/), [catalogue commu
 - Conserver le visuel générique iRacing existant pour tout circuit sans photo validée, inconnu, aléatoire ou à préciser.
 - Aucun chargement distant, aucune nouvelle requête D1. Conserver la géométrie, les badges et la navigation tactile/souris/clavier.
 - Contrôler les 44 circuits sur ordinateur et mobile et exécuter npm run check et les tests de compatibilité/visuels. Déploiement main uniquement avec accord explicite.
+
+## Procédure d'activation d'un circuit
+
+Le registre `IRACING_ARTWORK` dans `front/endurance-card.mjs` ne contient volontairement aucune entrée à ce stade. Chaque entrée future utilise l'identifiant complet du circuit et une référence écrite de permission. Par exemple, pour `iracing-spa`, une fois les droits documentés :
+
+1. Ajouter les deux WebP locaux `images/endurance/iracing/iracing-spa.webp` et `images/endurance/iracing-pano/iracing-spa.webp`, issus de la même capture authentique du jeu. Ne pas substituer une capture LMU. Le premier fichier doit mesurer au moins 250 × 250 px, le second au moins 400 × 120 px et être horizontal.
+2. Dans `styles/pages/endurance-cards.css`, ajouter la classe `.endurance-card-head.endurance-track-iracing-spa` avec `--endurance-photo` et les trois positions `--track-focus-compact`, `--track-focus-wide`, `--track-focus-detail`. Ajouter les classes `.endurance-pano.endurance-track-iracing-spa` et `.endurance-preview-track-iracing-spa` avec `--endurance-panorama` et `--panorama-focus`. Ajuster les valeurs par contrôle visuel, pas par estimation.
+3. Documenter la provenance, l'auteur, les conditions de republication et les crédits applicables dans ce fichier et mettre à jour `images/endurance/SOURCES.md`.
+4. Ajouter au registre l'identifiant avec la référence à l'autorisation. Les trois modes (miniature, aperçu interactif, bandeau) utilisent alors exclusivement ces fichiers iRacing. Le build vérifie l'identifiant, les deux WebP, leurs dimensions, le poids et les classes CSS.
+5. Adapter les attentes navigateur pour les circuits activés, vérifier le rendu desktop/mobile et seulement ensuite actualiser les références visuelles si nécessaire.
+
+Les conditions du site iRacing et la note développeurs tiers ne fournissent pas de licence générale de republication des captures. Ce registre ne doit pas être rempli sur la seule base d'une URL publique. Pas de hotlink ni de collecte automatique de captures.
