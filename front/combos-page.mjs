@@ -547,10 +547,10 @@ async function loadHistory() {
   view.history={key,loading:true,data:null,error:''}; render();
   try {
     const data=await call('/api/combos/history?'+key);
-    if (view.history.key!==key || !view.sheet || historyKey()!==key) return;
+    if (view.history?.key!==key || !view.sheet || historyKey()!==key) return;
     view.history={key,loading:false,data,error:''};
   } catch(error) {
-    if (view.history.key!==key) return;
+    if (view.history?.key!==key) return;
     view.history={key,loading:false,data:null,error:error.message};
   }
   render();
