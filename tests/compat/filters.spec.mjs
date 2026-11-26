@@ -201,7 +201,8 @@ for (const game of ['lmu','iracing']) test(`${game}: preview preserves card size
   await touch(card);
   await expect(card).toHaveClass(/is-panorama-preview/);
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
-  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/lmu-pano/spa.webp');
+  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing.webp');
+  if(game==='iracing')expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).not.toContain('lmu-pano/');
   const after=await card.boundingBox();
   expect(after.width).toBeCloseTo(before.width,0);expect(after.height).toBeCloseTo(before.height,0);
   await touch(cards.nth(1));
