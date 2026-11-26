@@ -57,9 +57,9 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile cards show the simulat
       await expect(card.locator('.circuit-visual')).toHaveCount(0);
       const art=card.locator('.race-card-top > .endurance-card-head'),head=card.locator('.race-head'),date=head.locator('.race-date'),times=card.locator('.race-starts');
       await expect(art).toBeVisible();await expect(date).toHaveCount(1);
-      const badge=head.locator('.endurance-card-identity');
+      const badge=head.locator('.race-endurance-date .endurance-card-identity');
       await expect(badge).toHaveText(game==='lmu'?'LMU Endurance':'iRacing Endurance');
-      await expect(head.locator('.race-endurance-date .endurance-card-duration')).toHaveText('2 h');
+      await expect(head.locator('.race-endurance-meta .endurance-card-duration')).toHaveText('2 h');
       await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
       await expect(card).toHaveClass(/endurance-preview/);
       expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');

@@ -33,7 +33,8 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  for (const sim of ['lmu','iracing']) {
   const card=page.locator('.week-block.is-'+sim);
   const art=card.locator('.endurance-card-head');
-  const badge=card.locator('.week-endurance-schedule .endurance-card-identity');
+  const badge=card.locator('.week-block-title .endurance-card-identity');
+  await expect(card.locator('.week-endurance-schedule .endurance-card-duration')).toHaveText('6 h');
   await expect(badge).toHaveText(sim==='lmu'?'LMU Endurance':'iRacing Endurance');
   await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
@@ -62,7 +63,7 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await expect(page.locator('.week-block.is-endurance .week-block-logo')).toHaveCount(0);
  await expect(page.locator('.week-block.is-endurance .week-block-plan:visible')).toHaveCount(2);
  await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');
- await expect(page.locator('.week-block').filter({hasText:'Production Endurance Challenge'})).toContainText(/Sebring International Raceway[\s\S]*iRacing/);
+ await expect(page.locator('.week-block').filter({hasText:'Production Endurance Challenge'})).toContainText(/iRacing[\s\S]*Sebring International Raceway/);
  // No end time on the cards (Nathan 2026-11-01): the circuit instead.
  await expect(page.locator('.week-grid')).not.toContainText('fin ');
  await expect(page.locator('.week-block.is-endurance .week-plan-row em')).toHaveCount(0);
