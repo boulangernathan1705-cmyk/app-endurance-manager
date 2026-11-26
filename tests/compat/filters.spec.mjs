@@ -19,6 +19,32 @@ async function boot(page,game,events){
   await page.waitForLoadState('networkidle');
 }
 
+test('Endurance month shows all starts for the selected day', async ({page}) => {
+  await page.clock.setFixedTime(Date.parse('2030-11-26T08:00:00Z'));
+  const slot = (date, time) => ({
+    ...start(`${date}-${time}`), date, time, startsAt:Date.parse(`${date}T${time}:00+01:00`)
+  });
+  const departures = ['21:00', '00:00', '15:30', '06:00', '18:00', '03:00', '12:00']
+    .map(time => slot('2030-11-15', time));
+  departures.push(slot('2030-11-16', '08:45'));
+  await boot(page, 'lmu', [race('lmu', {name:'6h de COTA', circuit:'cota', departures})]);
+  await page.locator('[data-action="cal-view"][data-view="month"]').click();
+  const card = page.locator('.cal-side .cal-ev.is-endurance');
+  for (const [width, dayButton] of [[1440, '.cal-num'], [390, '.cal-tap']]) {
+    await page.setViewportSize({width, height:900});
+    await page.locator(`${dayButton}[data-day="2030-11-15"]`).click();
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('.cal-start-times strong')).toHaveText(['0h', '3h', '6h', '12h', '15h30', '18h', '21h']);
+    await expect(card.locator('.cal-type')).toHaveText('Événement spécial');
+    await expect(card).not.toContainText('+6');
+
+    await page.locator(`${dayButton}[data-day="2030-11-16"]`).click();
+    await expect(card).toHaveCount(1);
+    await expect(card).toContainText('8h45');
+    await expect(card.locator('.cal-start-times')).toHaveCount(0);
+  }
+});
+
 for(const game of ['lmu','iracing'])test(`${game}: mobile cards show the simulator and duration without the circuit drawing`,async({page})=>{
   const circuits=game==='iracing'?['iracing-indianapolis','iracing-nurburgring-gp','iracing-montreal']:['spa','le-mans'];
   await boot(page,game,circuits.map((circuit,index)=>race(game,{id:`mobile-${index}`,circuit,name:index===0?'Spa':'Production Endurance Challenge',departures:[start(),{...start('next'),date:'2090-10-17',startsAt:Date.parse('2090-10-17T12:00:00Z')}]})));
