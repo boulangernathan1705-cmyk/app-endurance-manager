@@ -4,7 +4,6 @@ import {filterStorageKey,readFilterState,writeFilterState} from '../filter-state
 import {weekStart,parisDay} from '../week-days.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {isStream} from '../../shared/stream.mjs';
-import {normalizeRaceFilters,raceFilterKey} from '../race-filters.mjs';
 import {parisMonth,seasonMonths} from '../../shared/season.mjs';
 export const fusedTdzHome=()=>state.access==='member'&&state.eventTdz&&state.soloRaces;
 const key=()=>filterStorageKey('tdz-home',{communityId:state.community?.id,userId:state.user?.id});
@@ -13,9 +12,8 @@ export function homePrefs(){
   const scope=key();
   if(state.tdzHomeScope!==scope){
     const saved=readFilterState(scope);
-    const legacy=readFilterState(raceFilterKey('lmu','solo',{communityId:state.community?.id,userId:state.user?.id}));
     state.tdzHomeScope=scope;
-    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.filter(k=>kinds.includes(k)):[],advanced:normalizeRaceFilters(saved.advanced??legacy,{format:'solo',kindIds:state.eventTypes||[]})};
+    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.filter(k=>kinds.includes(k)):[]};
     state.weekOffset=0;
   }
   return state.tdzHomePrefs;
@@ -62,24 +60,36 @@ export function weekContains(departure,monday){
 }
 
 // Shared filtering by departure: a registration or stream on another day must not leak into the selected week.
-export function homeAdvanced(){return homePrefs().advanced;}
-export function saveHomeAdvanced(){save();}
 export function homeMatches(event,departure){
-  const chosen=homeFilters(),types=[...chosen].filter(k=>k!=='mine'),advanced=homeAdvanced();
+  const chosen=homeFilters(),types=[...chosen].filter(k=>k!=='mine');
   const solo=event.format==='solo',game=event.otherGame||simForEvent(event);
   const regs=(departure.availability||[]).filter(reg=>reg.status!=='unavailable');
   const mine=regs.some(reg=>reg.mine),streamed=regs.some(reg=>reg.streamTime);
   if(types.length&&!types.includes(solo?'event':game)&&!(types.includes('event')&&streamed)&&!(types.includes('stream')&&(isStream(event)||streamed||Boolean(event.details?.streamTime))))return false;
   if(chosen.has('mine')&&!mine)return false;
-  if(advanced.sims.length&&!advanced.sims.includes(simForEvent(event)))return false;
-  if(advanced.kinds.length&&(!solo||!advanced.kinds.includes(event.details?.type)))return false;
-  if(advanced.from&&(!departure.date||departure.date<advanced.from))return false;
-  if(advanced.to&&(!departure.date||departure.date>advanced.to))return false;
-  if(advanced.situation==='registered'&&!mine)return false;
-  if(advanced.situation==='free'&&mine)return false;
-  if(advanced.situation==='absent'&&!(event.absences||[]).some(a=>a.mine))return false;
   return true;
 }
 export function filterHomeEvents(events){
   return events.flatMap(event=>{const departures=(event.departures||[]).filter(d=>homeMatches(event,d));return departures.length||(!(event.departures||[]).length&&homeMatches(event,{}))?[{...event,departures}]:[];});
+}
+
+// Group starts by Paris day, without changing the full event.
+export function agendaDays(events,monday){
+  const days=Array.from({length:7},(_,i)=>({day:monday+i,events:[]}));
+  for(const event of events){
+    if(event.schedulePending)continue;
+    const grouped=new Map();
+    for(const departure of event.departures||[]){
+      if(!weekContains(departure,monday))continue;
+      const day=parisDay(Number(departure.startsAt));
+      if(!grouped.has(day))grouped.set(day,[]);
+      grouped.get(day).push(departure);
+    }
+    for(const [day,departures] of grouped){
+      departures.sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
+      days[day-monday].events.push({...event,departures});
+    }
+  }
+  for(const day of days)day.events.sort((a,b)=>Number(a.departures[0].startsAt)-Number(b.departures[0].startsAt)||String(a.name).localeCompare(String(b.name),'fr'));
+  return days.filter(day=>day.events.length);
 }

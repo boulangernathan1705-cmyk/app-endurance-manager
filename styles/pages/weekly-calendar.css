@@ -234,3 +234,18 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 
 /* Counter of the « Équipages » tab. */
 .nav-count { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 5px; border-radius: var(--em-radius-pill); background: var(--em-danger); color: var(--em-text-strong); font-size: 11px; font-weight: 800; line-height: 1.4; text-align: center; }
+
+/* TDZ Accueil — agenda de la semaine uniquement. */
+#app .tdz-agenda { display: grid; gap: var(--em-space-3); }
+#app .tdz-agenda-day { display: grid; grid-template-columns: minmax(116px,1fr) minmax(0,3fr); gap: var(--em-space-3); align-items: start; padding: var(--em-space-3) 0; border-bottom: 1px solid var(--em-border); min-width: 0; }
+#app .tdz-agenda-day:last-child { border-bottom: 0; }
+#app .tdz-agenda-date { display: grid; gap: 4px; margin: 0; padding: var(--em-space-2) 0; font-size: var(--em-text-lg); font-weight: 800; color: var(--em-text); text-transform: none; }
+#app .tdz-agenda-date > span { text-transform: capitalize; }
+#app .tdz-agenda-date small { color: var(--em-muted); font-size: var(--em-text-sm); font-weight: 600; }
+#app .tdz-agenda-date .tdz-agenda-today { color: var(--em-accent); }
+html[data-game] #app .tdz-agenda .tdz-agenda-cards { display: grid; grid-template-columns: minmax(0,1fr); gap: var(--em-space-2); min-width: 0; }
+html[data-game] #app .tdz-agenda .tdz-agenda-cards > .event-card { width: 100%; max-width: none; min-width: 0; margin: 0; }
+@media (max-width: 760px) {
+  #app .tdz-agenda-day { grid-template-columns: minmax(0,1fr); gap: var(--em-space-2); }
+  #app .tdz-agenda-date { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--em-space-2); padding: 0; }
+}

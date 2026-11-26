@@ -145,29 +145,49 @@ for(const game of ['lmu','iracing'])test(`${game}: official special filter, rese
   await expect(page.locator('.event-card')).toHaveCount(3);expect(errors).toEqual([]);
 });
 
-test('SOLO and TDZ calendars ignore endurance-only filters and preserve their simulator choice',async({page})=>{
-  await page.clock.setFixedTime(Date.parse('2090-10-15T08:00:00Z'));
-  const solo=race('lmu',{format:'solo',sim:'lmu',name:'Solo OPEN',access:'open',official:false,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],details:{type:'OPEN'},categories:[]});
+test('TDZ agenda groups Paris days, uses one filter bar and ignores obsolete advanced filters',async({page})=>{
+  await page.clock.setFixedTime(Date.parse('2090-10-13T08:00:00Z'));
+  const base={...start(),date:'2090-10-13',startsAt:Date.parse('2090-10-13T12:00:00Z')};
+  const tomorrow={...base,id:'tomorrow',date:'2090-10-14',startsAt:Date.parse('2090-10-14T12:00:00Z')};
+  const second={...base,id:'second',time:'18:00',startsAt:Date.parse('2090-10-13T16:00:00Z')};
+  const solo=race('lmu',{format:'solo',sim:'lmu',name:'Solo OPEN',access:'open',official:false,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],details:{type:'OPEN'},categories:[],departures:[base,second,tomorrow]});
+  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('em_filters_v3:tdz-home:all:alpha:111111111111111111',JSON.stringify({view:'list',advanced:{sims:['iracing'],kinds:['SAFE'],from:'2091-01-01'}}));});
   await boot(page,'lmu',[solo]);
-  await page.evaluate(async()=>{
-    const {state}=await import('/front/app/core.mjs');state.listFormat='solo';
-    const {raceFilterKey}=await import('/front/race-filters.mjs');const key=raceFilterKey('lmu','solo',{communityId:state.community.id,userId:state.user.id});
-    localStorage.setItem(key,JSON.stringify({types:['special'],communities:['beta'],categories:['GTP'],sims:['lmu'],kinds:['OPEN'],situation:'crew'}));
-    state.raceFiltersBy={};state.raceFilterOpen=true;const {setHomeView}=await import('/front/app/tdz-home-state.mjs');setHomeView('list');const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
-  });
-  await expect(page.locator('.event-card')).toHaveCount(1);
-  await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');
+  await page.goto('/lmu/#accueil');
+  const list=page.locator('.tdz-agenda'),days=list.locator('.tdz-agenda-day[data-day]');
+  await expect(days).toHaveCount(2);
+  await expect(days.first()).toHaveAttribute('data-day','2090-10-13');
+  await expect(days.last()).toHaveAttribute('data-day','2090-10-14');
+  await expect(days.first().locator('.event-card')).toHaveCount(1);
+  await expect(days.first().locator('.race-start')).toHaveCount(2);
+  await expect(days.last().locator('.event-card')).toHaveCount(1);
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:900});
+    const heading=await days.first().locator('h2').boundingBox(),card=await days.first().locator('.event-card').boundingBox(),row=await days.first().boundingBox();
+    if(width>760){expect(card.x).toBeGreaterThan(heading.x);expect(card.width/row.width).toBeGreaterThan(.65);expect(card.width/row.width).toBeLessThan(.85);}
+    else {expect(card.y).toBeGreaterThan(heading.y);expect(card.width/row.width).toBeGreaterThan(.95);}
+    expect(await list.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  }
+  await expect(page.locator('[data-action="race-filter-toggle"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'Endurance LMU',exact:true}).click();
+  await expect(list.locator('.event-card')).toHaveCount(0);
+  await page.getByRole('button',{name:'Tout',exact:true}).click();
+  await expect(list.locator('.event-card')).toHaveCount(2);
   await page.getByRole('button',{name:'Semaine suivante'}).click();
-  await expect(page.locator('.event-card')).toHaveCount(0);
+  await expect(list.locator('.event-card')).toHaveCount(0);
   await page.getByRole('button',{name:'Semaine précédente'}).click();
-  await expect(page.locator('.event-card')).toHaveCount(1);
+  await expect(list.locator('.event-card')).toHaveCount(2);
   await page.getByRole('button',{name:'Semaine',exact:true}).click();
-  await expect(page.locator('.week-block')).toContainText('Solo OPEN');
-  await page.getByRole('button',{name:'Liste',exact:true}).click();
+  await expect(page.locator('.week-block').filter({hasText:'Solo OPEN'})).toHaveCount(2);
+  await expect(page.locator('[data-action="race-filter-toggle"]')).toHaveCount(0);
+  await page.getByRole('button',{name:'Mois',exact:true}).click();
+  await expect(page.locator('.cal')).toBeVisible();
+  await expect(page.locator('[data-action="race-filter-toggle"]')).toHaveCount(0);
+  await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};state.listFormat='solo';state.raceFilterOpen=true;const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
   await expect(page.locator('.event-card')).toHaveCount(1);
-  await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};state.listFormat='solo';const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
-  await expect(page.locator('.event-card')).toHaveCount(1);await expect(page.locator('[data-group="kinds"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="race-filter-toggle"]')).toHaveCount(1);
+  await expect(page.locator('[data-group="sims"]')).not.toHaveCount(0);
+  await expect(page.locator('[data-group="kinds"]')).toHaveCount(0);
 });
 
 test('community choices update the whole race view and never hide a private event',async({page})=>{
