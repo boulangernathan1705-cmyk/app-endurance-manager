@@ -546,11 +546,18 @@ html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race
   padding: 0;
   border: 0;
 }
-.week-block.is-endurance .week-block-title > .endurance-card-identity {
+.week-block.is-endurance .week-endurance-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--em-space-1);
+}
+.week-block.is-endurance .week-endurance-heading > .week-chip { margin: 0; }
+.week-block.is-endurance .week-endurance-heading > .endurance-card-identity {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  justify-self: end;
+  margin-inline-start: auto;
   padding: 2px var(--em-space-1);
   border-inline-start-width: 2px;
 }
