@@ -554,7 +554,7 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
 @media (max-width:760px) {
   html[data-game] #app button.race-card.is-endurance > .race-card-body {
     grid-template-columns: clamp(82px,27%,112px) minmax(0,1fr) !important;
-    gap: 4px 8px !important;
+    gap: var(--em-space-1) var(--em-space-2) !important;
     padding-right: 0 !important;
   }
   html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
@@ -567,8 +567,8 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
     flex-flow: row wrap;
     justify-content: flex-start;
     align-items: baseline;
-    gap: 3px 4px;
-    padding: 5px 8px 5px 0 !important;
+    gap: 3px var(--em-space-1);
+    padding: 5px var(--em-space-2) 5px 0 !important;
   }
   html[data-game] #app button.race-card.is-endurance .race-head > .race-date,
   html[data-game] #app button.race-card.is-endurance .race-head > .event-name,
@@ -595,12 +595,13 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
     justify-self: start;
     width: 36px;
     height: 29px;
-    margin: 4px 0 0 4px;
+    margin: var(--em-space-1) 0 0 var(--em-space-1);
     z-index: 1;
     pointer-events: none;
     background: rgba(8,14,20,.82);
     border-radius: 4px;
   }
+  html[data-game] #app button.race-card.is-endurance .race-card-circuit:empty { display: none; }
   html[data-game] #app button.race-card.is-endurance .race-card-circuit .circuit-visual {
     background: transparent;
     border: 0;
@@ -614,14 +615,14 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
   html[data-game] #app button.race-card.is-endurance .race-situation,
   html[data-game] #app button.race-card.is-endurance .race-fill {
     grid-column: 1/-1 !important;
-    margin-inline: 8px;
+    margin-inline: var(--em-space-2);
   }
   html[data-game] #app button.race-card.is-endurance .race-starts {
     width: auto;
     gap: 3px;
-    padding: 4px 0 0;
+    padding: var(--em-space-1) 0 0;
   }
-  html[data-game] #app button.race-card.is-endurance .race-day { gap: 4px; }
+  html[data-game] #app button.race-card.is-endurance .race-day { gap: var(--em-space-1); }
   html[data-game] #app button.race-card.is-endurance .race-day em {
     flex: 0 0 49px;
     margin: 0;
@@ -637,23 +638,23 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
     min-width: 47px;
     min-height: 0;
     margin: 0;
-    padding: 2px 4px;
-    font-size: 13px;
+    padding: 2px var(--em-space-1);
+    font-size: var(--em-text-sm);
     line-height: 1.2;
     white-space: nowrap;
   }
   html[data-game] #app button.race-card.is-endurance .race-start > span { font-size: 10px; }
-  html[data-game] #app button.race-card.is-endurance .race-fill { padding-bottom: 4px; }
+  html[data-game] #app button.race-card.is-endurance .race-fill { padding-bottom: var(--em-space-1); }
   html[data-game] #app button.race-card.is-endurance .race-fill .event-category-badges {
     display: flex !important;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--em-space-1);
   }
   html[data-game] #app button.race-card.is-endurance .event-category-badge {
     display: inline-flex;
     flex: 0 1 auto;
     align-items: center;
-    gap: 4px;
+    gap: var(--em-space-1);
     box-sizing: border-box;
     max-width: 100%;
     min-width: 0;
