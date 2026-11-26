@@ -183,6 +183,15 @@ async function cleanup(env) {
 // Anything else (other hosts, protocol-relative URLs, query strings) falls back to the home page.
 function returnPath(value) {
   const path = typeof value === 'string' ? value : '';
+  // Allow only explicit memo parameters on these two local pages; never a host or redirect target.
+  if (path.length <= 600 && /^\/(?:simhub|fiches-combo)(?:\.html)?(?:[?#]|$)/.test(path)) {
+    const url = new URL(path, 'https://local.invalid');
+    const allowed = new Set(['circuit','track','car','event','version','setup','moment','tmin','tmax','from','to','tab','compare','crew','race','cond','scope','reserve','laps','tyres','rubber']);
+    if (url.origin === 'https://local.invalid' && [...url.searchParams].every(([key, value]) => allowed.has(key) && value.length <= 120 && !/[\u0000-\u001f]/.test(value)) && /^(?:#(?:memo|mur|board|chrono|car|tele|map|installer))?$/.test(url.hash)) {
+      return url.pathname + url.search + url.hash;
+    }
+    return '/';
+  }
   return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+\/?)*(?:#event=[a-f0-9-]{36}|#inscriptions)?$/.test(path) ? path : '/';
 }
 function text(value, max, label) {

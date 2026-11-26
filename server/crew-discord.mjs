@@ -15,6 +15,7 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublic
 import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {bellReminders, BELL_REMINDER_WINDOW} from './race-bell-reminders.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
+import {memoHref} from '../shared/memo-links.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
 
@@ -115,7 +116,11 @@ function recapPayload(env, community, row, start, pilots) {
     author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit].filter(Boolean).join(' · ')},
     title:clip(safeText(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
     description:clip(lines.join('\n'), 4096), footer:{text:'Ce vocal ferme 2 h après l’arrivée'}};
-  return {content:'', embeds:[embed], components:pageButton(link)};
+  const components = pageButton(link);
+  const memo = community.modules?.combos === true && link
+    ? memoHref({id:row.event_id,circuit:row.circuit,sim:row.event_sim,format:row.event_format},row.car,row.crew_id) : '';
+  if (memo) components[0].components.push({type:2,style:5,label:'Fiche mémo',url:new URL(memo,link).href});
+  return {content:'', embeds:[embed], components};
 }
 // After the finish, once: a word to the crew before its voice closes.
 function endPayload(env, community, row, start, pilots) {
@@ -147,7 +152,7 @@ const discordIds = pilots => [...new Set(pilots.map(pilot => pilot.user_id).filt
 
 // The crews with their race (rows of crew_discord, or crews about to get one).
 const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id, c.locked, c.owner_user_id,
-  e.name AS event_name, e.details AS event_details, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
+  e.name AS event_name, e.sim AS event_sim, e.format AS event_format, e.details AS event_details, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
   -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.

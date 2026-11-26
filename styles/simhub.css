@@ -57,3 +57,5 @@
   .sh-steps { border-left: 0; border-top: 1px solid var(--em-border); padding: 14px 0 0; }
 }
 .combos-page .cb-message a { color: var(--em-accent); }
+
+#simhub-app[hidden],#simhub-gate[hidden],[data-module-link][hidden]{display:none!important;}

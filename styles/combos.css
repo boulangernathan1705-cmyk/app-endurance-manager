@@ -396,3 +396,27 @@ th.an-who { color: var(--dc) !important; }
   .an-gaps-list { max-height: 360px; }
   .combos-page .an-h2h th, .combos-page .an-h2h td { padding: 5px 6px; font-size: 13px; }
 }
+
+/* Compact memo summary; the detailed tables remain available below. */
+.cb-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0;}
+.cb-overview>div{display:grid;gap:4px;min-width:0;padding:12px;border:1px solid var(--cb-line);background:var(--cb-panel);border-radius:8px;}
+.cb-overview small{font-size:12px;color:var(--muted);}
+.cb-overview strong{font-size:clamp(17px,2vw,24px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+@media(max-width:620px){.cb-overview{grid-template-columns:repeat(2,minmax(0,1fr));}.cb-overview>div{padding:9px;}}
+
+.cb-history{overflow-x:auto;max-width:100%;}.cb-history table{width:100%;}.cb-history td small{display:block;color:var(--muted);font-size:11px;}.cb-history td:first-child{min-width:100px;}.cb-history td{white-space:nowrap;}
+
+.cb-note-fields { display:flex; flex-wrap:wrap; gap:var(--em-space-3); align-items:end; }
+.cb-note-fields label { display:grid; min-width:0; gap:var(--em-space-1); }
+.cb-note-fields label > * { max-width:100%; }
+.cb-prep { margin-block:var(--em-space-4); }
+
+@media print {
+  body:has(.cb-prep) > :not(#combos-app),
+  #combos-app > :not(.cb-prep),
+  .cb-prep .cb-no-print { display:none !important; }
+  #simhub-app, #combos-app, .cb-prep { position:static !important; width:auto !important; max-width:none !important; }
+  .cb-prep, .cb-prep * { background:white !important; color:black !important; }
+  .cb-prep table { width:100%; min-width:0; }
+  .cb-prep tr { break-inside:avoid; }
+}

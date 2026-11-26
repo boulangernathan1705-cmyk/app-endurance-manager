@@ -30,3 +30,30 @@ test('the tyre summary averages each wheel independently and preserves missing d
   assert.deepEqual(crew.wear, [null, 5, 10, null]);
   assert.deepEqual(tyreStats(data, pilots, new Set(['b'])).map(row => row.id), ['a']);
 });
+
+// Memo reliability: unknown values cannot produce a confident pit estimate.
+test('memo projections keep the reserve and unknown refuelling times', async () => {
+  const {stintProjection, refuelDuration, localDayEnd} = await import('../front/combos-stats.mjs');
+  assert.equal(stintProjection(100, 4.2, 3), 23);
+  assert.equal(stintProjection(100, null, 3), null);
+  assert.equal(refuelDuration({fuel:40, energy:60, fuelRate:2, energyRate:3, connect:2}), 22);
+  assert.equal(refuelDuration({fuel:40, energy:60, fuelRate:null, energyRate:3, connect:2}), null);
+  assert.equal(refuelDuration({fuel:null, energy:0}), 0);
+  assert.equal(localDayEnd('2026-10-25'), new Date(2026,9,26).getTime() - 1);
+});
+
+test('memo autonomy uses measured fuel and energy limits, and tyres may start used', async()=>{
+ const {availableLaps,tyreRemaining}=await import('../front/combos-stats.mjs');
+ assert.equal(availableLaps(75,3,null,3),24);
+ assert.equal(availableLaps(90,4,4.2,3),21);
+ assert.equal(availableLaps(null,null,null,3),null);
+ assert.ok(Math.abs(tyreRemaining(80,1.2,46)-24.8)<1e-9);
+ assert.equal(tyreRemaining(40,2,23),0);
+});
+
+test('fuel-only pit estimates do not require virtual energy',async()=>{
+ const {refuelDuration}=await import('../front/combos-stats.mjs');
+ assert.equal(refuelDuration({fuel:75,fuelRate:1.5,connect:2,fuelOnly:true}),52);
+ assert.equal(refuelDuration({fuel:75,fuelRate:null,connect:2,fuelOnly:true}),null);
+ assert.equal(refuelDuration({fuel:null,fuelRate:1.5,connect:2,fuelOnly:true}),null);
+});

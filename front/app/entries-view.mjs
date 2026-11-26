@@ -1,3 +1,4 @@
+import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
 import {contextHelpMarker as helpContext,carLabel} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
@@ -97,6 +98,7 @@ function card({event,departure,reg}, grouped=false) {
       <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${carLabel(crew.car,'Voiture à définir')}</span></div></div>
       <span class="ux-my-crew-state">${crew.locked?'Équipage complet':'Équipage ouvert'}</span>
     </div>
+    ${state.combos && memoHref(event,crew.car,crew.id)?`<a class="secondary-button" href="${esc(memoHref(event,crew.car,crew.id))}">Fiche mémo</a>`:''}
     ${crewAvailability(event,departure,members,{editable:false})}
   </article>`:`<article class="ux-my-awaiting-crew">
     <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>

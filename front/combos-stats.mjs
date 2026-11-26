@@ -33,3 +33,38 @@ export function bestOf(rows, get, lower = true) {
   return lower ? Math.min(...values) : Math.max(...values);
 }
 export const isBest = (row, value, best) => !row.crew && known(value) && known(best) && Math.abs(Number(value) - best) < 1e-9;
+
+// Calendar bounds must use the next local midnight, including DST changes.
+export function localDayEnd(value) {
+  const [year, month, day] = String(value).split('-').map(Number);
+  return new Date(year, month - 1, day + 1).getTime() - 1;
+}
+
+export function stintProjection(capacity, consumption, reserve = 0) {
+  if (![capacity, consumption, reserve].every(known) || capacity <= 0 || consumption <= 0 || reserve < 0 || reserve >= capacity) return null;
+  return Math.floor((capacity - reserve) / consumption);
+}
+
+// Missing rates must not look like an instantaneous pit stop.
+export function refuelDuration({fuel, energy, fuelRate, energyRate, connect, fuelOnly=false}) {
+  if (fuelOnly) {
+    if (!known(fuel)||fuel<0) return null;
+    if (fuel===0) return 0;
+    return known(fuelRate)&&fuelRate>0&&known(connect)?Number(connect)+fuel/fuelRate:null;
+  }
+  if (!known(energy) || energy < 0) return null;
+  if (energy === 0) return 0;
+  if (!known(fuel) || fuel < 0 || (fuel > 0 && (!known(fuelRate) || fuelRate <= 0 || !known(connect))) || !known(energyRate) || energyRate <= 0) return null;
+  return Math.max(fuel > 0 ? Number(connect) + fuel / fuelRate : 0, energy / energyRate);
+}
+
+// Use all measured limits; never assume unknown fuel capacity or consumption.
+export function availableLaps(capacity, fuel, energy, reservePercent = 0) {
+  if (!known(reservePercent) || reservePercent < 0 || reservePercent >= 100) return null;
+  const values = [stintProjection(100,energy,reservePercent), known(capacity) ? stintProjection(capacity,fuel,capacity*reservePercent/100) : null].filter(known);
+  return values.length ? Math.min(...values) : null;
+}
+export function tyreRemaining(initial, wear, laps) {
+  if (![initial,wear,laps].every(known) || initial<0 || initial>100 || wear<0 || laps<0) return null;
+  return Math.max(0,initial-wear*laps);
+}

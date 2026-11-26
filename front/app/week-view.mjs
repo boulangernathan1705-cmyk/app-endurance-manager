@@ -1,3 +1,4 @@
+import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
@@ -261,7 +262,7 @@ function nextBox(all,now){
   return `<aside class="home-next-box"><h2 class="home-next-label">${live?'En course':'Ta prochaine course'}</h2>
     <p class="home-next-name">${esc(event.name)}</p><p class="home-next-when">${esc(when(startsAt))} · ${esc(hour(startsAt))}</p>
     ${rows.length?`<dl class="home-next-rows">${rows.map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}
-    ${go}</aside>`;
+    ${go}${state.combos && memoHref(event,crew?.car,crew?.id) ? `<a class="home-next-go" href="${esc(memoHref(event,crew?.car,crew?.id))}">Fiche mémo →</a>` : ''}</aside>`;
 }
 
 // « Équipages à former » (organisers): the starts where pilots wait for a crew or ask for one, and the way to the
