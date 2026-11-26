@@ -1,5 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
+import {IRACING_ARTWORK} from '../front/endurance-card.mjs';
+import {GAME_CATALOGS} from '../shared/catalog.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 
@@ -31,10 +33,11 @@ function webpDimensions(buffer){
   throw new Error('dimensions WebP introuvables');
 }
 
-async function validateWebp(path,{minWidth=1,minHeight=1,maxBytes=Infinity}={}){
+async function validateWebp(path,{minWidth=1,minHeight=1,maxBytes=Infinity,landscape=false}={}){
   const buffer=await readFile(root+path);
   const {width,height}=webpDimensions(buffer);
   if(width<minWidth||height<minHeight) throw new Error(`${path}: dimensions invalides ${width}×${height}`);
+  if(landscape&&width<=height) throw new Error(`${path}: un panorama doit être horizontal`);
   if(buffer.length>maxBytes) throw new Error(`${path}: asset trop lourd ${(buffer.length/1024).toFixed(1)} KiB (maximum ${(maxBytes/1024).toFixed(1)} KiB)`);
   console.log(`Asset image OK: ${path} (${width}×${height}, ${(buffer.length/1024).toFixed(1)} KiB)`);
 }
@@ -46,3 +49,14 @@ for (const sim of ['lmu','iracing']) await validateWebp(`images/endurance/${sim}
 for (const circuit of ['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']) await validateWebp(`images/endurance/lmu/${circuit}.webp`,{minWidth:250,minHeight:250,maxBytes:180000});
 
 for (const circuit of ['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']) await validateWebp(`images/endurance/lmu-pano/${circuit}.webp`,{minWidth:400,minHeight:120,maxBytes:180000});
+
+const validIracingIds=new Set(GAME_CATALOGS.iracing.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd')).map(c=>c.id));
+const css=await readFile(root+'styles/pages/endurance-cards.css','utf8');
+for(const [id,permission] of Object.entries(IRACING_ARTWORK)){
+  if(!validIracingIds.has(id)||typeof permission!=='string'||!permission.trim()) throw new Error(`Registre iRacing invalide : ${id}`);
+  const cover=`images/endurance/iracing/${id}.webp`;
+  const pano=`images/endurance/iracing-pano/${id}.webp`;
+  await validateWebp(cover,{minWidth:250,minHeight:250,maxBytes:180000});
+  await validateWebp(pano,{minWidth:400,minHeight:120,maxBytes:180000,landscape:true});
+  if(!css.includes('.endurance-card-head.endurance-track-'+id)||!css.includes('.endurance-pano.endurance-track-'+id)||!css.includes('.endurance-preview-track-'+id)||!css.includes('/'+cover)||!css.includes('/'+pano)) throw new Error(`Styles de circuit manquants : ${id}`);
+}
