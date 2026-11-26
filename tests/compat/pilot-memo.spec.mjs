@@ -97,3 +97,46 @@ test('disabled memo hides pilot navigation and never fetches downloads, sheet or
   await expect(page.locator('.nav-plugin-button')).toBeHidden();
   expect(paths).toEqual(['/api/combos/link']);
 });
+
+test('chooses an available pair explicitly and applies advanced filters in one request',async({page})=>{
+  const requests=[];
+  const monza={...combo,track:'Monza',car:'Oreca 07 Gibson'};
+  await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:here}));
+  await page.route(url=>url.pathname==='/api/combos/link',route=>route.fulfill({json:{linked:true}}));
+  await page.route(url=>url.pathname==='/api/combos',route=>route.fulfill({json:{combos:[combo,monza],preferenceScope:'picker-test'}}));
+  await page.route(url=>url.pathname==='/api/combos/sheet',route=>{
+    const params=new URL(route.request().url()).searchParams;
+    requests.push(Object.fromEntries(params));
+    return route.fulfill({json:{...sheet,combo:params.get('track')==='Monza'?monza:combo}});
+  });
+  await page.goto('/simhub.html#memo');
+  const box=page.getByRole('dialog');
+  await page.locator('[data-picker=track]').click();
+  await box.getByRole('searchbox').fill('mon');
+  await expect(box.locator('[data-track-choice]')).toHaveCount(1);
+  await box.getByRole('button',{name:/Monza/}).click();
+  await expect(box.getByRole('heading',{name:'Choisir une voiture'})).toBeVisible();
+  expect(requests).toHaveLength(1);
+  await box.getByRole('button',{name:'Fermer'}).click();
+  await expect(page.locator('[data-picker=track]')).toContainText(combo.track);
+  await page.locator('[data-picker=track]').click();
+  await box.getByRole('button',{name:/Monza/}).click();
+  await box.getByRole('button',{name:/Oreca/}).click();
+  await expect(page).toHaveURL(/track=Monza/);
+  expect(requests.at(-1)).toMatchObject({track:'Monza',car:monza.car});
+  await page.getByRole('button',{name:/Filtres avancés/}).click();
+  await box.getByLabel('Température de piste minimale').fill('18');
+  await box.getByLabel('Température de piste maximale').fill('30');
+  expect(requests).toHaveLength(2);
+  await box.getByRole('button',{name:'Appliquer'}).click();
+  await expect(page).toHaveURL(/tmin=18/);
+  expect(requests).toHaveLength(3);
+  await page.getByRole('button',{name:/Filtres avancés/}).click();
+  await box.getByRole('button',{name:'Réinitialiser'}).click();
+  await box.getByRole('button',{name:'Fermer'}).click();
+  expect(requests).toHaveLength(3);
+  await expect(page).toHaveURL(/tmax=30/);
+  await page.getByRole('button',{name:'Accès rapides'}).click();
+  await box.getByRole('button',{name:/Ferrari/}).click();
+  await expect(page.locator('[data-picker=track]')).toContainText(combo.track);
+});
