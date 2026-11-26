@@ -1,37 +1,17 @@
 {
-  "version": "0.2.0",
-  "size": 1964032,
-  "sha256": "C255A56FD3F63A9036961CDA1DB2BC0E5E4707681F93A0FEA4598201E4160D52",
+  "version": "0.2.1",
+  "size": 1964544,
+  "sha256": "89175E509C9E712F4C93E57A348C7CCC43C09AC8422AEC3EBC7B518313562670",
   "changes": [
     {
-      "type": "nouveau",
-      "text": "Version bêta : le plugin est encore en développement. Un souci ? Assistance › Signaler un souci",
-      "page": "souci"
-    },
-    {
-      "type": "nouveau",
-      "text": "Réglages voiture en course : les profils suivent la voiture et le circuit, pris tout seuls",
+      "type": "corrige",
+      "text": "Application des profils : espacement des commandes pour atteindre les réglages mémorisés.",
       "page": "profils"
     },
     {
-      "type": "nouveau",
-      "text": "Profil Stream Deck « Endurance Manager · FMT » en boutons dynamiques SimHub (dossier streamdeck)",
-      "page": "bb"
-    },
-    {
-      "type": "mieux",
-      "text": "Black box sur le VoCore : page Pneus et icônes comme dans le jeu, navigation par 6 boutons",
-      "page": "bb"
-    },
-    {
-      "type": "mieux",
-      "text": "Les commandes d'un module coupé disparaissent des contrôles de SimHub (SimHub 9.13.6 ou plus)",
-      "page": "home"
-    },
-    {
-      "type": "mieux",
-      "text": "Moins de charge processeur",
-      "page": "home"
+      "type": "corrige",
+      "text": "Indication du profil actif fondée sur les réglages lus dans la voiture.",
+      "page": "profils"
     }
   ]
 }
