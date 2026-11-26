@@ -251,6 +251,22 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // Nothing changed: nothing sent.
   mark=discord.calls.length;await sync(startsAt-3*24*HOUR+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
 
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('true')) WHERE id=?").run(DEV);
+  mark=discord.calls.length;
+  await sync(startsAt-3*24*HOUR+2*HOUR);
+  const withMemo=discord.calls.slice(mark).find(call=>call.method==='PATCH'&&call.path.includes('/messages/'));
+  assert.equal(withMemo.body.components[0].components[1].label,'Fiche mémo');
+  const memo=new URL(withMemo.body.components[0].components[1].url);
+  assert.equal(memo.searchParams.get('crew'),crew.data.id);
+  assert.equal(memo.searchParams.get('race'),event.id);
+  assert.deepEqual(withMemo.body.allowed_mentions,{parse:[]});
+  assert.deepEqual(created(discord.calls,mark),[]);
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV);
+  mark=discord.calls.length;
+  await sync(startsAt-3*24*HOUR+3*HOUR);
+  const withoutMemo=discord.calls.slice(mark).find(call=>call.method==='PATCH'&&call.path.includes('/messages/'));
+  assert.equal(withoutMemo.body.components[0].components.length,1);
+
   // Bob joins and the crew gets a car: the recap is edited (without pinging), no welcome message.
   let crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:mate.data.id,version:crewRow.version,selfJoin:true},'mate')).status,200);

@@ -170,6 +170,7 @@ const residualImports = publicCss.split(/\r?\n/).filter(line => /^\s*@import\s+u
 if (residualImports.length) warnings.push(`public/app.css contient encore de vrais imports CSS : ${residualImports.slice(0,5).join(' | ')}`);
 if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
 if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
+if (await exists(resolve(publicDir, 'shared/relay-pass.mjs'))) warnings.push('Le module de signature du relais doit rester côté serveur.');
 if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
 const requiredHeaderFragments = [
   "Content-Security-Policy: default-src 'self'",

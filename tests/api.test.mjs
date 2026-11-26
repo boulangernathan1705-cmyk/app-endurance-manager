@@ -47,7 +47,7 @@ function harness(withParticipants=true){
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
  DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0104_iracing_source_snapshot.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0105_iracing_supervision.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0090_event_list_revision.sql',import.meta.url),'utf8'));}
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0105_iracing_source_snapshot.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0106_iracing_supervision.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0090_event_list_revision.sql',import.meta.url),'utf8'));}
  const env={DB,...(withParticipants?{COMMUNITY:'tdz'}:{}),APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -363,7 +363,8 @@ test('a sign-in lasts 30 days and each visit (once a day) pushes it back',async(
  assert.ok(renewed.data.user);assert.match(renewed.response.headers.get('Set-Cookie'),/__Host-em_session=[a-f0-9]{64};.*Max-Age=2592000/);
  assert.ok(expires()>=at+30*86400-5);
 });
-test('validation, closed departures, guest link rejection and free-tier rate limiting',async()=>{
+test('validation, closed departures, guest link rejection and free-tier rate limiting',async t=>{
+ t.mock.method(Date,'now',()=>Date.UTC(2026,10,26,18,5));
  const h=harness();await h.login(ADMIN,'admin');
  for(const data of [{...eventInput,name:' '},{...eventInput,categories:['LMP2']},{...eventInput,departures:[{date:'2090-02-30',time:'14:00'}]},{...eventInput,departures:[eventInput.departures[0],eventInput.departures[0]]}])assert.equal((await h.req('/api/events','POST',data,'admin')).status,400);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'a'.repeat(64)})).status,410,'no entries without an account any more');

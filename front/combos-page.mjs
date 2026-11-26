@@ -1,8 +1,9 @@
 // « Fiche mémo » (module Plugin SimHub; server/combos.mjs, module "combos"): what the team measured in practice on one car and one
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
-import {COLORS, CONDITIONS} from '../shared/combos.mjs';
-import {known, paceStats, tyreStats, bestOf, isBest} from './combos-stats.mjs';
+import {memoCandidates, memoRequestLabel, NOTE_THEMES} from '../shared/memo-links.mjs';
+import {COLORS, CONDITIONS, NIGHT_BELOW} from '../shared/combos.mjs';
+import {known, paceStats, tyreStats, bestOf, isBest, localDayEnd, stintProjection, refuelDuration, availableLaps, tyreRemaining} from './combos-stats.mjs';
 import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
@@ -25,8 +26,27 @@ const view = {
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
   tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, zone:null, sort:'lap', sessions:new Map(), loading:false, error:''}
 };
-try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
-const saveHidden = () => { try { localStorage.setItem(STORE, JSON.stringify([...view.hidden])); } catch {} };
+view.scope='all'; view.favorites=new Set();
+function readPrefs(scope) {
+  if (!scope || view.preferenceScope===scope) return;
+  view.preferenceScope=scope; view.hidden=new Set(); view.favorites=new Set();
+  try { const saved=JSON.parse(localStorage.getItem(STORE+':'+scope)||'{}');
+    view.hidden=new Set(Array.isArray(saved.hidden)?saved.hidden:[]);
+    view.favorites=new Set(Array.isArray(saved.favorites)?saved.favorites:[]);
+  } catch {}
+}
+const saveHidden=()=>{if(!view.preferenceScope)return;try{localStorage.setItem(STORE+':'+view.preferenceScope,JSON.stringify({hidden:[...view.hidden],favorites:[...view.favorites]}));}catch{}};
+function hiddenFor(sheet=view.sheet) {
+  if(view.scope==='all')return new Set();
+  if(view.scope==='custom')return view.hidden;
+  return new Set((sheet?.drivers||[]).filter(d=>view.scope==='me'?!d.me:!view.crew?.members.includes(d.id)).map(d=>d.id));
+}
+function crewMatches(combo) {
+  if(!view.crew||!combo)return false;
+  const q=new URLSearchParams({circuit:view.crew.circuit});
+  if(view.crew.car)q.set('car',view.crew.car);
+  return memoCandidates([combo],q).length===1;
+}
 
 async function call(path, method = 'GET', data) {
   let response;
@@ -41,12 +61,14 @@ async function call(path, method = 'GET', data) {
 }
 
 function renderError(error) {
-  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent('/simhub.html')}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
+  const login = error.status === 401 ? `<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent(location.pathname + location.search + location.hash)}">Se connecter avec Discord</a>` : '<a class="secondary-button" href="/lmu/">Retour aux courses</a>';
   app.innerHTML = `<section class="members-panel members-error"><h1>Fiche mémo</h1><p>${esc(error.message)}</p>${login}</section>`;
 }
 
 // ---------- Loading ----------
 
+const wholeNumber = (value,min,max,fallback) => value == null || value === '' || !Number.isFinite(Number(value))
+  ? fallback : Math.min(max,Math.max(min,Math.round(Number(value))));
 const comboKey = combo => `${combo.car}\u0000${combo.track}`;
 // A day picked in the filters (YYYY-MM-DD) → its local midnight in ms, and back; « to » runs to the end of its day.
 const dayStart = text => { const [y, m, d] = text.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
@@ -56,8 +78,10 @@ const dayParam = value => /^\d+$/.test(value || '') ? dayText(Number(value)) : '
 const sheetQuery = (event = view.event, compare = false) => {
   const query = new URLSearchParams({track:view.combo.track, car:view.combo.car});
   if (event) query.set('event', event);
+  if (compare) query.set('comparison','1');
+  else if (view.raceId) query.set('race',view.raceId);
   if (view.since && !compare) query.set('from', dayStart(view.since));
-  if (view.until && !compare) query.set('to', dayStart(view.until) + 86_399_999);
+  if (view.until && !compare) query.set('to', localDayEnd(view.until));
   if (view.version) query.set('version', view.version);
   if (view.setup) query.set('setup', view.setup);
   if (view.moment) query.set('moment', view.moment);
@@ -66,39 +90,65 @@ const sheetQuery = (event = view.event, compare = false) => {
   return query;
 };
 
-async function start() {
+export async function startMemo(link) {
   const params = new URLSearchParams(location.search);
+  view.compareEvent = params.get('compare') || '';
+  view.raceId = params.get('race') || '';
+  view.cond = CONDITIONS.includes(params.get('cond')) ? params.get('cond') : null;
+  view.explicitCondition = Boolean(view.cond);
+  view.scope = ['all','crew','me','custom'].includes(params.get('scope')) ? params.get('scope') : 'all';
+  view.reserve = wholeNumber(params.get('reserve'),0,50,3);
+  view.stint = wholeNumber(params.get('laps'),1,60,null);
+  view.tyreInitial = wholeNumber(params.get('rubber'),0,100,100);
+  view.tyreRelays = wholeNumber(params.get('tyres'),1,3,1);
   view.event = params.get('event') || ''; view.version = params.get('version') || ''; view.setup = params.get('setup') || '';
   view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
   view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
   view.since = dayParam(params.get('from')); view.until = dayParam(params.get('to'));
   if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
-    const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link;
+    const list = await call('/api/combos');
+    view.combos = list.combos; view.link = link; readPrefs(list.preferenceScope);
   } catch (error) { renderError(error); return; }
-  const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
-  view.combo = wanted || view.combos[0] || null;
+  if (params.get('crew')) { try { view.crew=await call('/api/combos/crew?id='+encodeURIComponent(params.get('crew'))); } catch { view.message='Équipage indisponible : la fiche reste accessible pour la communauté.'; } }
+  selectRequestedCombo(params);
+  if (!params.has('scope') && crewMatches(view.combo)) view.scope='crew';
+  if (view.scope==='crew' && !crewMatches(view.combo)) view.scope='all';
   if (view.combo) await loadSheet(); else render();
 }
 
+function selectRequestedCombo(params) {
+  const label = memoRequestLabel(params);
+  const candidates = memoCandidates(view.combos, params);
+  view.combo = label ? (candidates.length === 1 ? candidates[0] : null) : view.combos.find(item=>view.favorites.has(comboKey(item))) || view.combos[0] || null;
+  view.requested = !view.combo ? label : '';
+  view.candidates = view.requested ? candidates : [];
+}
+
+let sheetRequest = 0;
 async function loadSheet(fresh = false) {
+  const request = ++sheetRequest;
+  view.sheetLoading = true; view.error = ''; view.sheet = null; view.compare = null; view.history = null;
+  render();
   try {
     const [sheet, compare] = await Promise.all([call(`/api/combos/sheet?${sheetQuery()}`),
       view.compareEvent && view.compareEvent !== view.event ? call(`/api/combos/sheet?${sheetQuery(view.compareEvent, true)}`) : null]);
+    if (request !== sheetRequest) return;
     view.sheet = sheet; view.compare = compare; view.error = ''; view.loadedAt = Date.now();
   } catch (error) {
-    if (error.status === 401 || error.status === 403) { renderError(error); return; }
+    if (request !== sheetRequest) return;
+    if (error.status === 401 || error.status === 403) { view.sheetLoading = false; renderError(error); return; }
     view.error = error.message;
   }
+  view.sheetLoading = false;
   if (view.sheet) {
     const conditions = view.sheet.conditions;
     // A condition left empty by the day/night or track temperature choice stays chosen: its frame says why it is empty.
     const narrowed = view.moment || view.trackMin !== '' || view.trackMax !== '';
-    if (!view.cond || (!narrowed && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
+    if (!view.cond || (!narrowed && !view.explicitCondition && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
     remember();
   }
-  if (view.tab === 'analysis') await loadAnalysis(fresh); else render();
+  if (view.tab === 'analysis' && view.sheet) await loadAnalysis(fresh); else render();
 }
 
 // The new sessions without reloading the page: the list of combos, the plugin's link, then the sheet or the analysis
@@ -107,8 +157,10 @@ async function refresh() {
   view.refreshing = true; render();
   try {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link;
-    if (!view.combo) view.combo = view.combos[0] || null;
+    view.combos = list.combos; view.link = link; readPrefs(list.preferenceScope);
+    if (view.crew) {try{view.crew=await call('/api/combos/crew?id='+encodeURIComponent(view.crew.id));}catch{view.crew=null;if(view.scope==='crew')view.scope='all';view.message='Équipage indisponible.';}}
+    if (!view.combo && !view.requested) view.combo = view.combos[0] || null;
+    if (view.requested) selectRequestedCombo(new URLSearchParams(location.search));
   } catch (error) { view.message = error.message; }
   if (view.combo) await loadSheet(true);
   view.refreshing = false; render();
@@ -117,39 +169,60 @@ async function refresh() {
 // Another car or circuit: its own sheet, without the choices that belong to the previous one.
 async function openCombo(track, car) {
   const combo = view.combos.find(item => item.track === track && item.car === car);
-  if (!combo || comboKey(combo) === comboKey(view.combo)) { render(); return; }
-  Object.assign(view, {combo, setup:'', compareEvent:'', cond:null, compound:null, stint:null});
+  if (!combo || (view.combo && comboKey(combo) === comboKey(view.combo))) { render(); return; }
+  Object.assign(view, {combo, requested:'', candidates:[], event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null, tyreInitial:100, tyreRelays:1});
+  if(view.scope==='crew'&&!crewMatches(combo))view.scope='all';
   view.analysis.zone = null;
   await loadSheet();
 }
 
 function remember() {
   const query = sheetQuery();
+  if(view.crew&&crewMatches(view.combo))query.set('crew',view.crew.id);
+  if (view.cond) query.set('cond',view.cond);
+  if (view.scope !== 'all') query.set('scope',view.scope);
+  if (view.reserve !== 3) query.set('reserve',view.reserve);
+  if (view.stint) query.set('laps',view.stint);
+  if (view.tyreInitial !== 100) query.set('rubber',view.tyreInitial);
+  if (view.tyreRelays !== 1) query.set('tyres',view.tyreRelays);
   if (view.tab === 'analysis') query.set('tab', 'analyse');
-  history.replaceState(null, '', `${location.pathname}?${query}`);
+  if (view.compareEvent) query.set('compare', view.compareEvent);
+  history.replaceState(null, '', `${location.pathname}?${query}${location.hash}`);
 }
 
 // ---------- « Mon analyse » ----------
 
 // The combo's sessions once, then the two looked at (each kept once loaded: a trace weighs a few hundred kB).
+let analysisRequest = 0;
 async function loadAnalysis(fresh = false) {
+  const request = ++analysisRequest;
   const a = view.analysis, key = comboKey(view.combo);
+  const current = () => request === analysisRequest && view.combo && comboKey(view.combo) === key;
   try {
     if (a.key !== key) Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
-    if (!a.list || fresh) a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
-    const list = a.list;
+    if (fresh) a.sessions.clear();
+    if (!a.list || fresh) {
+      const result = await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`);
+      if (!current()) return;
+      a.list = result.sessions;
+    }
+    const list = analysisSessions(a);
     const useful = item => item.trace || item.expert;
     if (!list.some(item => item.id === a.mine)) a.mine = (list.find(item => item.mine && useful(item)) || list.find(item => item.mine) || list.find(useful) || list[0])?.id || '';
     const mine = list.find(item => item.id === a.mine);
     // Compared by default with the fastest traced lap of a teammate.
-    if (a.other !== 'none' && !list.some(item => item.id === a.other && item.id !== a.mine)) {
-      const others = list.filter(item => item.trace && item.userId !== mine?.userId).sort((x, y) => x.trace.time - y.trace.time);
+    const compatible = list.filter(item=>item.id!==a.mine && comparableTrace(mine?.trace,item.trace));
+    if (a.other !== 'none' && !compatible.some(item=>item.id===a.other)) {
+      const others = compatible.filter(item=>item.userId!==mine.userId).sort((x,y)=>x.trace.time-y.trace.time);
       a.other = others[0]?.id || 'none';
     }
     a.loading = true; render();
-    await Promise.all([a.mine, a.other].filter(id => id && id !== 'none' && !a.sessions.has(id)).map(async id => a.sessions.set(id, await call(`/api/combos/analysis/session?id=${encodeURIComponent(id)}`))));
+    const entries = await Promise.all([a.mine, a.other].filter(id => id && id !== 'none' && !a.sessions.has(id)).map(async id => [id, await call(`/api/combos/analysis/session?id=${encodeURIComponent(id)}`)]));
+    if (!current()) return;
+    for (const [id, data] of entries) a.sessions.set(id, data);
     a.error = '';
   } catch (error) {
+    if (!current()) return;
     if (error.status === 401 || error.status === 403) { renderError(error); return; }
     a.error = error.message;
   }
@@ -187,13 +260,26 @@ function analysisSides() {
 
 // The session looked at, then who it is compared with: each teammate's best traced lap and the pilot's own best other
 // session one tap away, any other session in the list below.
+const SESSION_LABELS = {practice:'Essais',qualifying:'Qualifications',warmup:'Warm-up',race:'Course',unknown:'Type inconnu'};
+function sessionGroup(type) {
+  if (!Number.isInteger(type)) return 'unknown';
+  if (type<=4) return 'practice';
+  if (type<=8) return 'qualifying';
+  return type===9?'warmup':'race';
+}
+const analysisSessions = a => (a.list || []).filter(item=>!a.type || sessionGroup(item.type)===a.type);
+function comparableTrace(a,b) {
+  return Boolean(a && b && a.cond===b.cond && (!known(a.temp)||!known(b.temp)||Math.abs(a.temp-b.temp)<=5) &&
+    (!known(a.light)||!known(b.light)||(a.light<NIGHT_BELOW)===(b.light<NIGHT_BELOW)));
+}
+
 function analysisChoices() {
-  const a = view.analysis, list = a.list || [], colour = people();
-  const label = item => `${dayTime(item.startedAt)} · ${item.laps} tours · ${lapTime(item.best)}${item.trace ? '' : ' · sans tracé'}`;
+  const a = view.analysis, list = analysisSessions(a), colour = people();
+  const label = item => `${dayTime(item.startedAt)} · ${item.laps} tours · ${lapTime(item.best)} · ${SESSION_LABELS[sessionGroup(item.type)]}${item.trace ? ' · '+COND[item.trace.cond][0] : ' · sans tracé'}`;
   const option = (item, current, withName) => `<option value="${esc(item.id)}"${item.id === current ? ' selected' : ''}>${withName ? `${esc(item.name)} · ` : ''}${esc(label(item))}</option>`;
   const mineList = list.filter(item => item.mine);
   const mine = list.find(item => item.id === a.mine);
-  const traced = list.filter(item => item.trace && item.id !== a.mine).sort((x, y) => x.trace.time - y.trace.time);
+  const traced = list.filter(item => item.id !== a.mine && comparableTrace(mine?.trace,item.trace)).sort((x, y) => x.trace.time - y.trace.time);
   // The fastest traced lap of each pilot, the pilot of the session first.
   const best = new Map();
   for (const item of traced) if (!best.has(item.userId)) best.set(item.userId, item);
@@ -204,10 +290,12 @@ function analysisChoices() {
       <i></i><span>${own ? 'Ma meilleure autre séance' : esc(item.name)}</span><b>${lapTime(item.trace.time)}</b></button>`;
   };
   const rest = traced.filter(item => !chips.includes(item));
-  return `<div class="an-choices">
+  const typeFilter = `<label>Type de séance <select data-field="an-type"><option value="">Tous</option>${Object.entries(SESSION_LABELS).map(([key,value])=>`<option value="${key}"${a.type===key?' selected':''}>${value}</option>`).join('')}</select></label>`;
+  if (!list.length) return `<div class="an-choices">${typeFilter}<p>Aucune séance de ce type.</p></div>`;
+  return `<div class="an-choices">${typeFilter}
     <label>Séance<select data-field="an-mine">${mineList.length ? `<optgroup label="Mes séances">${mineList.map(item => option(item, a.mine)).join('')}</optgroup>` : ''}
       ${list.some(item => !item.mine) ? `<optgroup label="${mineList.length ? 'Coéquipiers' : 'Séances de l’équipe'}">${list.filter(item => !item.mine).map(item => option(item, a.mine, true)).join('')}</optgroup>` : ''}</select></label>
-    <div class="an-compare"><span>Comparer avec</span><div class="an-chips">${chips.map(chip).join('')}<button type="button" class="an-chip" data-other="none" aria-pressed="${a.other === 'none'}"><span>Personne</span></button></div>
+    <div class="an-compare"><span>Comparer avec · conditions compatibles</span><div class="an-chips">${chips.map(chip).join('')}<button type="button" class="an-chip" data-other="none" aria-pressed="${a.other === 'none'}"><span>Personne</span></button></div>
       ${rest.length ? `<select data-field="an-other" aria-label="Une autre séance"><option value="">Une autre séance…</option>${rest.map(item => option(item, a.other, true)).join('')}</select>` : ''}</div></div>`;
 }
 
@@ -217,7 +305,7 @@ function analysis() {
   if (!a.list) return '<p class="cb-empty">Chargement…</p>';
   if (!a.list.length) return '<p class="cb-empty">Aucune séance sur ce combo pour l’instant.</p>';
   const sides = analysisSides();
-  const body = sides.length ? analysisBody(sides, a.metric, a.pick, a.size, a.zone, a.sort) : '<p class="cb-empty">Chargement…</p>';
+  const body = sides.length ? analysisBody(sides, a.metric, a.pick, a.size, a.zone, a.sort) : a.loading ? '<p class="cb-empty">Chargement…</p>' : '';
   return `${analysisChoices()}<div class="an-body${a.loading ? ' is-loading' : ''}">${body}</div>`;
 }
 
@@ -237,11 +325,11 @@ function people() {
 // ---------- The crew row ----------
 
 function paceRows(condition, sheet = view.sheet) {
-  return paceStats(sheet?.conditions[condition]?.drivers || [], people(), view.hidden);
+  return paceStats(sheet?.conditions[condition]?.drivers || [], people(), hiddenFor(sheet));
 }
 
 function tyreRows(condition, compound) {
-  return tyreStats(view.sheet.conditions[condition]?.compounds[compound]?.drivers || [], people(), view.hidden);
+  return tyreStats(view.sheet.conditions[condition]?.compounds[compound]?.drivers || [], people(), hiddenFor());
 }
 
 const nameCell = (row, dot = false) => `<td class="cb-name" style="--dc:${esc(row.color)}">${dot ? '<span class="cb-dot"></span>' : ''}${esc(row.name)}${row.me ? ' (moi)' : ''}</td>`;
@@ -272,7 +360,7 @@ function header() {
   const time = view.loadedAt ? `À jour à ${new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 'Actualiser';
   return `<div class="cb-hero"><div class="cb-hero-top"><span class="cb-crumb">Fiche mémo · <span class="cb-word">Le Mans Ultimate</span><span class="cb-short">LMU</span></span>
       <div class="cb-tools"><button type="button" class="cb-btn is-quiet" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${esc(time)}" aria-label="Actualiser">↻<span class="cb-word"> ${view.refreshing ? 'Actualisation…' : 'Actualiser'}</span></button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn is-quiet" data-action="export" title="Exporter la fiche (JSON)">Exporter</button>' : ''}</div></div>
-    ${picker()}${sheet ? sample() : ''}</div>
+    <button type="button" class="cb-btn is-quiet" data-action="favorite" aria-pressed="${view.favorites.has(comboKey(view.combo))}">${view.favorites.has(comboKey(view.combo))?'★ Retirer des favoris':'☆ Ajouter aux favoris'}</button>${picker()}${sheet ? sample() : ''}</div>
     <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
 }
 
@@ -280,16 +368,18 @@ function header() {
 // the most recent first. Clicking one opens its sheet.
 function picker() {
   const combo = view.combo, current = comboKey(combo);
-  const carClass = view.sheet?.combo.carClass || combo.carClass;
+  const carClass = view.sheet?.combo?.carClass || combo.carClass;
   const tracks = new Map();
   for (const item of view.combos) tracks.set(item.track, [...(tracks.get(item.track) || []), item]);
+  const favoriteItems=view.combos.filter(item=>view.favorites.has(comboKey(item)));
+  const favorites=favoriteItems.length?`<li><span class="cb-pick-track">★ Favoris</span><div class="cb-pick-cars">${favoriteItems.map(item=>`<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}"><b>${esc(item.car)}</b><span>${esc(item.track)}</span></button>`).join('')}</div></li>`:'';
   const list = [...tracks].sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([track, cars]) => `<li><span class="cb-pick-track">${esc(track)}</span>
     <div class="cb-pick-cars">${cars.map(item => `<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}" aria-pressed="${comboKey(item) === current}">
       <b>${esc(item.car)}</b><span>${[item.carClass, `${item.laps} tours`, `${item.drivers} pilote${item.drivers > 1 ? 's' : ''}`, item.last ? day(item.last) : ''].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div></li>`).join('');
   return `<details class="cb-picker" data-fold="picker"${view.pickerOpen ? ' open' : ''}>
     <summary><span class="cb-picker-what"><span class="cb-picker-track">${esc(combo.track)}</span><span class="cb-picker-car">${esc(combo.car)}${carClass ? ` · ${esc(carClass)}` : ''}</span></span>
       <span class="cb-picker-change">${tracks.size} circuit${tracks.size > 1 ? 's' : ''}<b>Changer</b></span></summary>
-    <div class="cb-picker-body"><ul>${list}</ul><p class="cb-src">Un circuit ou une voiture apparaît ici dès qu’un pilote y a roulé avec le plugin.</p></div></details>`;
+    <div class="cb-picker-body"><ul>${favorites}${list}</ul><p class="cb-src">Un circuit ou une voiture apparaît ici dès qu’un pilote y a roulé avec le plugin.</p></div></details>`;
 }
 
 function filters() {
@@ -316,7 +406,8 @@ function sample() {
 function drivers() {
   const list = [...people().values()];
   if (!list.length) return '';
-  return `<div class="cb-drivers" role="group" aria-label="Pilotes affichés">${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!view.hidden.has(item.id)}" title="${view.hidden.has(item.id) ? 'Afficher' : 'Masquer'} ${esc(item.name)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div>`;
+  const hidden=hiddenFor();
+  return `<div class="cb-drivers" role="group" aria-label="Pilotes affichés">${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!hidden.has(item.id)}" title="${hidden.has(item.id) ? 'Afficher' : 'Masquer'} ${esc(item.name)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div>`;
 }
 
 function swatches() {
@@ -326,7 +417,7 @@ function swatches() {
 
 // Above the sheet, over its whole width: the pilots shown, and the filters folded in one line.
 function toolbar() {
-  return `<div class="cb-toolbar">${drivers()}<details class="cb-filterbox" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres<span>${esc(activeFilters())}</span></summary>
+  return `<div class="cb-toolbar"><div class="cb-drivers" role="group" aria-label="Périmètre des statistiques">${[['all','Communauté'],...(crewMatches(view.combo)?[['crew','Mon équipage']]:[]),['me','Moi'],['custom','Personnalisé']].map(([key,label])=>`<button type="button" class="cb-chip" data-scope="${key}" aria-pressed="${view.scope===key}">${label}</button>`).join('')}</div>${view.scope==='crew'?`<p class="cb-src">${esc(view.crew.name)} · ${view.crew.members.length} comptes liés à des pilotes inscrits</p>`:''}${drivers()}<details class="cb-filterbox" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres<span>${esc(activeFilters())}</span></summary>
     <div class="cb-filterbox-body">${filters()}${swatches()}</div></details></div>`;
 }
 
@@ -354,7 +445,7 @@ function energy(rows) {
   const crew = rows.find(row => row.crew) || rows[0];
   const minutes = laps => known(crew?.avg) ? `${Math.floor(laps * crew.avg / 60)} min ${String(Math.round(laps * crew.avg % 60)).padStart(2, '0')}` : '—';
   const stints = whole ? `<div class="cb-wrap"><table class="cb-stints"><thead><tr><th>Relais de</th><th>Énergie / tour à tenir (%)</th><th>Durée</th><th>Pilotes qui tiennent</th></tr></thead><tbody>${[whole - 1, whole, whole + 1, whole + 2].map(laps => {
-    const under = pilots.filter(row => row.ve <= 100 / laps);
+    const under = pilots.filter(row => stintProjection(100, row.ve, 0) >= laps);
     return `<tr><td>${laps} tours</td><td>${fr(100 / laps)}</td><td>${minutes(laps)}</td><td><div class="cb-names">${under.map(row => `<span style="--dc:${esc(row.color)}">${esc(row.name)}</span>`).join('') || '<span class="cb-src">aucun</span>'}</div></td></tr>`;
   }).join('')}</tbody></table></div>` : '';
   return `<section><div class="cb-head"><h2>Énergie virtuelle</h2></div>
@@ -366,7 +457,7 @@ function energy(rows) {
 function stintLaps() {
   if (view.stint) return view.stint;
   const crew = paceRows(view.cond)[0];
-  return known(crew?.ve) && crew.ve > 0 ? Math.max(1, Math.floor(100 / crew.ve)) : 12;
+  return Math.max(1, Math.min(60, availableLaps(view.sheet.combo.capacity,crew?.fuel,crew?.ve,view.reserve) ?? 12));
 }
 
 function tyres() {
@@ -376,16 +467,16 @@ function tyres() {
   if (!names.includes(view.compound)) view.compound = names.sort((a, b) => compounds[b].laps - compounds[a].laps)[0];
   return `<section><div class="cb-head"><h2>Pneus</h2></div>
     <div class="cb-compounds" role="group" aria-label="Gomme">${names.map(name => `<button type="button" class="cb-pill" data-compound="${esc(name)}" aria-pressed="${name === view.compound}">${esc(name)}<small>${compounds[name].laps} tours${compounds[name].trackTemp ? ` · piste ${fr(compounds[name].trackTemp[0], 0)}–${fr(compounds[name].trackTemp[1], 0)} °C` : ''}</small></button>`).join('')}</div>
-    <div class="cb-stint"><label for="cb-stint">Usure sur un relais de</label><input type="number" id="cb-stint" min="1" max="60" value="${stintLaps()}" data-field="stint"><span>tours${view.stint ? '' : ' <span class="cb-src">(ce que permet l’énergie de l’équipage)</span>'}</span></div>
-    <div class="cb-tyres" data-tyres>${tyreCards()}</div></section>`;
+    <div class="cb-stint"><label for="cb-stint">Usure sur un relais de</label><input type="number" id="cb-stint" min="1" max="60" value="${stintLaps()}" data-field="stint"><span>tours${view.stint ? '' : ' <span class="cb-src">(selon les consommations disponibles, ou 12 tours à défaut)</span>'}</span></div>
+    <div class="cb-stint"><label for="cb-tyre-initial">Gomme restante au départ (%)</label><input type="number" id="cb-tyre-initial" min="0" max="100" value="${view.tyreInitial ?? 100}" data-field="tyreInitial"><label for="cb-tyre-relays">Relais cumulés</label><select id="cb-tyre-relays" data-field="tyreRelays">${[1,2,3].map(n=>`<option value="${n}"${n===(view.tyreRelays||1)?' selected':''}>${n}</option>`).join('')}</select></div><p class="cb-src">Projection linéaire, sans changement de gomme.</p><div class="cb-tyres" data-tyres>${tyreCards()}</div></section>`;
 }
 
 function tyreCards() {
   const rows = tyreRows(view.cond, view.compound);
   // Least worn tyre at each corner; its tread left after the stint is the highest.
   const best = [0, 1, 2, 3].map(index => bestOf(rows, row => row.wear[index]));
-  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Restant après ${stintLaps()} t.</span><span class="cb-short">Reste</span> (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row, true)}${cell(row, row.wear[index], best[index], fr(row.wear[index]))}${cell(row, row.wear[index], best[index], known(row.wear[index]) ? fr(Math.max(0, 100 - row.wear[index] * stintLaps()), 1) : '—')}<td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
+  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Restant après ${stintLaps()*(view.tyreRelays||1)} t.</span><span class="cb-short">Reste</span> (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row, true)}${cell(row, row.wear[index], best[index], fr(row.wear[index]))}${cell(row, row.wear[index], best[index], known(row.wear[index]) ? fr(tyreRemaining(view.tyreInitial ?? 100,row.wear[index],stintLaps()*(view.tyreRelays||1)), 1) : '—')}<td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
 }
 
 function pace(rows) {
@@ -429,39 +520,56 @@ function pitJobs() {
     ['Freins', p.brakes ? service.brakes : 0, along(service, 'brakesAlong', false), 0],
     ['Réparation', p.repair === 'all' ? service.repair : p.repair === 'aero' ? service.aeroRepair : 0, along(service, 'repairAlong', false), p.repair ? service.repairRandom : 0]
   ];
-  return jobs.filter(([, time]) => known(time) && time > 0).map(([name, time, during, random]) => ({name, time, during, random:known(random) ? random : 0}));
+  return jobs.filter(([,time])=>!known(time) || time>0).map(([name,time,during,random])=>({name,time,during,random:known(random)?random:0}));
 }
 
 function pitNumbers() {
   const {service, laneThrough} = view.sheet.pit;
   const crew = paceRows(view.cond)[0];
-  const p = view.pit, energyAdded = Math.max(0, p.after - p.before);
-  const fuel = crew && known(crew.ve) && crew.ve > 0 && known(crew.fuel) ? energyAdded / crew.ve * crew.fuel : null;
-  const fill = fuel > 0 && known(service?.fuelRate) && service.fuelRate > 0 ? (service.connect || 0) + fuel / service.fuelRate : 0;
-  const charge = known(service?.energyRate) && service.energyRate > 0 ? energyAdded / service.energyRate : 0;
-  const refuel = Math.max(fill, charge);
+  const p = view.pit, fuelMode = p.mode === 'fuel', added = Math.max(0,p.after-p.before), energyAdded = fuelMode?0:added;
+  const fuel = added===0?0:fuelMode?(known(view.sheet.combo.capacity)?added*view.sheet.combo.capacity/100:null):crew && known(crew.ve) && crew.ve>0 && known(crew.fuel)?energyAdded/crew.ve*crew.fuel:null;
+  const refuel = refuelDuration({fuel,energy:energyAdded,fuelRate:service?.fuelRate,energyRate:service?.energyRate,connect:service?.connect,fuelOnly:fuelMode});
   const jobs = pitJobs();
-  const during = Math.max(0, ...jobs.filter(job => job.during).map(job => job.time));
-  const after = jobs.filter(job => !job.during).reduce((sum, job) => sum + job.time, 0);
-  const stopped = Math.max(refuel, during) + after;
+  const during = jobs.some(job=>job.during&&!known(job.time))?null:Math.max(0,...jobs.filter(job=>job.during).map(job=>job.time));
+  const after = jobs.some(job=>!job.during&&!known(job.time))?null:jobs.filter(job=>!job.during).reduce((sum,job)=>sum+job.time,0);
+  const stopped = [refuel,during,after].every(known)?Math.max(refuel,during)+after:null;
   const random = jobs.reduce((sum, job) => sum + job.random, energyAdded > 0 && known(service?.fuelRandom) ? service.fuelRandom : 0);
-  return {energyAdded, fuel, refuel, during, after, stopped, random, laneThrough, total:known(laneThrough) ? stopped + laneThrough : null};
+  return {energyAdded, fuel, fuelMode, missing:jobs.filter(job=>!known(job.time)).map(job=>job.name), refuel, during, after, stopped, random, laneThrough, total:known(laneThrough) && known(stopped) ? stopped + laneThrough : null};
 }
 
 function pitResult() {
   const n = pitNumbers(), pit = view.sheet.pit;
   const row = (label, value) => `<div><span>${label}</span><b>${value}</b></div>`;
-  return `${row('Énergie ajoutée', `${n.energyAdded} %`)}${row('Carburant ajouté', known(n.fuel) ? `${fr(n.fuel, 1)} L` : '—')}
+  return `${n.fuelMode?'':row('Énergie ajoutée', `${n.energyAdded} %`)}${row('Carburant ajouté', known(n.fuel) ? `${fr(n.fuel, 1)} L` : '—')}
     ${row('Ravitaillement', `${fr(n.refuel, 1)} s`)}${row('En même temps', `${fr(n.during, 1)} s`)}${row('Après le ravitaillement', `${fr(n.after, 1)} s`)}
     ${row('Temps arrêté', `${fr(n.stopped, 1)} s`)}${row('Traversée de la voie des stands', known(n.laneThrough) ? `${fr(n.laneThrough, 1)} s` : '—')}
     <div class="cb-total"><span>Temps total au stand</span><b>${known(n.total) ? `${fr(n.total, 1)} s` : '—'}</b></div>
+    ${n.missing.length?`<p>Temps de service inconnus : ${esc(n.missing.join(', '))}. Total indisponible.</p>`:''}
+    ${!known(n.refuel)?'<p>Ravitaillement : données insuffisantes.</p>':''}
     ${n.random ? `<p>Le jeu peut ajouter jusqu’à ${fr(n.random, 0)} s au hasard.</p>` : ''}
+    ${pitComparison(n)}
     <p>Temps de service lus dans le jeu pour cette voiture. ${pit.stops ? `Traversée mesurée sur ${pit.stops} arrêt${pit.stops > 1 ? 's' : ''} de l’équipe.` : 'Traversée : pas encore d’arrêt mesuré.'} Les écopes de frein n’ont pas de temps dans le jeu.</p>`;
+}
+
+function pitComparison(estimate) {
+  if (!known(estimate.stopped)||!known(estimate.fuel)) return '';
+  const data = view.history?.data;
+  if (!data) return '<p>Charge l’historique pour comparer aux arrêts enregistrés.</p>';
+  const p = view.pit;
+  if (p.driver||p.brakes||p.pressure||p.wing||p.frontWing||p.radiator||p.repair)
+    return '<p>La comparaison est disponible pour le ravitaillement et les pneus seuls. Les autres interventions ne sont pas détaillées dans l’historique.</p>';
+  const visible = new Set(paceRows(view.cond).map(row=>row.id));
+  const matches = data.stops.filter(stop=>visible.has(stop.pilot)&&!stop.repair&&stop.tyres===p.tyres&&
+    Math.abs(stop.fuel-estimate.fuel)<=5&&Math.abs(stop.ve-estimate.energyAdded)<=5);
+  if (!matches.length) return '<p>Aucun arrêt mesuré avec les mêmes pneus et des ajouts à ±5 L et ±5 % de VE.</p>';
+  const mean = matches.reduce((sum,stop)=>sum+stop.stopped,0)/matches.length;
+  const gap = mean-estimate.stopped;
+  return `<p>Temps immobilisé · ${fr(estimate.stopped,1)} s simulées · ${fr(mean,1)} s mesurées (${matches.length} arrêts) · écart ${gap>=0?'+':''}${fr(gap,1)} s.</p>`;
 }
 
 function pitSummary() {
   const n = pitNumbers();
-  return `+${n.energyAdded} % d’énergie · ${view.pit.tyres ? `${view.pit.tyres} pneus` : 'sans pneus'}${known(n.total) ? ` · ${fr(n.total, 1)} s au stand` : ''}`;
+  return `${n.fuelMode?(known(n.fuel)?`+${fr(n.fuel,1)} L`:'Carburant non mesuré'):`+${n.energyAdded} % d’énergie`} · ${view.pit.tyres ? `${view.pit.tyres} pneus` : 'sans pneus'}${known(n.total) ? ` · ${fr(n.total, 1)} s au stand` : ''}`;
 }
 
 function pitStop() {
@@ -474,8 +582,10 @@ function pitStop() {
   const radios = (field, labels, times) => Object.entries(labels).map(([value, label]) => `<label class="cb-toggle"><input type="radio" name="cb-${field}" value="${value}" data-pit-field="${field}"${String(p[field]) === value ? ' checked' : ''}> ${label}${value === '' || value === '0' ? '' : ` ${s(times[value])}`}</label>`).join('');
   return `<details class="cb-fold" data-fold="pit"${view.pitOpen ? ' open' : ''}><summary><h2>Simulateur d’arrêt au stand</h2><span data-pit-summary>${esc(pitSummary())}</span></summary><div class="cb-fold-body">
     <form class="cb-form" data-pit>
-      <div class="cb-ctrl"><label for="cb-before">Énergie dans la voiture à l’arrivée <output data-out="before">${p.before} %</output></label><input type="range" id="cb-before" min="0" max="100" value="${p.before}" data-pit-field="before"></div>
-      <div class="cb-ctrl"><label for="cb-after">Énergie au départ du stand <output data-out="after">${p.after} %</output></label><input type="range" id="cb-after" min="0" max="100" value="${p.after}" data-pit-field="after"></div>
+      <label>Mode de ravitaillement <select data-field="pitMode"><option value="energy"${p.mode!=='fuel'?' selected':''}>Énergie virtuelle + carburant</option><option value="fuel"${p.mode==='fuel'?' selected':''}>Carburant seul</option></select></label>
+      ${p.mode==='fuel'?`<p class="cb-src">Capacité du réservoir : ${known(view.sheet.combo.capacity)?`${fr(view.sheet.combo.capacity,1)} L`:'non mesurée'}. Pour les voitures sans énergie virtuelle.</p>`:''}
+      <div class="cb-ctrl"><label for="cb-before">${p.mode==='fuel'?'Réservoir':'Énergie dans la voiture'} à l’arrivée <output data-out="before">${p.before} %</output></label><input type="range" id="cb-before" min="0" max="100" value="${p.before}" data-pit-field="before"></div>
+      <div class="cb-ctrl"><label for="cb-after">${p.mode==='fuel'?'Réservoir':'Énergie'} au départ du stand <output data-out="after">${p.after} %</output></label><input type="range" id="cb-after" min="0" max="100" value="${p.after}" data-pit-field="after"></div>
       <fieldset><legend>Pneus</legend>${radios('tyres', {0:'Aucun', 2:'1 ou 2 pneus', 4:'3 ou 4 pneus'}, {2:service.tyres2, 4:service.tyres4})}${p.tyres ? '' : check('pressure', 'Pressions seules', service.pressure)}</fieldset>
       <fieldset><legend>Pilote</legend>${check('driver', 'Changement de pilote', service.driver)}</fieldset>
       <fieldset><legend>Aileron arrière</legend>${radios('wing', WINGS, {adjust:service.wing, new:service.wingNew})}</fieldset>
@@ -486,36 +596,140 @@ function pitStop() {
 }
 
 function notes() {
-  const list = view.sheet.notes;
+  const {notes:list,race,canManageNotes} = view.sheet;
+  const fields = (note = {}) => `<div class="cb-note-fields"><label>Thème <select name="theme">${Object.entries(NOTE_THEMES).map(([key,name])=>`<option value="${key}"${key===note.theme?' selected':''}>${name}</option>`).join('')}</select></label>
+    ${race?`<label>Portée <select name="eventId"><option value="">Permanente</option><option value="${esc(race.id)}"${note.eventId===race.id?' selected':''}>${esc(race.name)}</option></select></label>`:''}</div>
+    <textarea name="body" maxlength="1000" required aria-label="${note.id?'Modifier la note':'Nouvelle note'}">${esc(note.body||'')}</textarea>`;
   return `<section class="cb-card"><div class="cb-head"><h2>Notes de l’équipe</h2></div>
-    <form class="cb-form" data-note-form><textarea maxlength="1000" placeholder="Une info utile sur ce combo (pressions, limites de piste, sortie des stands…)" data-note-body aria-label="Nouvelle note"></textarea><div><button type="submit" class="cb-btn">Ajouter la note</button></div></form>
+    <form class="cb-form" data-note-form>${fields()}<div><button type="submit" class="cb-btn">Ajouter la note</button></div></form>
     <div class="cb-notes">${list.map(note => view.editing === note.id
-      ? `<form class="cb-note cb-form" data-note-edit="${esc(note.id)}"><textarea maxlength="1000" aria-label="Modifier la note">${esc(note.body)}</textarea><div class="cb-actions"><button type="submit" class="cb-btn">Enregistrer</button><button type="button" class="cb-btn is-quiet" data-action="cancel-note">Annuler</button></div></form>`
-      : `<div class="cb-note"><div class="cb-note-meta"><span>${esc(note.author)} · ${esc(day(seconds(note.createdAt)))}</span>${note.mine ? `<button type="button" data-action="edit-note" data-id="${esc(note.id)}">Modifier</button><button type="button" data-action="delete-note" data-id="${esc(note.id)}">Supprimer</button>` : ''}</div><p>${esc(note.body)}</p></div>`).join('') || '<p class="cb-empty">Pas encore de note.</p>'}</div></section>`;
+      ? `<form class="cb-note cb-form" data-note-edit="${esc(note.id)}">${fields(note)}<div class="cb-actions"><button type="submit" class="cb-btn">Enregistrer</button><button type="button" class="cb-btn is-quiet" data-action="cancel-note">Annuler</button></div></form>`
+      : `<article class="cb-note"><div class="cb-note-meta"><span>${note.pinned?'📌 ':''}${esc(NOTE_THEMES[note.theme])} · ${esc(note.eventId?race?.name:'Permanente')} · ${esc(note.author)} · ${esc(day(seconds(note.createdAt)))}</span>
+        ${canManageNotes?`<button type="button" data-action="pin-note" data-id="${esc(note.id)}" aria-pressed="${note.pinned}">${note.pinned?'Désépingler':'Épingler'}</button>`:''}
+        ${note.mine || canManageNotes ? `<button type="button" data-action="edit-note" data-id="${esc(note.id)}">Modifier</button><button type="button" data-action="delete-note" data-id="${esc(note.id)}">Supprimer</button>` : ''}</div><p>${esc(note.body)}</p></article>`).join('') || '<p class="cb-empty">Pas encore de note.</p>'}</div></section>`;
+}
+
+async function saveNote(form) {
+  const input = Object.fromEntries(new FormData(form));
+  const id = form.dataset.noteEdit;
+  if (!input.body?.trim()) return;
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  try {
+    if (id) await call('/api/combos/notes/'+encodeURIComponent(id),'PATCH',input);
+    else await call('/api/combos/notes','POST',{track:view.combo.track,car:view.combo.car,...input});
+    view.editing = null;
+    view.message = 'Note enregistrée.';
+    await loadSheet();
+  } catch (error) {
+    const status = form.querySelector('[role="alert"]') || form.appendChild(document.createElement('p'));
+    status.setAttribute('role','alert');
+    status.textContent = error.message;
+    button.disabled = false;
+  }
 }
 
 // Races being prepared and game versions: a session belongs to them by its date.
 function periodsCard() {
   const {events, versions} = view.sheet.periods;
-  const item = (period, detail) => `<div class="cb-period"><span>${esc(period.name)} <small>${esc(detail)}</small></span><button type="button" class="cb-btn is-quiet" data-action="delete-period" data-id="${esc(period.id)}" aria-label="Supprimer ${esc(period.name)}">Supprimer</button></div>`;
+  const item = (period, detail) => `<div class="cb-period"><span>${esc(period.name)} <small>${esc(detail)}</small></span>${view.sheet.canManagePeriods ? `<button type="button" class="cb-btn is-quiet" data-action="delete-period" data-id="${esc(period.id)}" aria-label="Supprimer ${esc(period.name)}">Supprimer</button>` : ''}</div>`;
   return `<details class="cb-fold" data-fold="periods"${view.periodsOpen ? ' open' : ''}><summary><h2>Épreuves et versions</h2><span>${events.length} épreuve${events.length > 1 ? 's' : ''} · ${versions.length} version${versions.length > 1 ? 's' : ''}</span></summary><div class="cb-fold-body">
     <div class="cb-periods"><b>Épreuves préparées</b>${events.map(period => item(period, `${day(period.startsAt)} → ${day(period.endsAt)}${period.track ? '' : ' · tous les circuits'}`)).join('') || '<p class="cb-empty">Aucune.</p>'}
-      <form class="cb-form" data-period="event"><input type="text" maxlength="80" placeholder="24h du Mans 2026" aria-label="Nom de l’épreuve" data-name required>
+      ${view.sheet.canManagePeriods ? `<form class="cb-form" data-period="event"><input type="text" maxlength="80" placeholder="24h du Mans 2026" aria-label="Nom de l’épreuve" data-name required>
         <div class="cb-row"><label class="cb-src">Du<input type="date" data-start required></label><label class="cb-src">Au<input type="date" data-end required></label></div>
-        <label class="cb-check"><input type="checkbox" data-this-track checked> Seulement sur ${esc(view.combo.track)}</label><div><button type="submit" class="cb-btn">Ajouter l’épreuve</button></div></form></div>
+        <label class="cb-check"><input type="checkbox" data-this-track checked> Seulement sur ${esc(view.combo.track)}</label><div><button type="submit" class="cb-btn">Ajouter l’épreuve</button></div></form>` : ''}</div>
     <div class="cb-periods"><b>Versions du jeu / BoP</b>${versions.map(period => item(period, `depuis le ${day(period.startsAt)}`)).join('') || '<p class="cb-empty">Aucune.</p>'}
-      <form class="cb-form" data-period="version"><input type="text" maxlength="80" placeholder="BoP du 3 octobre" aria-label="Nom de la version" data-name required>
-        <label class="cb-src">À partir du<input type="date" data-start required></label><p class="cb-src">Une version dure jusqu’au début de la suivante.</p><div><button type="submit" class="cb-btn">Ajouter la version</button></div></form></div>
+      ${view.sheet.canManagePeriods ? `<form class="cb-form" data-period="version"><input type="text" maxlength="80" placeholder="BoP du 3 octobre" aria-label="Nom de la version" data-name required>
+        <label class="cb-src">À partir du<input type="date" data-start required></label><p class="cb-src">Une version dure jusqu’au début de la suivante.</p><div><button type="submit" class="cb-btn">Ajouter la version</button></div></form>` : ''}</div>
   </div></details>`;
+}
+
+function historyKey() { const q=sheetQuery(); q.set('cond',view.cond); return q.toString(); }
+async function loadHistory() {
+  if (!view.sheet) return;
+  const key=historyKey(), pending={key,loading:true,data:null,error:''};
+  view.history=pending; render();
+  try {
+    const data=await call('/api/combos/history?'+key);
+    if (view.history!==pending || !view.sheet || historyKey()!==key) return;
+    view.history={key,loading:false,data,error:''};
+  } catch(error) {
+    if (view.history!==pending) return;
+    view.history={key,loading:false,data:null,error:error.message};
+  }
+  render();
+}
+function historyCard() {
+  const key=historyKey(), h=view.history?.key===key?view.history:null;
+  const names=people(),hidden=hiddenFor(),show=id=>view.scope==='crew'?view.crew.members.includes(id):view.scope==='me'?names.get(id)?.me===true:!hidden.has(id);
+  const name=id=>esc(names.get(id)?.name || 'Pilote');
+  const rows=(h?.data?.stints||[]).filter(row=>show(row.pilot));
+  const stops=(h?.data?.stops||[]).filter(row=>show(row.pilot));
+  const content=h?.loading?'<p role="status">Chargement…</p>':h?.error?`<p class="cb-message is-error">${esc(h.error)}</p>`:h?.data?`
+    <h3>Relais mesurés</h3><p class="cb-src">Tours retenus dans les conditions et filtres choisis. La durée représente le temps cumulé des tours retenus, pas nécessairement le relais entier.</p>
+    <div class="cb-history"><table><thead><tr><th>Pilote / date</th><th>Tours retenus</th><th>Rythme</th><th>VE / t.</th><th>L / t.</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${name(row.pilot)}<small>${esc(dayTime(row.at))} · t. ${row.first}–${row.last}</small></td><td>${row.laps}/${row.timed}</td><td>${lapTime(row.pace)}</td><td>${fr(row.ve)}</td><td>${fr(row.fuel)}</td></tr>`).join('')||none(5)}</tbody></table></div>
+    ${h.data.moreStints?'<p class="cb-src">100 derniers relais maximum. Réduis la période pour voir les précédents.</p>':''}
+    <h3>Arrêts enregistrés</h3><p class="cb-src">Arrêts sur la période choisie, toutes conditions et tous réglages confondus. Temps voie des stands ≠ temps perdu en course.</p>
+    <div class="cb-history"><table><thead><tr><th>Pilote / tour</th><th>Immobilisé</th><th>Voie</th><th>Ajouts</th></tr></thead><tbody>${stops.map(row=>`<tr><td>${name(row.pilot)}<small>${esc(dayTime(row.at))} · t. ${row.lap}</small></td><td>${fr(row.stopped,1)} s</td><td>${fr(row.lane,1)} s</td><td>${fr(row.fuel,1)} L · ${fr(row.ve,1)} %<small>${row.tyres} pneus${row.repair?' · réparation':''}</small></td></tr>`).join('')||none(4)}</tbody></table></div>
+    ${h.data.moreStops?'<p class="cb-src">100 derniers arrêts maximum.</p>':''}`:'<p class="cb-src">Charge les relais et arrêts enregistrés pour cette fiche.</p>';
+  return `<details class="cb-fold" data-fold="history"${view.historyOpen?' open':''}><summary><h2>Relais et arrêts mesurés</h2><span>Historique</span></summary><div class="cb-fold-body">${content}<div><button type="button" data-action="history" class="cb-btn"${h?.loading?' disabled':''}>${h?.data?'Actualiser':'Charger l’historique'}</button></div></div></details>`;
+}
+
+function summaryCards(rows) {
+  const row = rows.find(item => item.crew) || rows[0];
+  if (!row) return '';
+  const laps = availableLaps(view.sheet.combo.capacity,row.fuel,row.ve,view.reserve);
+  const data = [['Rythme moyen',lapTime(row.avg)],['Meilleur tour',lapTime(row.best)],['Énergie / tour',known(row.ve)?`${fr(row.ve)} %`:'—'],[`Autonomie (réserve ${view.reserve} %)`,known(laps)?`${laps} tours`:'—'],['Carburant / tour',known(row.fuel)?`${fr(row.fuel)} L`:'—'],['Tours retenus',String(row.laps)]];
+  return `<section class="cb-overview" aria-label="Synthèse des données">${data.map(([label,value])=>`<div><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('')}</section><p class="cb-src">Données mesurées dans les conditions choisies. Autonomie estimée à partir des consommations disponibles.</p>`;
+}
+
+function preparation(rows) {
+  const laps = stintLaps(), reserve = view.reserve;
+  return `<section class="cb-card cb-prep"><div class="cb-head"><h2>Préparation de course</h2>
+    <div class="cb-actions cb-no-print"><button type="button" class="cb-btn" data-action="share-prep">Partager</button><button type="button" class="cb-btn" data-action="print-prep">Imprimer</button></div></div>
+    <p>${esc(view.sheet.race?.name || view.combo.track)} · ${esc(view.combo.car)} · ${COND[view.cond][0]}</p>
+    <div class="cb-note-fields cb-no-print"><label>Réserve du plein (%) <input type="number" data-field="reserve" min="0" max="50" value="${reserve}"></label>
+      <label>Objectif (tours) <input type="number" data-field="prepLaps" min="1" max="60" value="${laps}"></label></div>
+    <div data-prep-results>${preparationResults(rows)}</div>
+  </section>`;
+}
+
+function preparationResults(rows) {
+  const capacity = view.sheet.combo.capacity, laps = stintLaps(), reserve = view.reserve;
+  const duration = pace => !known(pace) ? '—' : `${Math.floor(Math.round(laps*pace)/60)} min ${String(Math.round(laps*pace)%60).padStart(2,'0')} s`;
+  const target = (full,unit) => known(full) ? `${fr(full*(1-reserve/100)/laps)} ${unit}` : '—';
+  const actual = (value,unit) => known(value) ? `${fr(value)} ${unit}` : '—';
+  return `<p>${laps} tours · réserve ${reserve} % · capacité mesurée ${actual(capacity,'L')}</p>
+    <p>Objectifs estimés par tour · ${target(capacity,'L')} · ${rows.some(row=>row.ve>0)?target(100,'% VE'):'— VE'}</p>
+    <div class="cb-wrap"><table><thead><tr><th>Pilote</th><th>L / tour mesurés</th><th>VE / tour mesurée</th><th>Autonomie estimée</th><th>Durée estimée</th></tr></thead>
+      <tbody>${rows.map(row=>{const max=availableLaps(capacity,row.fuel,row.ve,reserve);return `<tr${rowClass(row)}>${nameCell(row)}<td>${actual(row.fuel,'L')}</td><td>${actual(row.ve,'%')}</td>
+        <td>${known(max)?`${max} t. · ${max>=laps?'objectif tenu':'objectif dépassé'}`:'—'}</td><td>${duration(row.avg)}</td></tr>`;}).join('')||none(5)}</tbody></table></div>
+    <p class="cb-src">— Donnée manquante. Une autonomie fondée sur une seule ressource est partielle. Les durées excluent les stands.</p>
+    ${preparationTyres(laps)}`;
+}
+
+function preparationTyres(laps) {
+  const row = view.compound && tyreRows(view.cond,view.compound)[0];
+  if (!row) return '';
+  const remaining = n => row.wear.map(wear=>tyreRemaining(view.tyreInitial,wear,laps*n)).filter(known);
+  return `<p>Gomme ${esc(view.compound)} · ${view.tyreInitial} % au départ · pneu le plus usé selon les mesures disponibles.</p>
+    <div class="cb-wrap"><table><thead><tr><th>Projection d’usure</th><th>Simple</th><th>Double</th><th>Triple</th></tr></thead>
+    <tbody><tr><td>${esc(row.name)}</td>${[1,2,3].map(n=>{const values=remaining(n);return `<td>${values.length?fr(Math.min(...values),1)+' %':'—'}</td>`;}).join('')}</tr></tbody></table></div>`;
 }
 
 function render() {
   const message = view.message ? `<p class="cb-message" role="status">${esc(view.message)}</p>` : '';
   if (!view.combo) {
+    if (view.requested) {
+      const candidates = view.candidates || [];
+      const choices = candidates.map(item => `<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}"><b>${esc(item.car)}</b><span>${esc(item.track)} · ${item.laps} tours</span></button>`).join('');
+      app.innerHTML = `${message}<section class="cb-card"><div class="cb-head"><h2>${esc(view.requested)}</h2></div>${choices ? '<p>Choisis la voiture et le circuit exacts.</p><div class="cb-pick-cars">'+choices+'</div>' : '<p class="cb-empty">Aucune séance disponible pour cette combinaison.</p>'}<p><a href="/simhub.html">Voir les autres fiches</a> · <button type="button" class="cb-btn" data-action="refresh">Actualiser</button></p></section>${view.link?.linked ? '' : linkCard()}`; return;
+    }
     app.innerHTML = `${message}
       <p class="cb-empty">Aucune séance reçue pour l’instant. Relie SimHub et roule : la fiche de chaque voiture et de chaque circuit se remplit toute seule, avec les chiffres de chaque pilote.</p>${linkCard()}`;
     return;
   }
+  if (view.sheetLoading) { app.innerHTML = `${header()}<p class="cb-empty" role="status">Chargement de la fiche…</p>`; return; }
   if (!view.sheet) {
     app.innerHTML = `${header()}${message}<p class="cb-message is-error">${esc(view.error || 'Fiche indisponible.')}</p>${linkCard()}`;
     return;
@@ -526,21 +740,22 @@ function render() {
     return;
   }
   const rows = paceRows(view.cond);
+  const tyreSection = tyres();
   const c = view.sheet.conditions[view.cond];
   const track = c.trackTemp ? ` · piste ${fr(c.trackTemp[0], 0)} à ${fr(c.trackTemp[1], 0)} °C` : '';
   // Linked, the SimHub block goes to the foot of the page; not yet, it leads.
   app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linked ? '' : linkCard()}
     ${toolbar()}${conditions()}
     <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}${view.moment ? ` · ${view.moment === 'night' ? 'nuit' : 'jour'}` : ''}</span><span class="cb-meta">${c.laps} tours${track}</span>
-      <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours. Équipage = moyenne des pilotes affichés. <span class="cb-best-key">En violet</span> : le meilleur pilote de la colonne.</p>
-      ${c.laps ? `<div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyres()}` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
-    ${pitStop()}${notes()}
+      <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours (sauf meilleur tour retenu). Moyenne = pilotes affichés, pas nécessairement un équipage inscrit. <span class="cb-best-key">En violet</span> : le meilleur pilote de la colonne.</p>
+      ${c.laps ? `${summaryCards(rows)}<details class="cb-fold" data-fold="measurements"${view.measurementsOpen?' open':''}><summary><h2>Mesures détaillées</h2></summary><div class="cb-fold-body"><div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyreSection}</div></details>` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
+    ${preparation(rows)}${historyCard()}${pitStop()}${notes()}
     <div class="cb-foot">${periodsCard()}</div>`;
 }
 
 // The filters in use, for the folded panel's title.
 function activeFilters() {
-  const count = [view.event, view.version, view.since, view.until, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + view.hidden.size;
+  const count = [view.event, view.version, view.since, view.until, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + hiddenFor().size;
   return count ? `${count} actif${count > 1 ? 's' : ''}` : 'aucun filtre';
 }
 
@@ -552,11 +767,12 @@ async function act(work, success = '') {
   catch (error) { view.message = error.message; }
 }
 
-const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0).getTime() : null; };
+const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0).getTime() : null; };
 
 async function exportSheet() {
   await act(async () => {
     const base = new URLSearchParams({track:view.combo.track, car:view.combo.car});
+    if (view.sheet?.race) base.set('race',view.sheet.race.id);
     let page = await call(`/api/combos/export?${base}`);
     const out = {...page, sessions:[...page.sessions]};
     while (page.next) {
@@ -590,14 +806,18 @@ app.addEventListener('click', async event => {
   }
   const target = event.target.closest('button');
   if (!target || !app.contains(target)) return;
+  if (target.dataset.scope) {view.scope=target.dataset.scope;remember();render();return;}
+  if(target.dataset.action==='favorite'){const key=comboKey(view.combo);view.favorites.has(key)?view.favorites.delete(key):view.favorites.add(key);saveHidden();render();return;}
   if (target.dataset.driver) {
+    if(view.scope!=='custom'){view.hidden=hiddenFor();view.scope='custom';}
     const id = target.dataset.driver;
     view.hidden.has(id) ? view.hidden.delete(id) : view.hidden.add(id);
     saveHidden(); render(); return;
   }
-  if (target.dataset.cond) { view.cond = target.dataset.cond; render(); return; }
+  if (target.dataset.cond) { view.cond = target.dataset.cond; view.explicitCondition = true; remember(); render(); return; }
   if (target.dataset.combo !== undefined) { view.pickerOpen = false; await openCombo(target.dataset.track, target.dataset.car); return; }
   if (target.dataset.tab) {
+    if (!view.sheet) return;
     view.tab = target.dataset.tab; remember();
     if (view.tab === 'analysis') await loadAnalysis(); else render();
     return;
@@ -615,7 +835,24 @@ app.addEventListener('click', async event => {
   }
   switch (target.dataset.action) {
     case 'export': await exportSheet(); break;
+    case 'share-prep':
+      remember();
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(location.href);
+        else if (navigator.share) await navigator.share({title:'Préparation de course',url:location.href});
+        else throw Error();
+        view.message = 'Lien de préparation partagé.';
+      } catch { view.message = 'Lien de préparation disponible dans la barre d’adresse.'; }
+      render(); break;
+    case 'print-prep': window.print(); break;
+    case 'pin-note': {
+      const note = view.sheet.notes.find(item=>item.id===target.dataset.id);
+      if (!note) return;
+      await act(() => call('/api/combos/notes/'+encodeURIComponent(note.id),'PATCH',{pinned:!note.pinned}));
+      await loadSheet(); break;
+    }
     case 'refresh': await refresh(); break;
+    case 'history': await loadHistory(); break;
     case 'edit-note': view.editing = target.dataset.id; render(); break;
     case 'cancel-note': view.editing = null; render(); break;
     case 'delete-note':
@@ -634,6 +871,15 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   const field = event.target.dataset.field;
+  if (['reserve','prepLaps','tyreInitial','stint'].includes(field)) {
+    if (field==='reserve') view.reserve=wholeNumber(event.target.value,0,50,3);
+    if (field==='prepLaps'||field==='stint') view.stint=wholeNumber(event.target.value,1,60,null);
+    if (field==='tyreInitial') view.tyreInitial=wholeNumber(event.target.value,0,100,100);
+    remember(); render(); return;
+  }
+  if (field === 'pitMode') { view.pit.mode=event.target.value; render(); return; }
+  if (field === 'tyreRelays') { view.tyreRelays = Number(event.target.value); remember(); render(); return; }
+  if (field === 'an-type') { Object.assign(view.analysis,{type:event.target.value,mine:'',other:'',zone:null}); await loadAnalysis(); return; }
   if (field === 'an-size') { Object.assign(view.analysis, {size:Number(event.target.value) || 450, zone:null}); render(); return; }
   if (field === 'an-mine' || field === 'an-other') {
     if (!event.target.value) return;
@@ -659,6 +905,26 @@ app.addEventListener('change', async event => {
 
 app.addEventListener('input', event => {
   const target = event.target;
+  if (['reserve','prepLaps'].includes(target.dataset.field)) {
+    if (target.value === '' || !target.validity.valid) return;
+    if (target.dataset.field==='reserve') view.reserve = Number(target.value);
+    else view.stint = Number(target.value);
+    remember();
+    const rows=paceRows(view.cond);
+    app.querySelector('[data-prep-results]').innerHTML=preparationResults(rows);
+    const overview=app.querySelector('.cb-overview');
+    if (overview && rows.length) {
+      const container=document.createElement('div');
+      container.innerHTML=summaryCards(rows);
+      overview.replaceWith(container.firstElementChild);
+    }
+    return;
+  }
+  if (target.dataset.field === 'tyreInitial') {
+    if (target.value === '') return;
+    view.tyreInitial = Math.min(100, Math.max(0, Number(target.value)));
+    const cards = app.querySelector('[data-tyres]'); if (cards) cards.innerHTML = tyreCards(); return;
+  }
   if (target.dataset.field === 'stint') {
     view.stint = Math.min(60, Math.max(1, Math.round(Number(target.value)) || stintLaps()));
     const cards = app.querySelector('[data-tyres]');
@@ -675,7 +941,7 @@ app.addEventListener('input', event => {
     const form = app.querySelector('[data-pit]'), open = view.pitOpen;
     if (form) { app.querySelector('[data-fold="pit"]').outerHTML = pitStop(); view.pitOpen = open; }
   }
-  if (pitField === 'before' && view.pit.after < view.pit.before) view.pit.after = view.pit.before;
+  if (view.pit.after < view.pit.before) view.pit.after = view.pit.before;
   for (const key of ['before', 'after']) {
     const output = app.querySelector(`[data-out="${key}"]`);
     if (output) output.textContent = `${view.pit[key]} %`;
@@ -696,7 +962,9 @@ app.addEventListener('pointermove', event => {
 // The folds keep their state when the page is drawn again.
 app.addEventListener('toggle', event => {
   const fold = event.target.dataset?.fold;
+  if (fold === 'measurements') view.measurementsOpen = event.target.open;
   if (fold === 'pit') view.pitOpen = event.target.open;
+  if (fold === 'history') view.historyOpen = event.target.open;
   if (fold === 'periods') view.periodsOpen = event.target.open;
   if (fold === 'side') view.sideOpen = event.target.open;
   if (fold === 'laps') view.analysis.lapsOpen = event.target.open;
@@ -706,17 +974,8 @@ app.addEventListener('toggle', event => {
 app.addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target;
-  if (form.matches('[data-note-form]')) {
-    const body = form.querySelector('[data-note-body]').value.trim();
-    if (!body) return;
-    await act(() => call('/api/combos/notes', 'POST', {track:view.combo.track, car:view.combo.car, body}));
-    await loadSheet();
-  } else if (form.dataset.noteEdit) {
-    const body = form.querySelector('textarea').value.trim();
-    if (!body) return;
-    await act(() => call(`/api/combos/notes/${encodeURIComponent(form.dataset.noteEdit)}`, 'PATCH', {body}));
-    view.editing = null;
-    await loadSheet();
+  if (form.matches('[data-note-form], [data-note-edit]')) {
+    await saveNote(form);
   } else if (form.dataset.period) {
     const kind = form.dataset.period;
     const input = {kind, name:form.querySelector('[data-name]').value, startsAt:dateOf(form.querySelector('[data-start]').value)};
@@ -725,5 +984,3 @@ app.addEventListener('submit', async event => {
     await loadSheet();
   }
 });
-
-start();

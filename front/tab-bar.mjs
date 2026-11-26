@@ -9,7 +9,7 @@ const SECTIONS = [
   ['nav-entries-button', 'Inscriptions', '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>'],
   ['nav-crews-button', 'Équipages', '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.4 5 2.8 5 5.8"/>'],
   // Module Plugin SimHub (LMU), when it is open for the pilot (Nathan, 2026-11-24).
-  ['nav-plugin-button', 'Plugin', '<path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/>']
+  ['nav-plugin-button', 'Pilote', '<path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/>']
 ];
 
 const nav = document.getElementById('navigation');
@@ -17,7 +17,7 @@ let bar = null, queued = false;
 
 function render() {
   queued = false;
-  const found = SECTIONS.map(([css, label, icon]) => [nav.querySelector(`.nav-sections .${css}`), label, icon, css]).filter(([item]) => item);
+  const found = SECTIONS.map(([css, label, icon]) => [nav.querySelector(`.nav-sections .${css}`), label, icon, css]).filter(([item]) => item && !item.hidden);
   if (found.length < 2 || document.querySelector('.community-gate')) { bar?.remove(); bar = null; document.body.classList.remove('has-tab-bar'); return; }
   if (!bar) {
     bar = document.createElement('nav');
@@ -43,7 +43,7 @@ function render() {
 function queue() { if (!queued) { queued = true; requestAnimationFrame(render); } }
 
 if (nav) {
-  new MutationObserver(queue).observe(nav, {subtree:true, childList:true, attributes:true, attributeFilter:['aria-current', 'class']});
+  new MutationObserver(queue).observe(nav, {subtree:true, childList:true, attributes:true, attributeFilter:['aria-current', 'class', 'hidden']});
   const app = document.getElementById('app');
   if (app) new MutationObserver(queue).observe(app, {childList:true});
   queue();
