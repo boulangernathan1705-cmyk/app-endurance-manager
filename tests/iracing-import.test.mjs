@@ -219,3 +219,19 @@ test('verified official supplements fill omissions but respect a live report or 
   const pcc=supplementSpecialEvents([{slug:'pcc-vir',name:'THE Production Car Challenge @ViR',date_start:'2026-12-18',date_end:'2026-12-19'}], '2026S4');
   assert.equal(pcc.find(item=>item.slug==='pcc-vir').duration_minutes,240);
 });
+
+
+test('an official sports-car endurance missing from the feed is flagged for review, not blindly created',async()=>{
+  const {unmatchedOfficialSpecials}=await import('../server/iracing-import.mjs');
+  const post={id:123,date:'2026-11-23T09:00:00',title:{rendered:'THIS WEEK: iRacing 992 Endurance Cup | Special Event'},
+    link:'https://www.iracing.com/this-week-iracing-creventic-992-endurance-cup-special-event/',
+    content:{rendered:'<p>12 hours of team racing</p><h3>TRACK: CIRCUIT DE SPA-FRANCORCHAMPS</h3><h3>CAR COMPETING:</h3><p>Porsche 911 Cup (992.2)</p><p>Timeslot #1: Friday at 22:00 GMT</p><p>Timeslot #2: Saturday at 07:00 GMT</p>'}};
+  const unrelated={...post,id:124,title:{rendered:'THIS WEEK: Winter Derby | Special Event'},content:{rendered:'<p>Stock car racing</p><p>Timeslot #1: Saturday at 07:00 GMT</p>'}};
+  const at=Date.parse('2026-11-26T12:00:00Z');
+  const findings=unmatchedOfficialSpecials([post,unrelated],[],at);
+  assert.equal(findings.length,1);assert.equal(findings[0].externalId,'official-article:123');
+  assert.equal(findings[0].value.durationMinutes,720);
+  assert.deepEqual(findings[0].value.starts,['2026-11-27T22:00:00.000Z','2026-11-28T07:00:00.000Z']);
+  assert.deepEqual(unmatchedOfficialSpecials([post],[{special:{name:'992 Endurance Cup',slug:'992-endurance-cup',dateStart:'2026-11-27',dateEnd:'2026-11-29'}}],at),[]);
+  assert.deepEqual(unmatchedOfficialSpecials([post],[],Date.parse('2026-12-01T12:00:00Z')),[]);
+});
