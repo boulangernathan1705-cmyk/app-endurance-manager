@@ -296,7 +296,7 @@ function seasonValidator(code) {
   };
 }
 
-export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=id,date,modified,title,content';
+export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=id,date,modified,title,content,link';
 const WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 const decode = value => String(value || '').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
   .replace(/<[^>]+>/g, ' ').replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
@@ -387,8 +387,39 @@ function validateNews(data) {
     throw new Error('liste d’articles invalide');
   return data.filter(post => /special event/i.test(post.title.rendered)).map(post => ({
     id:post.id, date:post.date, modified:post.modified, title:post.title,
+    link:typeof post.link === 'string' && /^https:\/\/(?:www\.)?iracing\.com\//i.test(post.link) ? post.link : null,
     content:{rendered:(post.content?.rendered || '').slice(0, 65_000)}
   }));
+}
+
+// Independent official-news discovery. A race omitted by the season feed is surfaced
+// for review rather than silently lost or blindly created from an inferred weekend.
+export function unmatchedOfficialSpecials(posts, plans, timestamp) {
+  const matched = new Set(plans.filter(plan=>plan.special).map(plan=>articleFor(posts,plan.special)).filter(Boolean));
+  const findings = [];
+  for (const post of posts) {
+    if (matched.has(post)) continue;
+    const title = decode(post.title?.rendered).trim(), body = decode(post.content?.rendered);
+    if (!/^this week\s*:/i.test(title) || !/\bspecial event\b/i.test(title)) continue;
+    const published = Date.parse(post.date?.endsWith('Z') ? post.date : post.date+'Z');
+    if (!Number.isFinite(published) || published > timestamp+DAY_MS || published < timestamp-10*DAY_MS) continue;
+    // Require a sportscar signal plus actual race details; generic editorial boilerplate is insufficient.
+    const carSection = /\b(?:cars? competing|cars? eligible|car classes)\s*:\s*([\s\S]{0,350}?)(?=\b(?:broadcast details|timeslot|time slot|race details|track:)\b|$)/i.exec(body)?.[1] || '';
+    const categories = knownCategories(title,carSection) || [];
+    const hasClass = categories.length || knownCategories(title).length || /\b(?:GT[34]|GTP|LMP[23]|Porsche.{0,20}(?:Cup|992)|production car|Supercars)\b/i.test(title);
+    if (!hasClass || !/\b(?:endurance|team racing)\b/i.test(title+' '+body)) continue;
+    const day = Date.parse(new Date(published).toISOString().slice(0,10)), monday = day-((new Date(day).getUTCDay()+6)%7)*DAY_MS;
+    const dateStart = new Date(monday).toISOString().slice(0,10), dateEnd = new Date(monday+6*DAY_MS).toISOString().slice(0,10);
+    const details = articleDetails(post,{dateStart,dateEnd});
+    if (!details.starts.some(start=>start>timestamp) || (!details.durationMinutes && !details.layout)) continue;
+    const key = Number.isSafeInteger(post.id) ? String(post.id) : slug(title);
+    const name = title.replace(/^this week:\s*/i,'').replace(/\s*\|\s*special event.*$/i,'').trim().slice(0,100);
+    findings.push({externalId:'official-article:'+key,name,finding:'official-article',value:{
+      published:post.date,source:post.link||null,layout:details.layout,durationMinutes:details.durationMinutes,
+      categories:categories.length?categories:knownCategories(title),starts:details.starts.map(start=>new Date(start).toISOString())
+    }});
+  }
+  return findings;
 }
 
 async function importOfficial(env, plans, review, timestamp) {
@@ -500,10 +531,11 @@ export function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetc
     if (!specialOnly && !plans.length && Object.entries(sources).some(([key, state]) => key.startsWith('season:') && state.error))
       throw Object.assign(new Error(errors.join(' · ')), {sources});
     const specials = plans.filter(plan => plan.special && (!scheduled || Date.parse(plan.special.dateStart) <= specialCutoff));
-    if (specials.length) {
+    if (specials.length || !specialOnly) {
       const news = await readIracingSource(env, 'articles', IRACING_NEWS, fetchImpl, validateNews, timestamp);
       const posts = observe('articles', news) || [];
       for (const plan of specials) addArticleToPlan(plan, articleFor(posts, plan.special), timestamp, Boolean(news.error));
+      if (!news.error && !specialOnly) review.push(...unmatchedOfficialSpecials(posts,plans,timestamp));
       if (specialOnly && news.error) return {sources, errors};
     }
     const result = await importOfficial(env, plans, review, timestamp);
