@@ -15,6 +15,8 @@
 // table iracing_imports): editing or deleting it is never undone. Module "iracingImport": the communities that
 // enable it show these races, each with its own entries and crews on them.
 import {validateEvent, id, now} from './core.mjs';
+import {sourceSnapshot, synchronizeKnown} from './iracing-sync.mjs';
+import {askToChooseStart} from './event-departures.mjs';
 
 const OFFICIAL = {id:'official'};
 
@@ -245,12 +247,12 @@ export async function importNextCommunity(env, at = new Date(), {fetchImpl = fet
 
 async function importOfficial(env, plans, {timestamp, fetchImpl}) {
   const community = OFFICIAL;
-  const rows=(await env.DB.prepare('SELECT i.external_id,e.id,e.circuit,e.version,e.created_by FROM iracing_imports i LEFT JOIN events e ON e.id=i.event_id WHERE i.community_id=?').bind(community.id).all()).results;
+  const rows=(await env.DB.prepare('SELECT i.external_id,i.source_snapshot,e.* FROM iracing_imports i LEFT JOIN events e ON e.id=i.event_id WHERE i.community_id=?').bind(community.id).all()).results;
   const known=new Map(rows.map(row=>[row.external_id,row]));
-  let created=0,repaired=0,skipped=0,pending=[],kinds=[];
+  let created=0,repaired=0,skipped=0,updated=0,conflicts=0,initialized=0,pending=[],kinds=[];
   // New races are written 10 at a time: each batch is one call to the database (at most 50 per run).
   const flush = async () => {
-    if(pending.length){const results=await env.DB.batch(pending);results.forEach((result,index)=>{if(kinds[index]==='create')created+=Number(result.meta.changes)||0;if(kinds[index]==='repair')repaired+=Number(result.meta.changes)||0;});}
+    if(pending.length){const results=await env.DB.batch(pending);results.forEach((result,index)=>{if(kinds[index]==='create')created+=Number(result.meta.changes)||0;if(kinds[index]==='repair')repaired+=Number(result.meta.changes)||0;if(kinds[index]==='initialize')initialized+=Number(result.meta.changes)||0;});}
     pending=[];kinds=[];
   };
   for (const plan of plans) {
@@ -260,6 +262,18 @@ async function importOfficial(env, plans, {timestamp, fetchImpl}) {
       if(saved?.id&&saved.circuit==='iracing-tbd'&&saved.version===1&&saved.created_by===IMPORT_AUTHOR&&plan.input.circuit!=='iracing-tbd'){
         pending.push(env.DB.prepare("UPDATE events SET circuit=?,version=version+1 WHERE id=? AND circuit='iracing-tbd' AND version=1 AND created_by=?").bind(plan.input.circuit,saved.id,IMPORT_AUTHOR));kinds.push('repair');
         if(pending.length>=20)await flush();
+        continue;
+      }
+      if(saved?.id&&saved.created_by===IMPORT_AUTHOR){
+        let data;
+        try { data=validateEvent(plan.input,null,{officialImport:true}); } catch(error){skipped++;console.warn('iRacing race skipped',plan.externalId,error.message);continue;}
+        if(!saved.source_snapshot){
+          pending.push(env.DB.prepare('UPDATE iracing_imports SET source_snapshot=? WHERE community_id=? AND external_id=? AND source_snapshot IS NULL').bind(JSON.stringify(sourceSnapshot(data)),community.id,plan.externalId));kinds.push('initialize');
+          if(pending.length>=20)await flush();
+        }else{
+          const result=await synchronizeKnown(env,saved,data,timestamp,{special:Boolean(plan.special)});
+          updated+=result.updated||0;conflicts+=result.conflicts||0;
+        }
       }
       continue;
     }
@@ -269,14 +283,14 @@ async function importOfficial(env, plans, {timestamp, fetchImpl}) {
     pending.push(
       env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id,sim,details) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM iracing_imports WHERE community_id=? AND external_id=?)')
         .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now(), community.id, data.sim, JSON.stringify(data.details), community.id, plan.externalId),
-      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=?)').bind(community.id, plan.externalId, eventId, now(), eventId));
+      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at,source_snapshot) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=?)').bind(community.id, plan.externalId, eventId, now(), JSON.stringify(sourceSnapshot(data)), eventId));
     kinds.push('create','marker');
     known.set(plan.externalId,null);
     if (pending.length >= 20) await flush();
   }
   await flush();
   const completed = await completeSpecialTimes(env, {timestamp, fetchImpl, community});
-  return {created,completed,...(repaired?{repaired}:{}),...(skipped?{skipped}:{})};
+  return {created,completed,updated,conflicts,initialized,...(repaired?{repaired}:{}),...(skipped?{skipped}:{})};
 }
 
 export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';
@@ -289,6 +303,7 @@ export function specialStarts(text, dateStart, dateEnd) {
   const first = Date.parse(`${dateStart}T00:00:00Z`) - DAY_MS, last = Date.parse(`${dateEnd}T00:00:00Z`) + DAY_MS;
   const starts = [];
   for (const [, day, hours, minutes] of decode(text).matchAll(/time\s*slot\s*#?\s*\d+\s*:\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+at\s+(\d{1,2}):(\d{2})\s*(?:gmt|utc)/gi)) {
+    if(Number(hours)>23||Number(minutes)>59)continue;
     for (let date = first; date <= last; date += DAY_MS) {
       if (WEEKDAYS[new Date(date).getUTCDay()] !== day.toLowerCase()) continue;
       starts.push(date + (Number(hours) * 60 + Number(minutes)) * 60_000);
@@ -301,8 +316,7 @@ export function specialStarts(text, dateStart, dateEnd) {
 // The article of a special event: "THIS WEEK: iRacing Bathurst 1000 presented by … | Special Event",
 // published in the ten days before the event. The article may use the short name of the schedule slug
 // ("8 Hours of Indianapolis", slug "indy-8hr" → "THIS WEEK: iRacing Indy 8 Hour …"): either name matches.
-// If iRacing names it otherwise again, the only "Special Event" article of the race week (published in the
-// six days before the event) is taken: there is one special event a weekend.
+// Never infer a match solely from publication week: an unrelated race may have the only article.
 export function articleFor(posts, special) {
   const significant = text => normalize(text).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
   const eventWords = significant(special.name), slugWords = significant(special.slug);
@@ -312,8 +326,7 @@ export function articleFor(posts, special) {
   const articles = posts.filter(post => title(post).includes('special event') && publishedWithin(post, 10));
   const named = articles.find(post => (eventWords.length ? eventWords.every(word => title(post).includes(word)) : title(post).includes(normalize(special.name)))
     || (slugWords.length > 0 && slugWords.every(word => title(post).includes(word))));
-  const ofTheWeek = articles.filter(post => publishedWithin(post, 6));
-  return named || (ofTheWeek.length === 1 ? ofTheWeek[0] : null);
+  return named || null;
 }
 
 // Imported special events still waiting for their times (a single "Horaire à définir" start, unless an
@@ -323,7 +336,7 @@ export function articleFor(posts, special) {
 // ("special:<slug>:<first day>", three days).
 export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchImpl = fetch, withinDays = Infinity, community = null} = {}) {
   // One community (import) or all of them (hourly task): each race is completed in its own community.
-  const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.version, e.departures, i.external_id FROM iracing_imports i
+  const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.circuit, e.community_id, e.version, e.departures, i.external_id FROM iracing_imports i
     JOIN events e ON e.id=i.event_id AND e.community_id=i.community_id
     WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1 AND (? IS NULL OR i.community_id=?)`).bind(community?.id ?? null, community?.id ?? null).all()).results || [];
   const candidates = waiting.map(row => {
@@ -339,7 +352,7 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
   });
   if (!candidates.length) return 0;
   const response = await fetchImpl(IRACING_NEWS, {headers:{Accept:'application/json'}});
-  if (!response.ok) return 0;
+  if (!response.ok) {console.warn('iRacing special event news unavailable',response.status);return 0;}
   const posts = await response.json();
   let completed = 0;
   for (const {row, plan} of candidates) {
@@ -352,9 +365,10 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
     // (its pilots and crews keep everything) and each crew then picks its slot; it closes with the first slot.
     const used = await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? UNION SELECT 1 FROM crews WHERE event_id=? LIMIT 1').bind(row.id, row.id).first();
     const departures = used ? [{...common, ...parisDateTime(starts[0]), startsAt:starts[0], tbd:true}, ...slots] : slots;
-    const result = await env.DB.prepare('UPDATE events SET departures=?, schedule_pending=0, version=version+1 WHERE id=? AND version=?')
-      .bind(JSON.stringify(departures), row.id, row.version).run();
-    if (result.meta.changes) completed++;
+    const result = await env.DB.prepare(`UPDATE events SET departures=?, schedule_pending=0, version=version+1 WHERE id=? AND version=?
+      AND (?=1 OR (NOT EXISTS(SELECT 1 FROM registrations WHERE event_id=events.id) AND NOT EXISTS(SELECT 1 FROM crews WHERE event_id=events.id)))`)
+      .bind(JSON.stringify(departures), row.id, row.version, used?1:0).run();
+    if (result.meta.changes) {completed++;if(used)await askToChooseStart(env,row,common.id);}
   }
   return completed;
 }
