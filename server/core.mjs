@@ -186,7 +186,7 @@ function returnPath(value) {
   // Allow only explicit memo parameters on these two local pages; never a host or redirect target.
   if (path.length <= 600 && /^\/(?:simhub|fiches-combo)\.html(?:[?#]|$)/.test(path)) {
     const url = new URL(path, 'https://local.invalid');
-    const allowed = new Set(['circuit','track','car','event','version','setup','moment','tmin','tmax','from','to','tab','compare']);
+    const allowed = new Set(['circuit','track','car','event','version','setup','moment','tmin','tmax','from','to','tab','compare','crew']);
     if (url.origin === 'https://local.invalid' && [...url.searchParams].every(([key, value]) => allowed.has(key) && value.length <= 120 && !/[\u0000-\u001f]/.test(value)) && /^(?:#(?:memo|mur|board|chrono|car|tele|map|installer))?$/.test(url.hash)) {
       return url.pathname + url.search + url.hash;
     }

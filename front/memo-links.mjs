@@ -12,10 +12,11 @@ const aliases = {
   'laguna-seca':['Laguna Seca'], 'long-beach':['Long Beach'], lusail:['Lusail','Losail International Circuit'],
   'paul-ricard':['Paul Ricard'], 'road-atlanta':['Road Atlanta'], sebring:['Sebring'], silverstone:['Silverstone']
 };
-export function memoHref(event, car = '') {
+export function memoHref(event, car = '', crew = '') {
   if (!event || simForEvent(event) !== 'lmu' || event.format === 'solo' || !catalogForGame('lmu').circuits.some(item => item.id === event.circuit && !item.random)) return '';
   const q = new URLSearchParams({circuit:event.circuit});
   if (car) q.set('car', car);
+  if (/^[a-f0-9-]{36}$/i.test(crew || '')) q.set('crew', crew);
   return '/simhub.html?' + q.toString() + '#memo';
 }
 export function memoCandidates(combos, params) {

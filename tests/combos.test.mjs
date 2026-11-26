@@ -505,8 +505,8 @@ test('notes: the team writes, only the author or an admin changes them; the expo
 test('the Plugin SimHub page: one tab in the menu and the phone bar, the fiche and the wall as its two tabs, nothing run from the page text', () => {
   const home = readFileSync(new URL('../simhub.html', import.meta.url), 'utf8');
   assert.match(home, /src="\/front\/simhub-page\.mjs/);
-  assert.match(home, /class="nav-section-button nav-plugin-button" href="\/simhub\.html" data-module-link="combos" aria-current="page">Plugin SimHub</);
-  assert.match(home, /<main id="combos-app"[^>]*data-sh-panel="memo"/);
+  assert.match(home, /class="nav-section-button nav-plugin-button" href="\/simhub\.html" data-module-link="combos" hidden aria-current="page">Espace pilote</);
+  assert.match(home, /<main hidden id="combos-app"[^>]*data-sh-panel="memo"/);
   assert.match(home, /class="pw-body sh-wall" data-sh-panel="wall" hidden><main id="pw-app"/);
   assert.match(home, /data-panel="memo"[^>]*>Fiche mémo<\/a><a [^>]*data-panel="wall"[^>]*>Mur des stands<\/a>/);
   assert.doesNotMatch(home, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
@@ -522,8 +522,8 @@ test('the Plugin SimHub page: one tab in the menu and the phone bar, the fiche a
   // Hidden, the wall stops asking the room for the cars.
   assert.match(readFileSync(new URL('../front/pit-wall.mjs', import.meta.url), 'utf8'), /watch:shown\(\)/);
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button nav-plugin-button" href="\/simhub\.html">Plugin SimHub<\/a>'/);
-  assert.match(readFileSync(new URL('../front/tab-bar.mjs', import.meta.url), 'utf8'), /\['nav-plugin-button', 'Plugin'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button nav-plugin-button" href="\/simhub\.html">Espace pilote<\/a>'/);
+  assert.match(readFileSync(new URL('../front/tab-bar.mjs', import.meta.url), 'utf8'), /\['nav-plugin-button', 'Pilote'/);
 });
 
 test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {
@@ -623,4 +623,13 @@ test('memo history is optional, protected and uses the same condition filters',a
  assert.equal((await req('/api/session','GET',null,NATHAN)).data.combos,false);
  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('true')) WHERE id=?").run(DEV_COMMUNITY);
  assert.equal((await req(q,'GET',null,NATHAN)).data.stops.length,1);
+});
+
+test('memo crew context refuses unknown crew and is gated by the optional module',async()=>{
+ const {req,signIn,DB}=harness();signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const q='/api/combos/crew?id=00000000-0000-4000-8000-000000000001';
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
+ assert.equal((await req(q,'GET',null,null)).status,401);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
 });

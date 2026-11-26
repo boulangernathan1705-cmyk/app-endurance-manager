@@ -488,7 +488,21 @@ export async function combosApi(path, method, request, env, actor, community) {
   if (!combosEnabled(community)) fail(404, 'Les fiches combo ne sont pas ouvertes dans cette communauté.');
   requirePermission(actor, 'combos', 'Les fiches combo sont réservées aux pilotes de l’équipe.');
   const url = new URL(request.url), userId = actor.user.id;
-  if (path === '/api/combos' && method === 'GET') return json({combos:await combos(env, community)});
+  if (path === '/api/combos' && method === 'GET') return json({combos:await combos(env, community), preferenceScope:community.id+':'+userId});
+  if (path === '/api/combos/crew' && method === 'GET') {
+    const crewId=String(url.searchParams.get('id')||'');
+    if (!/^[a-f0-9-]{36}$/i.test(crewId)) fail(404,'Équipage indisponible.');
+    // Use actual Discord accounts, not display names, and never resolve a foreign community or another crew.
+    const crew=await env.DB.prepare(`SELECT c.id,c.name,c.car,e.circuit FROM crews c JOIN events e ON e.id=c.event_id
+      WHERE c.id=? AND c.community_id=? AND (e.community_id=? OR e.community_id='official')
+      AND e.format='endurance' AND COALESCE(e.sim,CASE WHEN e.circuit LIKE 'iracing-%' THEN 'iracing' ELSE 'lmu' END)='lmu'
+      AND EXISTS(SELECT 1 FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
+        WHERE cm.crew_id=c.id AND r.community_id=c.community_id AND r.status!='unavailable' AND p.user_id=?)`).bind(crewId,community.id,community.id,userId).first();
+    if (!crew) fail(404,'Équipage indisponible.');
+    const members=await all(env,`SELECT DISTINCT p.user_id AS id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
+      WHERE cm.crew_id=? AND r.community_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL`,crew.id,community.id);
+    return json({id:crew.id,name:crew.name,car:crew.car,circuit:crew.circuit,members:members.map(m=>m.id)});
+  }
   // Mur des stands: a page of the site watching the team's cars live. A GET skips the site's origin check: done here,
   // so no other site can open it with the member's cookie.
   if (path === '/api/combos/live') {

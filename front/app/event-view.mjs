@@ -259,8 +259,9 @@ export function renderEvent(message=''){
   const trash='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
   const manageActions=`${canEditRace(event)?button('edit-event','Modifier l’événement',`data-id="${event.id}"`,'secondary-button'):''}${state.manager&&!event.official&&!isSolo(event)?button('make-official','Rendre officielle',`data-id="${event.id}"`,'link-button'):''}${canEditRace(event)?button('delete-event',`${trash}<span>Supprimer l’événement</span>`,`data-id="${event.id}"`,'danger-link'):''}`;
   const shareAction=button('share-event','Copier le lien',`data-id="${event.id}"`,'link-button');
-  const myCars=[...new Set((event.departures||[]).flatMap(d=>(d.crews||[]).filter(c=>(c.registrationIds||[]).some(id=>(d.availability||[]).some(reg=>reg.mine&&String(reg.id)===String(id)))).map(c=>c.car)).filter(Boolean))];
-  const memo=state.combos ? memoHref(event,myCars.length===1?myCars[0]:'') : '';
+  const myCrews=(event.departures||[]).flatMap(d=>(d.crews||[]).filter(c=>(c.registrationIds||[]).some(id=>(d.availability||[]).some(reg=>reg.mine&&String(reg.id)===String(id)))));
+  const myCars=[...new Set(myCrews.map(c=>c.car).filter(Boolean))];
+  const memo=state.combos ? memoHref(event,myCars.length===1?myCars[0]:'',myCrews.length===1?myCrews[0].id:'') : '';
   const eventActions=`<span class="race-header-actions">${manageActions?`<details class="race-actions-menu"><summary aria-label="Actions de la course">⋯</summary><div class="race-actions-popover">${manageActions}</div></details>`:''}</span>`;
   const visible=[...future,...undated];
   const upcoming=visible.map(({departure,index})=>renderDeparturePanel(event,departure,index,departure.id===state.selectedDepartureId||state.registrationOpen.has(departure.id))).join('');

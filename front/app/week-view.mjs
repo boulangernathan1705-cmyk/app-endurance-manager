@@ -262,7 +262,7 @@ function nextBox(all,now){
   return `<aside class="home-next-box"><h2 class="home-next-label">${live?'En course':'Ta prochaine course'}</h2>
     <p class="home-next-name">${esc(event.name)}</p><p class="home-next-when">${esc(when(startsAt))} · ${esc(hour(startsAt))}</p>
     ${rows.length?`<dl class="home-next-rows">${rows.map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}
-    ${go}${state.combos && memoHref(event,crew?.car) ? `<a class="home-next-go" href="${esc(memoHref(event,crew?.car))}">Fiche mémo →</a>` : ''}</aside>`;
+    ${go}${state.combos && memoHref(event,crew?.car,crew?.id) ? `<a class="home-next-go" href="${esc(memoHref(event,crew?.car,crew?.id))}">Fiche mémo →</a>` : ''}</aside>`;
 }
 
 // « Équipages à former » (organisers): the starts where pilots wait for a crew or ask for one, and the way to the

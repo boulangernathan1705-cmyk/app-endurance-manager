@@ -26,8 +26,27 @@ const view = {
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
   tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, zone:null, sort:'lap', sessions:new Map(), loading:false, error:''}
 };
-try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
-const saveHidden = () => { try { localStorage.setItem(STORE, JSON.stringify([...view.hidden])); } catch {} };
+view.scope='all'; view.favorites=new Set();
+function readPrefs(scope) {
+  if (!scope || view.preferenceScope===scope) return;
+  view.preferenceScope=scope; view.hidden=new Set(); view.favorites=new Set();
+  try { const saved=JSON.parse(localStorage.getItem(STORE+':'+scope)||'{}');
+    view.hidden=new Set(Array.isArray(saved.hidden)?saved.hidden:[]);
+    view.favorites=new Set(Array.isArray(saved.favorites)?saved.favorites:[]);
+  } catch {}
+}
+const saveHidden=()=>{if(!view.preferenceScope)return;try{localStorage.setItem(STORE+':'+view.preferenceScope,JSON.stringify({hidden:[...view.hidden],favorites:[...view.favorites]}));}catch{}};
+function hiddenFor(sheet=view.sheet) {
+  if(view.scope==='all')return new Set();
+  if(view.scope==='custom')return view.hidden;
+  return new Set((sheet?.drivers||[]).filter(d=>view.scope==='me'?!d.me:!view.crew?.members.includes(d.id)).map(d=>d.id));
+}
+function crewMatches(combo) {
+  if(!view.crew||!combo)return false;
+  const q=new URLSearchParams({circuit:view.crew.circuit});
+  if(view.crew.car)q.set('car',view.crew.car);
+  return memoCandidates([combo],q).length===1;
+}
 
 async function call(path, method = 'GET', data) {
   let response;
@@ -77,16 +96,18 @@ async function start() {
   if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link;
+    view.combos = list.combos; view.link = link; readPrefs(list.preferenceScope);
   } catch (error) { renderError(error); return; }
+  if (params.get('crew')) { try { view.crew=await call('/api/combos/crew?id='+encodeURIComponent(params.get('crew'))); } catch { view.message='Équipage indisponible : la fiche reste accessible pour la communauté.'; } }
   selectRequestedCombo(params);
+  if(crewMatches(view.combo))view.scope='crew';
   if (view.combo) await loadSheet(); else render();
 }
 
 function selectRequestedCombo(params) {
   const label = memoRequestLabel(params);
   const candidates = memoCandidates(view.combos, params);
-  view.combo = label ? (candidates.length === 1 ? candidates[0] : null) : view.combos[0] || null;
+  view.combo = label ? (candidates.length === 1 ? candidates[0] : null) : view.combos.find(item=>view.favorites.has(comboKey(item))) || view.combos[0] || null;
   view.requested = !view.combo ? label : '';
   view.candidates = view.requested ? candidates : [];
 }
@@ -136,12 +157,14 @@ async function openCombo(track, car) {
   const combo = view.combos.find(item => item.track === track && item.car === car);
   if (!combo || (view.combo && comboKey(combo) === comboKey(view.combo))) { render(); return; }
   Object.assign(view, {combo, requested:'', candidates:[], event:'', setup:'', compareEvent:'', cond:null, compound:null, stint:null, tyreInitial:100, tyreRelays:1});
+  if(view.scope==='crew'&&!crewMatches(combo))view.scope='all';
   view.analysis.zone = null;
   await loadSheet();
 }
 
 function remember() {
   const query = sheetQuery();
+  if(view.crew&&crewMatches(view.combo))query.set('crew',view.crew.id);
   if (view.tab === 'analysis') query.set('tab', 'analyse');
   if (view.compareEvent) query.set('compare', view.compareEvent);
   history.replaceState(null, '', `${location.pathname}?${query}${location.hash}`);
@@ -266,11 +289,11 @@ function people() {
 // ---------- The crew row ----------
 
 function paceRows(condition, sheet = view.sheet) {
-  return paceStats(sheet?.conditions[condition]?.drivers || [], people(), view.hidden);
+  return paceStats(sheet?.conditions[condition]?.drivers || [], people(), hiddenFor(sheet));
 }
 
 function tyreRows(condition, compound) {
-  return tyreStats(view.sheet.conditions[condition]?.compounds[compound]?.drivers || [], people(), view.hidden);
+  return tyreStats(view.sheet.conditions[condition]?.compounds[compound]?.drivers || [], people(), hiddenFor());
 }
 
 const nameCell = (row, dot = false) => `<td class="cb-name" style="--dc:${esc(row.color)}">${dot ? '<span class="cb-dot"></span>' : ''}${esc(row.name)}${row.me ? ' (moi)' : ''}</td>`;
@@ -301,7 +324,7 @@ function header() {
   const time = view.loadedAt ? `À jour à ${new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 'Actualiser';
   return `<div class="cb-hero"><div class="cb-hero-top"><span class="cb-crumb">Fiche mémo · <span class="cb-word">Le Mans Ultimate</span><span class="cb-short">LMU</span></span>
       <div class="cb-tools"><button type="button" class="cb-btn is-quiet" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${esc(time)}" aria-label="Actualiser">↻<span class="cb-word"> ${view.refreshing ? 'Actualisation…' : 'Actualiser'}</span></button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn is-quiet" data-action="export" title="Exporter la fiche (JSON)">Exporter</button>' : ''}</div></div>
-    ${picker()}${sheet ? sample() : ''}</div>
+    <button type="button" class="cb-btn is-quiet" data-action="favorite" aria-pressed="${view.favorites.has(comboKey(view.combo))}">${view.favorites.has(comboKey(view.combo))?'★ Retirer des favoris':'☆ Ajouter aux favoris'}</button>${picker()}${sheet ? sample() : ''}</div>
     <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
 }
 
@@ -312,13 +335,15 @@ function picker() {
   const carClass = view.sheet?.combo?.carClass || combo.carClass;
   const tracks = new Map();
   for (const item of view.combos) tracks.set(item.track, [...(tracks.get(item.track) || []), item]);
+  const favoriteItems=view.combos.filter(item=>view.favorites.has(comboKey(item)));
+  const favorites=favoriteItems.length?`<li><span class="cb-pick-track">★ Favoris</span><div class="cb-pick-cars">${favoriteItems.map(item=>`<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}"><b>${esc(item.car)}</b><span>${esc(item.track)}</span></button>`).join('')}</div></li>`:'';
   const list = [...tracks].sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([track, cars]) => `<li><span class="cb-pick-track">${esc(track)}</span>
     <div class="cb-pick-cars">${cars.map(item => `<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}" aria-pressed="${comboKey(item) === current}">
       <b>${esc(item.car)}</b><span>${[item.carClass, `${item.laps} tours`, `${item.drivers} pilote${item.drivers > 1 ? 's' : ''}`, item.last ? day(item.last) : ''].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div></li>`).join('');
   return `<details class="cb-picker" data-fold="picker"${view.pickerOpen ? ' open' : ''}>
     <summary><span class="cb-picker-what"><span class="cb-picker-track">${esc(combo.track)}</span><span class="cb-picker-car">${esc(combo.car)}${carClass ? ` · ${esc(carClass)}` : ''}</span></span>
       <span class="cb-picker-change">${tracks.size} circuit${tracks.size > 1 ? 's' : ''}<b>Changer</b></span></summary>
-    <div class="cb-picker-body"><ul>${list}</ul><p class="cb-src">Un circuit ou une voiture apparaît ici dès qu’un pilote y a roulé avec le plugin.</p></div></details>`;
+    <div class="cb-picker-body"><ul>${favorites}${list}</ul><p class="cb-src">Un circuit ou une voiture apparaît ici dès qu’un pilote y a roulé avec le plugin.</p></div></details>`;
 }
 
 function filters() {
@@ -345,7 +370,8 @@ function sample() {
 function drivers() {
   const list = [...people().values()];
   if (!list.length) return '';
-  return `<div class="cb-drivers" role="group" aria-label="Pilotes affichés">${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!view.hidden.has(item.id)}" title="${view.hidden.has(item.id) ? 'Afficher' : 'Masquer'} ${esc(item.name)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div>`;
+  const hidden=hiddenFor();
+  return `<div class="cb-drivers" role="group" aria-label="Pilotes affichés">${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!hidden.has(item.id)}" title="${hidden.has(item.id) ? 'Afficher' : 'Masquer'} ${esc(item.name)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div>`;
 }
 
 function swatches() {
@@ -355,7 +381,7 @@ function swatches() {
 
 // Above the sheet, over its whole width: the pilots shown, and the filters folded in one line.
 function toolbar() {
-  return `<div class="cb-toolbar">${drivers()}<details class="cb-filterbox" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres<span>${esc(activeFilters())}</span></summary>
+  return `<div class="cb-toolbar"><div class="cb-drivers" role="group" aria-label="Périmètre des statistiques">${[['all','Communauté'],...(crewMatches(view.combo)?[['crew','Mon équipage']]:[]),['me','Moi'],['custom','Personnalisé']].map(([key,label])=>`<button type="button" class="cb-chip" data-scope="${key}" aria-pressed="${view.scope===key}">${label}</button>`).join('')}</div>${view.scope==='crew'?`<p class="cb-src">${esc(view.crew.name)} · ${view.crew.members.length} comptes liés à des pilotes inscrits</p>`:''}${drivers()}<details class="cb-filterbox" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres<span>${esc(activeFilters())}</span></summary>
     <div class="cb-filterbox-body">${filters()}${swatches()}</div></details></div>`;
 }
 
@@ -557,7 +583,7 @@ async function loadHistory() {
 }
 function historyCard() {
   const key=historyKey(), h=view.history?.key===key?view.history:null;
-  const names=people(), show=id=>!view.hidden.has(id);
+  const names=people(),hidden=hiddenFor(),show=id=>!hidden.has(id);
   const name=id=>esc(names.get(id)?.name || 'Pilote');
   const rows=(h?.data?.stints||[]).filter(row=>show(row.pilot));
   const stops=(h?.data?.stops||[]).filter(row=>show(row.pilot));
@@ -616,7 +642,7 @@ function render() {
 
 // The filters in use, for the folded panel's title.
 function activeFilters() {
-  const count = [view.event, view.version, view.since, view.until, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + view.hidden.size;
+  const count = [view.event, view.version, view.since, view.until, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + hiddenFor().size;
   return count ? `${count} actif${count > 1 ? 's' : ''}` : 'aucun filtre';
 }
 
@@ -666,7 +692,10 @@ app.addEventListener('click', async event => {
   }
   const target = event.target.closest('button');
   if (!target || !app.contains(target)) return;
+  if (target.dataset.scope) {view.scope=target.dataset.scope;render();return;}
+  if(target.dataset.action==='favorite'){const key=comboKey(view.combo);view.favorites.has(key)?view.favorites.delete(key):view.favorites.add(key);saveHidden();render();return;}
   if (target.dataset.driver) {
+    if(view.scope!=='custom'){view.hidden=hiddenFor();view.scope='custom';}
     const id = target.dataset.driver;
     view.hidden.has(id) ? view.hidden.delete(id) : view.hidden.add(id);
     saveHidden(); render(); return;

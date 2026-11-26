@@ -20,3 +20,10 @@ test('OAuth memo return preserves safe filters, never an external redirect',()=>
  assert.equal(returnPath('/simhub.html?car=%0Afoo'),'/');
  assert.equal(returnPath('/lmu/?foo=bar'),'/');
 });
+
+test('memo link carries a validated crew identifier through sign-in',()=>{
+ const crew='00000000-0000-4000-8000-000000000001';
+ const link=memoHref({circuit:'spa',format:'endurance'},'Ferrari 499P',crew);
+ assert.equal(new URL(link,'https://site.example').searchParams.get('crew'),crew);
+ assert.equal(returnPath(link),link);
+});
