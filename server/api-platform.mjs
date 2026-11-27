@@ -10,7 +10,8 @@ import {botInvite} from './api-community.mjs';
 import {syncIracingEvents} from './iracing-import.mjs';
 import {iracingSupervision, resolveIracingConflict} from './iracing-supervision.mjs';
 import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
-import {discordPreviewAvailable,diagnoseDiscordPreview,sendDiscordPreview} from './discord-test-preview.mjs';
+import {discordPreviewAvailable,diagnoseDiscordPreview} from './discord-test-preview.mjs';
+import {realDiscordPreview} from './discord-real-preview.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
   if (path === '/api/platform/iracing' && ['GET','POST','PATCH'].includes(method)) {
@@ -35,13 +36,12 @@ export async function platformApi({path, method, request, env, actor, community,
     if (method !== 'POST') fail(405,'Méthode non autorisée.');
     if (request.headers.get('Origin') !== 'https://dev.endurance-manager.app') fail(403,'Origine refusée.');
     const input = await body(request,256);
-    if (!['APERÇU','DIAGNOSTIC'].includes(input.confirm) || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
+    if (!['APERÇU','DIAGNOSTIC','PREPARER_LOGOS'].includes(input.confirm) || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
     const diagnose=input.confirm==='DIAGNOSTIC';
     await rateLimit(request,env,diagnose?'discord-test-diagnostic':'discord-test-preview',diagnose?8:4);
-    const connection=await diagnoseDiscordPreview(env);
-    const result=diagnose||!connection.ok?{...connection,sent:0}:await sendDiscordPreview(env);
+    const result=diagnose?{...await diagnoseDiscordPreview(env),sent:0}:await realDiscordPreview(env,actor,input.confirm);
     // Deliberately log only safe status fields: never the webhook URL, token, raw Discord response or user data.
-    console.log('discord-test-preview',{action:diagnose?'diagnostic':'send',ok:result.ok,stage:result.stage||'finished',httpStatus:result.httpStatus||0,discordCode:result.discordCode||0,sent:result.sent||0});
+    console.log('discord-test-preview',{action:diagnose?'diagnostic':input.confirm==='PREPARER_LOGOS'?'logos':'send',ok:result.ok,stage:result.stage||'finished',httpStatus:result.httpStatus||0,discordCode:result.discordCode||0,sent:result.sent||0});
     return json(result);
   }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
