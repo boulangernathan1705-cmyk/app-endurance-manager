@@ -36,7 +36,7 @@ function supervisionMarkup(result, esc, diagWhen) {
   const problems=result.communities.filter(item=>['error','attention'].includes(item.state)).length;
   return `<p class="members-help">Relevé : ${esc(when(result.generatedAt))} · ${result.communities.length} communauté(s) · ${problems} à surveiller.</p>
     ${result.development?'<p class="members-help">DEV : les tâches planifiées sont désactivées. Les dates ne prouvent pas une panne.</p>':''}
-    ${result.development&&result.testPreviewAvailable?'<div class="setup-actions"><button type="button" class="secondary-button" data-discord-test-preview>Envoyer un aperçu Discord</button><span role="status" class="settings-status"></span></div><p class="members-help">Trois messages fictifs dans le salon du webhook de test. Aucun vocal créé, aucune inscription, aucun ping.</p>':''}
+    ${result.development&&result.testPreviewAvailable?'<div class="setup-actions"><button type="button" class="secondary-button" data-discord-test-preview>Envoyer un aperçu Discord</button><button type="button" class="secondary-button" data-discord-test-diagnostic>Vérifier le webhook</button><span role="status" class="settings-status" data-preview-status></span></div><p class="members-help">Trois messages fictifs dans le salon du webhook de test. Aucun vocal créé, aucune inscription, aucun ping.</p>':''}
     ${!result.botConfigured?'<p class="settings-status" role="alert">Le token du bot n’est pas configuré.</p>':''}
     ${rows||'<p class="members-help">Aucun serveur lié.</p>'}`;
 }
@@ -67,19 +67,24 @@ export function installDiscordSupervision(app, {api, esc, diagWhen}) {
     } catch(error) {status.textContent=error.message;}
     finally {button.disabled=false;}
   }
-  async function sendPreview(button){
-    if(!confirm('Envoyer les trois aperçus fictifs dans le salon Discord de test ?'))return;
-    const status=button.nextElementSibling;
-    button.disabled=true;status.textContent='Envoi…';
+  async function sendPreview(button,diagnose=false){
+    if(!diagnose&&!confirm('Envoyer les trois aperçus fictifs dans le salon Discord de test ?'))return;
+    const area=button.parentElement,status=area.querySelector('[data-preview-status]'),buttons=area.querySelectorAll('button');
+    buttons.forEach(item=>item.disabled=true);status.textContent=diagnose?'Vérification…':'Envoi…';
     try{
-      const result=await api('/api/platform/discord/test-preview','POST',{confirm:'APERÇU'});
-      status.textContent=result.ok?`${result.sent} messages envoyés dans Discord.`:`${result.sent} message(s) confirmé(s). ${result.error}`;
+      const result=await api('/api/platform/discord/test-preview','POST',{confirm:diagnose?'DIAGNOSTIC':'APERÇU'});
+      status.textContent=result.ok?(diagnose?'Webhook valide. Salon de destination : ':`${result.sent} messages envoyés dans Discord.`):`${result.stage||'Envoi'} : ${result.error}${diagnose?'':` (${result.sent||0} message(s) confirmé(s))`}`;
+      if(diagnose&&result.ok&&/^https:\/\/discord\.com\/channels\/\d{15,22}\/\d{15,22}$/.test(result.channelUrl||'')){
+        const link=document.createElement('a');link.href=result.channelUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ouvrir le salon';status.append(link);
+      }
     }catch(error){status.textContent=error.message;}
-    finally{button.disabled=false;}
+    finally{buttons.forEach(item=>item.disabled=false);}
   }
   app.addEventListener('click',event=>{
     const preview=event.target.closest('[data-discord-test-preview]');
     if(preview){sendPreview(preview);return;}
+    const diagnostic=event.target.closest('[data-discord-test-diagnostic]');
+    if(diagnostic){sendPreview(diagnostic,true);return;}
     const thread=event.target.closest('[data-supervision-thread]');
     if(thread)verifySupervisionThread(thread);
     const button=event.target.closest('[data-supervision-refresh]');
