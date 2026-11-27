@@ -246,7 +246,7 @@ test('opening TDZ home resets dates, while browsing and switching views preserve
   await expect(view('Tout')).toHaveAttribute('aria-pressed','true');
 });
 
-test('TDZ weekly list fits seven days on desktop and scrolls only crowded days',async({page})=>{
+test('TDZ weekly list keeps full cards and natural page scrolling on all screens',async({page})=>{
   await page.setViewportSize({width:1440,height:900});
   await page.clock.setFixedTime(Date.parse('2090-10-09T08:00:00Z'));
   const date=i=>'2090-10-'+String(9+i).padStart(2,'0');
@@ -260,22 +260,19 @@ test('TDZ weekly list fits seven days on desktop and scrolls only crowded days',
   const agenda=page.locator('.tdz-agenda'),days=agenda.locator('.tdz-agenda-day[data-day]'),busy=days.nth(3).locator('.tdz-agenda-cards');
   await expect(days).toHaveCount(7);
   await expect(busy.locator('.event-card')).toHaveCount(6);
-  for(const [width,height] of [[1440,900],[1280,768]]){
+  for(const [width,height] of [[1440,900],[1280,768],[390,844]]){
     await page.setViewportSize({width,height});
-    await expect.poll(async()=>{const box=await agenda.boundingBox();return box.y+box.height;}).toBeLessThanOrEqual(height+1);
+    await page.evaluate(()=>window.scrollTo(0,0));
+    await expect(busy).not.toHaveCSS('overflow-y','auto');
+    expect(await busy.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
     const first=await days.first().boundingBox(),last=await days.last().boundingBox();
-    expect(first.y).toBeGreaterThan(0);expect(last.y+last.height).toBeLessThanOrEqual(height+1);
-    expect(await busy.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
-    await expect(busy).toHaveCSS('overflow-y','auto');
-    await busy.evaluate(el=>el.scrollTop=el.scrollHeight);
-    expect(await busy.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
-    await expect(page.getByRole('button',{name:'Semaine suivante'})).toBeInViewport();
+    expect(first.y).toBeGreaterThan(0);
+    expect(last.y+last.height).toBeGreaterThan(height);
+    await days.last().scrollIntoViewIfNeeded();
+    await expect(days.last()).toBeInViewport();
+    expect(await agenda.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(busy.locator('.event-card').last()).toBeVisible();
   }
-  await page.setViewportSize({width:390,height:844});
-  await expect(busy).not.toHaveCSS('overflow-y','auto');
-  expect((await days.last().boundingBox()).y).toBeGreaterThan(844);
-  await expect(busy.locator('.event-card').last()).toBeVisible();
-  expect(await agenda.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
 });
 
 test('community choices update the whole race view and never hide a private event',async({page})=>{
