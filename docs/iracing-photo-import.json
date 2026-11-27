@@ -1,0 +1,1009 @@
+{
+  "candidates": 41,
+  "downloaded": 40,
+  "records": [
+    {
+      "id": "iracing-adelaide",
+      "requestedTitle": "File:Adelaide Grand Prix Track Senna Chicane.jpeg",
+      "fileTitle": "File:Adelaide Grand Prix Track Senna Chicane.jpeg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Adelaide_Grand_Prix_Track_Senna_Chicane.jpeg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Adelaide_Grand_Prix_Track_Senna_Chicane.jpeg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "91e64de8a9129518fabd2842d81836eb2eda52fdb40eb26ab8a42cc5ce40553e",
+      "originalDimensions": [
+        1796,
+        1182
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 25346,
+      "panoramaBytes": 50018,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "John Dalton",
+      "attribution": "",
+      "credit": "Taken by the author in the early 1990s. Scanned on 29/10/2006.",
+      "restrictions": "",
+      "description": "The view through Senna Chicane of the Adelaide Grand Prix Circuit from Pit Straight. The track infrastructure is not in place."
+    },
+    {
+      "id": "iracing-portimao",
+      "requestedTitle": "File:Algarve International Circuit (Unsplash).jpg",
+      "fileTitle": "File:Algarve International Circuit (Unsplash).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Algarve_International_Circuit_(Unsplash).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Algarve_International_Circuit_%28Unsplash%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "8a6ca1018b4f6543aae0cc788cc48c91fed984316ff1ed2c5dba7a92afc1393e",
+      "originalDimensions": [
+        4160,
+        3120
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 41282,
+      "panoramaBytes": 93970,
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "artist": "Pascal Richier pascoual",
+      "attribution": "",
+      "credit": "https://unsplash.com/photos/ECju13NcBzg archive copy at the Wayback Machine",
+      "restrictions": "",
+      "description": "Autódromo Internacional do Algarve, Portimão, Portugal"
+    },
+    {
+      "id": "iracing-mexico",
+      "requestedTitle": "File:Vista aérea del Autódromo Hermanos Rodríguez 03.jpg",
+      "fileTitle": "File:Vista aérea del Autódromo Hermanos Rodríguez 03.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Vista_a%C3%A9rea_del_Aut%C3%B3dromo_Hermanos_Rodr%C3%ADguez_03.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/88/Vista_a%C3%A9rea_del_Aut%C3%B3dromo_Hermanos_Rodr%C3%ADguez_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "655f3fc9c03cce1373ad6729536fe1d43a1e91c0b5a92d1c6279143a5b3d5a24",
+      "originalDimensions": [
+        4032,
+        2268
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 89662,
+      "panoramaBytes": 154946,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "ProtoplasmaKid",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Main grandstand of the File:Vista aérea del Autódromo Hermanos Rodríguez."
+    },
+    {
+      "id": "iracing-interlagos",
+      "requestedTitle": "File:Autodromo Jose Carlos Pace Ferradura e Laranja.jpg",
+      "fileTitle": "File:Autodromo Jose Carlos Pace Ferradura e Laranja.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Autodromo_Jose_Carlos_Pace_Ferradura_e_Laranja.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/4b/Autodromo_Jose_Carlos_Pace_Ferradura_e_Laranja.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "909c604e7d6f5136f39b4e0d8b0d308d4154d459bfeefb72970a9de212b5291c",
+      "originalDimensions": [
+        2288,
+        1712
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 24452,
+      "panoramaBytes": 62682,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "Morio",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Autódromo José Carlos Pace: Ferradura to Laranja"
+    },
+    {
+      "id": "iracing-imola",
+      "requestedTitle": "File:Imola autodromo parte del parco delle acque minerali.jpg",
+      "fileTitle": "File:Imola autodromo parte del parco delle acque minerali.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imola_autodromo_parte_del_parco_delle_acque_minerali.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Imola_autodromo_parte_del_parco_delle_acque_minerali.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "5b94250a21cf15877022ab85a87c1cf08aa4417f28c6121731dbce091b965a36",
+      "originalDimensions": [
+        1620,
+        1080
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 64560,
+      "panoramaBytes": 136336,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Monia Mascagni",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "parco delle Acque Minerali"
+    },
+    {
+      "id": "iracing-monza",
+      "requestedTitle": "File:Circuito de Monza01.jpg",
+      "fileTitle": "File:Circuito de Monza01.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuito_de_Monza01.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d2/Circuito_de_Monza01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "44bb7467b6342be995650942c6aeea9f7ac6415663ee7d7be3962ab2436a057d",
+      "originalDimensions": [
+        3264,
+        2448
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 68854,
+      "panoramaBytes": 148948,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "Sitomon",
+      "attribution": "",
+      "credit": "Flickr",
+      "restrictions": "",
+      "description": "Circuito de Monza, PodiumCircuito de Monza"
+    },
+    {
+      "id": "iracing-mugello",
+      "requestedTitle": "File:Mugello circuit gare in corso.jpg",
+      "fileTitle": "File:Mugello circuit gare in corso.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mugello_circuit_gare_in_corso.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f9/Mugello_circuit_gare_in_corso.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "1b8d2ee6c93e9d4ed467e780443f3010401bfded964b6679935e37f6827c65c3",
+      "originalDimensions": [
+        3984,
+        1218
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 62932,
+      "panoramaBytes": 137672,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Anna.Massini",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Motorcycle races at the Mugello circuit"
+    },
+    {
+      "id": "iracing-barcelona",
+      "requestedTitle": "File:Circuit of Catalunya.jpg",
+      "fileTitle": "File:Circuit of Catalunya.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuit_of_Catalunya.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/69/Circuit_of_Catalunya.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "4d7b77c26e26a3a240e04120e89724e9ad1edb15d333f9739d5eaa140a9fd073",
+      "originalDimensions": [
+        4412,
+        2148
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 48892,
+      "panoramaBytes": 100362,
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "artist": "Tony Hisgett from Birmingham, UK",
+      "attribution": "",
+      "credit": "Circuit of Catalunya Uploaded by oxyman",
+      "restrictions": "",
+      "description": "Circuit of Catalunya"
+    },
+    {
+      "id": "iracing-magny-cours",
+      "requestedTitle": "File:Track near the stands-Circuit de Nevers Magny-Cours.jpg",
+      "fileTitle": "File:Track near the stands-Circuit de Nevers Magny-Cours.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Track_near_the_stands-Circuit_de_Nevers_Magny-Cours.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/ca/Track_near_the_stands-Circuit_de_Nevers_Magny-Cours.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "e79abd018af7fd7382b734ef47b8be914d5c4522f872b68490cf63c046c75377",
+      "originalDimensions": [
+        2560,
+        1920
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 54564,
+      "panoramaBytes": 136226,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Cjp24",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Track near the stands at the Circuit de Nevers Magny-Cours."
+    },
+    {
+      "id": "iracing-misano",
+      "requestedTitle": "File:Misano World Circuit (Misano Adriatico).jpg",
+      "fileTitle": "File:Misano World Circuit (Misano Adriatico).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Misano_World_Circuit_(Misano_Adriatico).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/29/Misano_World_Circuit_%28Misano_Adriatico%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "cc0af230926f24f32d75c677f9c0d42e48bef1cb24701bddf512cedfe6929d83",
+      "originalDimensions": [
+        3264,
+        2448
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 35428,
+      "panoramaBytes": 65754,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "Enrico Siboni",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Curva del carro del Misano World Circuit (Misano Adriatico)"
+    },
+    {
+      "id": "iracing-le-mans",
+      "requestedTitle": "File:Le Mans Classic Circuit.jpg",
+      "fileTitle": "File:Le Mans Classic Circuit.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Le_Mans_Classic_Circuit.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/80/Le_Mans_Classic_Circuit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "dc934f359c459687fbae85558acaeb3213ef25406add9c4c11760d98f58c910e",
+      "originalDimensions": [
+        2576,
+        1716
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 111946,
+      "panoramaBytes": 163424,
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "artist": "Brato",
+      "attribution": "",
+      "credit": "Le fichier vient de l'appareil photo numérique avec lequel j'ai pris cette photo",
+      "restrictions": "",
+      "description": "Photo of the circuit of Mans, at the time of “Le Mans Classic\" on 11, 12 an 13 July 2008. Portion of the circuit beetween the baffle at the end of the straight line of the stands, after the platform ACO, and the Dunlop footbridge."
+    },
+    {
+      "id": "iracing-cota",
+      "requestedTitle": "File:Main straight at COTA.jpg",
+      "fileTitle": "File:Main straight at COTA.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Main_straight_at_COTA.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/82/Main_straight_at_COTA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "217b52988c3a4021b3e62505d3ee742cbc7b4db7bdf3df8b872c323e27d1a595",
+      "originalDimensions": [
+        3264,
+        2448
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 65310,
+      "panoramaBytes": 139584,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Uppsalo",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "View of the main straight of the Circuit of Americas, Austin TX. View from turn 1. Picture taken after the 2014 MotoGP race, during the public track invasion."
+    },
+    {
+      "id": "iracing-daytona",
+      "requestedTitle": "File:Daytona International Speedway.jpg",
+      "fileTitle": "File:Daytona International Speedway.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Daytona_International_Speedway.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/74/Daytona_International_Speedway.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "bf4b63142a4343a11c90e2f8d489531503275479eeed4f5470f8da8ea3f54f56",
+      "originalDimensions": [
+        2592,
+        1952
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 77062,
+      "panoramaBytes": 128528,
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "artist": "ImperialAssassin",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Looking across the Daytona International Speedway's frontstrech."
+    },
+    {
+      "id": "iracing-fuji",
+      "requestedTitle": "File:Race Track - 2019 6 hours of Fuji - FIA World Endurance Championship.jpg",
+      "fileTitle": "File:Race Track - 2019 6 hours of Fuji - FIA World Endurance Championship.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Race_Track_-_2019_6_hours_of_Fuji_-_FIA_World_Endurance_Championship.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Race_Track_-_2019_6_hours_of_Fuji_-_FIA_World_Endurance_Championship.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "aff488713382e6713b7ccee5154d5710ad6785d091f295e6eac2a032d7f94542",
+      "originalDimensions": [
+        5184,
+        3456
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 18230,
+      "panoramaBytes": 41094,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "United Autosports/James Roberts",
+      "attribution": "",
+      "credit": "https://www.flickr.com/photos/unitedautosports/48836188396/in/album-72157711170791451/",
+      "restrictions": "",
+      "description": "Fuji Speedway Race Track, 2019 6 Hours of Fuji."
+    },
+    {
+      "id": "iracing-hockenheim",
+      "requestedTitle": "File:Hockenheimring, Hockenheim (P1100587).jpg",
+      "fileTitle": "File:Hockenheimring, Hockenheim (P1100587).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hockenheimring,_Hockenheim_(P1100587).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Hockenheimring%2C_Hockenheim_%28P1100587%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "1653b2b845737f0db470899a7be7875ae48e5e3c1e534c320ececac05f628fb3",
+      "originalDimensions": [
+        3135,
+        3135
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 83558,
+      "panoramaBytes": 142264,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/deed.en",
+      "artist": "Matti Blume",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Aerial photograph of Hockenheimring in 2023. The old track layout pre-2001 is still visible in the forest on the upper left."
+    },
+    {
+      "id": "iracing-indianapolis",
+      "requestedTitle": "File:Indianapolis-motor-speedway.jpg",
+      "fileTitle": "File:Indianapolis-motor-speedway.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Indianapolis-motor-speedway.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/40/Indianapolis-motor-speedway.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "42992096b07fe1a593aacfa897f6906894190e7835206b00177daf379e414af7",
+      "originalDimensions": [
+        2560,
+        1920
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 96250,
+      "panoramaBytes": 153276,
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "artist": "Not specified (public domain)",
+      "attribution": "",
+      "credit": "",
+      "restrictions": "",
+      "description": ""
+    },
+    {
+      "id": "iracing-road-atlanta",
+      "requestedTitle": "File:Chicane Road Atlanta Esses.jpg",
+      "fileTitle": "File:Chicane Road Atlanta Esses.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chicane_Road_Atlanta_Esses.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/Chicane_Road_Atlanta_Esses.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "49f630e1fb16d28ba22a2b4077ac56e94d4ee4d84d33b56b0a08d50df3384151",
+      "originalDimensions": [
+        2072,
+        3104
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 45170,
+      "panoramaBytes": 60950,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Paradigm Shift Driver Development",
+      "attribution": "",
+      "credit": "Paradigm Shift Driver Development www.paradigmshiftracing.com",
+      "restrictions": "",
+      "description": "Chicane Road Atlanta Esses"
+    },
+    {
+      "id": "iracing-nurburgring-gp",
+      "requestedTitle": "File:Mercedes-Arena Nürburgring.jpg",
+      "fileTitle": "File:Mercedes-Arena Nürburgring.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mercedes-Arena_N%C3%BCrburgring.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Mercedes-Arena_N%C3%BCrburgring.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "0f073a01a1053ba6121eb040ef28652ecbd588c8160c2a13dd3b192cf94319a6",
+      "originalDimensions": [
+        9564,
+        1557
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 30276,
+      "panoramaBytes": 70406,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "No machine-readable author provided. AndyMcG assumed (based on copyright claims).",
+      "attribution": "",
+      "credit": "No machine-readable source provided. Own work assumed (based on copyright claims).",
+      "restrictions": "",
+      "description": "Das ist ein Panoramafoto vom 2002 neu erbauten ersten Streckenteil des Nürburgrings. Die alte Schikane wurde zu einem engen Infield, der Mercedes-Arena, umgebaut. Allerdings kann eine Schikane, zwar in etwas verändeter Form, auch heute noch gefahren werden. Die Mercede-Arena ist die erste Streckenpassage nach der Start-/Zielgeraden."
+    },
+    {
+      "id": "iracing-nordschleife",
+      "requestedTitle": "File:Steilstreckenkurve auf der Nürburgring Nordschleife.jpg",
+      "fileTitle": "File:Steilstreckenkurve auf der Nürburgring Nordschleife.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Steilstreckenkurve_auf_der_N%C3%BCrburgring_Nordschleife.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/43/Steilstreckenkurve_auf_der_N%C3%BCrburgring_Nordschleife.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "aa0d04f8930a9862c02fb059135ee577a5be2d4735624b033d14dec60d3cdef4",
+      "originalDimensions": [
+        1512,
+        1134
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 90254,
+      "panoramaBytes": 148264,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "VLN-Fanclub.de",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Streckenabschnitt Steilstrecke mit Anfahrt zum Karussell auf der Nordschleife des Nürburgrings"
+    },
+    {
+      "id": "iracing-red-bull-ring",
+      "requestedTitle": "File:Luftaufnahme (c)Red Bull Ring.jpg",
+      "fileTitle": "File:Luftaufnahme (c)Red Bull Ring.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Luftaufnahme_(c)Red_Bull_Ring.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/cb/Luftaufnahme_%28c%29Red_Bull_Ring.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "850c69cb0100b6273cc97ebb6580cc9eaeda492eab10e968fdebe728a8f8a708",
+      "originalDimensions": [
+        5016,
+        3344
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 110524,
+      "panoramaBytes": 173818,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Vanessa Machelett",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Luftaufnahme des Red Bull Ring 2022 mit neuer Schikane. (c) Red Bull Ring"
+    },
+    {
+      "id": "iracing-road-america",
+      "requestedTitle": "File:10.27.07 Road America - frontstretch, pit lane.jpg",
+      "fileTitle": "File:10.27.07 Road America - frontstretch, pit lane.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:10.27.07_Road_America_-_frontstretch,_pit_lane.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/a/af/10.27.07_Road_America_-_frontstretch%2C_pit_lane.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "d27fbf960fc3f4f31473243d1a172dd0947131cc2c804976687ceda2870b1559",
+      "originalDimensions": [
+        2304,
+        1728
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 34710,
+      "panoramaBytes": 76208,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "Royal Broil",
+      "attribution": "",
+      "credit": "Flickr",
+      "restrictions": "",
+      "description": "The pit lane (center) and frontstretch (left) at en:Road America, taken from the bridge over the frontstretch.10.27.07 Road America - frontstretch, pit lane"
+    },
+    {
+      "id": "iracing-sebring",
+      "requestedTitle": "File:Sebring sunrise 448813409.jpg",
+      "fileTitle": "File:Sebring sunrise 448813409.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sebring_sunrise_448813409.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fc/Sebring_sunrise_448813409.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "057002cd2f1a69dfa08579984945fb35ad88f28e67d0b750a905c0e22d2da716",
+      "originalDimensions": [
+        2305,
+        912
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 35138,
+      "panoramaBytes": 85290,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "Chuck Schultz from Anniston, AL, USA, upload by Herrick",
+      "attribution": "",
+      "credit": "Sebring Sunrise",
+      "restrictions": "",
+      "description": "Sunrise at Sebring racetrack"
+    },
+    {
+      "id": "iracing-silverstone",
+      "requestedTitle": "File:Silverstone Racing Circuit.jpg",
+      "fileTitle": "File:Silverstone Racing Circuit.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Silverstone_Racing_Circuit.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Silverstone_Racing_Circuit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "d2c57d3da4f13f2f1ca70c9816dd6717f08e7d43f787ed058f6a172a44743c45",
+      "originalDimensions": [
+        4032,
+        3024
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 29552,
+      "panoramaBytes": 49010,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Harvey Milligan",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Silverstone Racing Circuit"
+    },
+    {
+      "id": "iracing-sonoma",
+      "requestedTitle": "File:Green Sonoma Raceway.jpg",
+      "fileTitle": "File:Green Sonoma Raceway.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Green_Sonoma_Raceway.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Green_Sonoma_Raceway.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "0c5a56520141f2efe154a002ce684cfc1795cf0f2a2ff46bcc0b825106e8dab6",
+      "originalDimensions": [
+        4032,
+        3024
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 39404,
+      "panoramaBytes": 74128,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Kkern19",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Turn 7 view of Sonoma Raceway"
+    },
+    {
+      "id": "iracing-suzuka",
+      "requestedTitle": "File:SUZUKA CIRCUIT MAIN STRAIGHT.JPG",
+      "fileTitle": "File:SUZUKA CIRCUIT MAIN STRAIGHT.JPG",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:SUZUKA_CIRCUIT_MAIN_STRAIGHT.JPG",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/00/SUZUKA_CIRCUIT_MAIN_STRAIGHT.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "2adcb2356a5a9b2a892cdce0ebe4a22f058f30037dfff59542e5ab127bc388cc",
+      "originalDimensions": [
+        2476,
+        1802
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 44806,
+      "panoramaBytes": 84616,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Tokumeigakarinoaoshima",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "鈴鹿サーキットメインストレートを撮影。"
+    },
+    {
+      "id": "iracing-thruxton",
+      "requestedTitle": "File:Thruxton race track - pit straight - geograph.org.uk - 1476030.jpg",
+      "fileTitle": "File:Thruxton race track - pit straight - geograph.org.uk - 1476030.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Thruxton_race_track_-_pit_straight_-_geograph.org.uk_-_1476030.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Thruxton_race_track_-_pit_straight_-_geograph.org.uk_-_1476030.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "01c1d75fa0a270ee83e694c7253be97b98fe8b644b57af916d637aa29a4ffe8f",
+      "originalDimensions": [
+        640,
+        480
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 49592,
+      "panoramaBytes": 84028,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "Barrie Cann",
+      "attribution": "Barrie Cann",
+      "credit": "From geograph.org.uk",
+      "restrictions": "",
+      "description": "Thruxton race track - pit straight A collection of Ferraris at Thruxton racing circuit on a 'racing experience' day out. This is the pits area, with the home straight in the background"
+    },
+    {
+      "id": "iracing-vir",
+      "requestedTitle": "File:VirginiaInternationalRacewayPit Road.jpg",
+      "fileTitle": "File:VirginiaInternationalRacewayPit Road.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:VirginiaInternationalRacewayPit_Road.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a2/VirginiaInternationalRacewayPit_Road.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "579c8fc6253c53eb7bb11d462ebd5246563135c1222591517cd1c0d5c5cb2d7b",
+      "originalDimensions": [
+        1664,
+        2496
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 84914,
+      "panoramaBytes": 97838,
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "artist": "Freewheeling Daredevil",
+      "attribution": "",
+      "credit": "originally posted to Flickr as VIR Pit Road",
+      "restrictions": "",
+      "description": "A picture of the pit road for w:Virginia International Raceway. Shot by \"The Daredevil\" at the 2008 Grand Am event at Virginia International Raceway"
+    },
+    {
+      "id": "iracing-zandvoort",
+      "requestedTitle": "File:Circuit Zandvoort motorsport race track in the Netherlands (46940292845).jpg",
+      "fileTitle": "File:Circuit Zandvoort motorsport race track in the Netherlands (46940292845).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuit_Zandvoort_motorsport_race_track_in_the_Netherlands_(46940292845).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/75/Circuit_Zandvoort_motorsport_race_track_in_the_Netherlands_%2846940292845%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "cbd189f153ff2ac22238edc30b1b66accbe1393383181a0bbbafc04d3abab0f9",
+      "originalDimensions": [
+        5464,
+        3640
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 65990,
+      "panoramaBytes": 136148,
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "artist": "dronepicr",
+      "attribution": "",
+      "credit": "Circuit Zandvoort motorsport race track in the Netherlands",
+      "restrictions": "",
+      "description": "Circuit Park Zandvoort"
+    },
+    {
+      "id": "iracing-brands-hatch",
+      "requestedTitle": "File:Brands-hatch.jpg",
+      "fileTitle": "File:Brands-hatch.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Brands-hatch.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/08/Brands-hatch.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "2ca54c9a28bdd3075cfdaed4b22aea8f602b1df0e2fa5a42d5ca0d1a188e8cb7",
+      "originalDimensions": [
+        2032,
+        1524
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 46328,
+      "panoramaBytes": 99654,
+      "license": "Public domain",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "artist": "Whiters",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Brands Hatch, Kent, England, Motor Racing, Grand Prix, Circuit, Brabham Straight, Clark Curve, Pits"
+    },
+    {
+      "id": "iracing-charlotte",
+      "requestedTitle": "File:Charlotte Motor Speedway's finish line.jpg",
+      "fileTitle": "File:Charlotte Motor Speedway's finish line.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Charlotte_Motor_Speedway%27s_finish_line.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/44/Charlotte_Motor_Speedway%27s_finish_line.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "bbea47d3242d9ea6057028235d63add8b4d135ea88e32df728189f7d9b4c2a9e",
+      "originalDimensions": [
+        2800,
+        2128
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 67202,
+      "panoramaBytes": 160204,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Nascar1996",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Looking toward the finish line at Charlotte Motor Speedway from Victory lane."
+    },
+    {
+      "id": "iracing-montreal",
+      "requestedTitle": "File:Circuit Gilles Villeneuve.jpg",
+      "fileTitle": "File:Circuit Gilles Villeneuve.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuit_Gilles_Villeneuve.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c0/Circuit_Gilles_Villeneuve.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "83173df0b0c50244a415449b284f4f69b8a06c40727de20b8d885025c0b79f83",
+      "originalDimensions": [
+        3024,
+        4032
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 75876,
+      "panoramaBytes": 144458,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Jmex",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Le circuit Gilles Villeneuve, base de loisirs hors week-end de Grand Prix"
+    },
+    {
+      "id": "iracing-navarra",
+      "requestedTitle": "File:Circuito de Navarra - DSC 1800 W.JPG",
+      "fileTitle": "File:Circuito de Navarra - DSC 1800 W.JPG",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuito_de_Navarra_-_DSC_1800_W.JPG",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/34/Circuito_de_Navarra_-_DSC_1800_W.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "13be816af6e8e1aace6f47b97d4e13a761cd6b88f9cc3b6999ead3f1a06e12f5",
+      "originalDimensions": [
+        1774,
+        1182
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 95468,
+      "panoramaBytes": 160146,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Juanje 2712",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Circuito de Navarra el día de su inaguración."
+    },
+    {
+      "id": "iracing-zolder",
+      "requestedTitle": "File:Circuit Zolder 6-11-2008 16-29-22.jpg",
+      "fileTitle": "File:Circuit Zolder 6-11-2008 16-29-22.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circuit_Zolder_6-11-2008_16-29-22.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Circuit_Zolder_6-11-2008_16-29-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "536935fd981579869fb597c386f2c88b7b99191e73b5cda4e6077f1e99792767",
+      "originalDimensions": [
+        2896,
+        1944
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 68058,
+      "panoramaBytes": 141550,
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "Paul Hermans",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Circuit te Zolder, België"
+    },
+    {
+      "id": "iracing-long-beach",
+      "requestedTitle": "File:LongBeachCircuit-SeasideWayTurn (33976611733).jpg",
+      "fileTitle": "File:LongBeachCircuit-SeasideWayTurn (33976611733).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:LongBeachCircuit-SeasideWayTurn_(33976611733).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3b/LongBeachCircuit-SeasideWayTurn_%2833976611733%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "5482432ebe5d1ce3f5666c7fd46c2103b96b50b27acc33a6e5ef9add980023da",
+      "originalDimensions": [
+        2400,
+        1600
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 75182,
+      "panoramaBytes": 145306,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "formulanone from Huntsville, United States",
+      "attribution": "",
+      "credit": "LongBeachCircuit-SeasideWayTurn",
+      "restrictions": "",
+      "description": "LongBeachCircuit-SeasideWayTurn"
+    },
+    {
+      "id": "iracing-motegi",
+      "requestedTitle": "File:Twin Ring Motegi start finish line 2008 Motegi.jpg",
+      "fileTitle": "File:Twin Ring Motegi start finish line 2008 Motegi.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Twin_Ring_Motegi_start_finish_line_2008_Motegi.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b0/Twin_Ring_Motegi_start_finish_line_2008_Motegi.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "37682ad6fdb5564c9daf89b74b88ce6fea4ca2583d52cca3bdad713263655473",
+      "originalDimensions": [
+        1024,
+        768
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 28248,
+      "panoramaBytes": 59266,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "ranpie",
+      "attribution": "",
+      "credit": "https://www.flickr.com/photos/ranpie/2931405007/in/album-72157622696600554/",
+      "restrictions": "",
+      "description": "The start/finish line of the Twin Ring Motegi in 2008, with the A-Style adverts shown prominently on the foreground."
+    },
+    {
+      "id": "iracing-oschersleben",
+      "requestedTitle": "File:Aerial image of Motorsport Arena Oschersleben (view from the west).jpg",
+      "fileTitle": "File:Aerial image of Motorsport Arena Oschersleben (view from the west).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Aerial_image_of_Motorsport_Arena_Oschersleben_(view_from_the_west).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Aerial_image_of_Motorsport_Arena_Oschersleben_%28view_from_the_west%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "b0405a1dfbe4fdbf60fc7a9d01be32ea9c31128f92da1b694c8a12b7fed68da5",
+      "originalDimensions": [
+        5000,
+        2700
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 98644,
+      "panoramaBytes": 141306,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Carsten Steger",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Aerial image of Motorsport Arena Oschersleben (view from the west)"
+    },
+    {
+      "id": "iracing-oulton-park",
+      "requestedTitle": "File:Oulton Park race track - geograph.org.uk - 7804217.jpg",
+      "fileTitle": "File:Oulton Park race track - geograph.org.uk - 7804217.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Oulton_Park_race_track_-_geograph.org.uk_-_7804217.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Oulton_Park_race_track_-_geograph.org.uk_-_7804217.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "01b01dea54ab11aab06b15d93ea8d47a9b8d87d8ec2ae761e4f002ab912f4003",
+      "originalDimensions": [
+        4080,
+        3072
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 88224,
+      "panoramaBytes": 163426,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "TCExplorer",
+      "attribution": "Oulton Park race track by TCExplorer",
+      "credit": "Geograph Britain and Ireland",
+      "restrictions": "",
+      "description": "Oulton Park race track"
+    },
+    {
+      "id": "iracing-snetterton",
+      "requestedTitle": "File:Bentley Straight, Snetterton - geograph.org.uk - 7783372.jpg",
+      "fileTitle": "File:Bentley Straight, Snetterton - geograph.org.uk - 7783372.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bentley_Straight,_Snetterton_-_geograph.org.uk_-_7783372.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/21/Bentley_Straight%2C_Snetterton_-_geograph.org.uk_-_7783372.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "40e0fc8654dc3347ff202516407423015761ea9fec51c94ceddf066d68b7448d",
+      "originalDimensions": [
+        4080,
+        3072
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 44068,
+      "panoramaBytes": 118548,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "TCExplorer",
+      "attribution": "Bentley Straight, Snetterton by TCExplorer",
+      "credit": "Geograph Britain and Ireland",
+      "restrictions": "",
+      "description": "Bentley Straight, Snetterton"
+    },
+    {
+      "id": "iracing-summit-point",
+      "requestedTitle": "File:Track Day Civic 166 SP24.jpg",
+      "fileTitle": "File:Track Day Civic 166 SP24.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Track_Day_Civic_166_SP24.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/07/Track_Day_Civic_166_SP24.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "220131ffbd72c60ad1a8cb9979e56a47c96f7446b808b46d2bbfc7e59366f850",
+      "originalDimensions": [
+        3008,
+        2000
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 21540,
+      "panoramaBytes": 41322,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "SmackJam",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "#166 Honda Civic Type R (FL5) during a track day at Summit Point Motorsports Park in August 2024."
+    },
+    {
+      "id": "iracing-the-bend",
+      "requestedTitle": "File:The Bend Motorsport Park (Aerial).jpg",
+      "fileTitle": "File:The Bend Motorsport Park (Aerial).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_Bend_Motorsport_Park_(Aerial).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/4e/The_Bend_Motorsport_Park_%28Aerial%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "5272ac8d0807e946986bff84ecdc19edca6aa71fb422a82d0b44d1ad718c10c9",
+      "originalDimensions": [
+        2650,
+        1491
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 58372,
+      "panoramaBytes": 116080,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Nathan Fenn",
+      "attribution": "",
+      "credit": "Own work",
+      "restrictions": "",
+      "description": "Aerial Photograph of the Bend Motorsport Park, Captured by passing aircraft."
+    }
+  ],
+  "errors": {
+    "iracing-watkins-glen": "Not a suitable raster image"
+  }
+}
