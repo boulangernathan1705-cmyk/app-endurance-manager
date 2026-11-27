@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import scheduledWorker, {scheduledJob} from '../server/worker-with-migrations.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, crewVoiceName, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -1036,4 +1036,13 @@ test('a refused deletion of a historical archived text channel retains its id', 
   discord.state.deleteStatus=null;
   assert.equal((await sync(now+60_000)).purged,1);
   assert.equal(DB.db.prepare("SELECT archived_id FROM crew_discord WHERE crew_id='old-archive'").get().archived_id,null);
+});
+
+
+test('compact names retain simulator categories and a visible vehicle even for long crew names',()=>{
+  assert.equal(crewVoiceName({crew_name:'TDZ 01',car:'Toyota GR010 Hybrid',category:'Hypercar'}),'#TDZ 01 · Toyota GR010 · HY');
+  assert.equal(crewVoiceName({crew_name:'TDZ 02',car:'Oreca 07 Gibson ELMS',category:'LMP2 ELMS'}),'#TDZ 02 · Oreca 07 ELMS · LMP2 ELMS');
+  assert.equal(crewVoiceName({crew_name:'TDZ 03',car:'Porsche 963 GTP',category:'GTP',circuit:'iracing-spa'}),'#TDZ 03 · Porsche 963 · GTP');
+  const long=crewVoiceName({crew_name:'X'.repeat(180),car:'Ferrari 296 LMGT3',category:'GT3'});
+  assert.ok(long.length<=100);assert.ok(long.endsWith(' · Ferrari 296 · GT3'));
 });

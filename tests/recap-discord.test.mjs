@@ -1517,3 +1517,21 @@ test('a refused expired recap does not starve other expired races',async t=>{
   setFailure(null);
   assert.equal(await cleanupEventRecaps(env,at+120_000,1),1);
 });
+
+
+test('a historical race thread is renamed in place, without deleting its messages or changing settings',async t=>{
+  const {DB,env,channels,calls}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'top'});
+  await syncBotRecaps(env,NOW,COMMUNITY);await syncBotRecaps(env,NOW,COMMUNITY);
+  const thread=channels.find(item=>item.type===11);
+  const row=DB.db.prepare("SELECT * FROM discord_recap_publications WHERE event_id='race-a'").get();
+  const settings=DB.db.prepare('SELECT layout,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').get(DEV_COMMUNITY);
+  thread.name='🏎️ LMU · 6h de Spa';
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='historical' WHERE event_id='race-a'").run();
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(thread.name,'LMU · 6h de Spa');
+  assert.equal(DB.db.prepare("SELECT channel_id,message_id FROM discord_recap_publications WHERE event_id='race-a'").get().channel_id,row.channel_id);
+  assert.equal(DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id,row.message_id);
+  assert.ok(!calls.some(call=>call.method==='DELETE'&&call.path.startsWith(`/channels/${thread.id}`)));
+  assert.deepEqual(DB.db.prepare('SELECT layout,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').get(DEV_COMMUNITY),settings);
+});

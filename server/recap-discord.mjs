@@ -715,10 +715,13 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
+  const {payload, hash:payloadHash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
+  // Store the checked thread name with the content hash: routine edits need no extra Discord read.
+  const nameTag = threaded ? `thread-name-v1:${await digest(raceThreadName(event))}:` : '';
+  const hash = nameTag + payloadHash;
   if (!repair && row.message_id && row.content_hash === hash) return;
-  // Rename an existing thread only when its recap is already due for an update. Never recreate it for its name.
-  if (threaded && row.message_id) {
+  // Rename once (or after the event changes its name), never recreate a thread for its name.
+  if (threaded && row.message_id && !String(row.content_hash || '').startsWith(nameTag)) {
     const existing = await discord(env,'GET',`/channels/${channel}`,null,budget).catch(error => { if (error.status !== 404 || error.code !== 10003) throw error; return null; });
     const wanted = raceThreadName(event);
     if (existing?.name && existing.name !== wanted) {

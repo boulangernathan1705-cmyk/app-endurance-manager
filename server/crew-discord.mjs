@@ -101,7 +101,7 @@ function recapPayload(env, community, row, start, pilots) {
   const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
-  const names = ordered.map(pilot => safeText(pilot.name) && safeText(pilot.name)).filter(Boolean);
+  const names = ordered.map(pilot => safeText(pilot.name)).filter(Boolean);
   const weather = weatherOf(row);
   const lines = [
     `Équipage **${safeText(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Il reste de la place'}`,
@@ -553,8 +553,7 @@ export async function serverCategories(env, guildId) {
 const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - Number(row.created_at) < WAIT_CATEGORY
   && (row.race_scope === 'all' || row.race_scope === game(row.circuit));
 
-// In its race's category the crew's name is enough; elsewhere the sim and the race come first (« LMU · 6h de Spa · Équipage A »).
-// « 🏎️ LMU · 6h de Spa · Équipage A »: the race's logo in front, as its thread.
+// One compact voice name, regardless of the category selected by the administrator.
 export const crewVoiceName = row => {
   const car = safe(carShortName(row.car)) || 'Voiture à choisir';
   const category = safe(row.category === 'Hypercar' ? 'HY' : row.category);
