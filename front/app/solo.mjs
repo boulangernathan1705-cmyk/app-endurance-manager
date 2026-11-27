@@ -204,8 +204,8 @@ export function soloCounts(event, departure) {
 }
 
 // Places taken / places available, and the waiting list.
-export function soloFill(event, departure = event.departures?.[0]) {
-  const {confirmed, waiting, capacity} = soloCounts(event, departure);
+export function soloFill(event, departure = event.departures?.[0], counts = soloCounts(event, departure)) {
+  const {confirmed, waiting, capacity} = counts;
   const ratio = capacity ? Math.min(1, confirmed / capacity) : 0;
   const full = capacity && confirmed >= capacity;
   return `<span class="solo-fill${full ? ' is-full' : ''}"><span class="solo-fill-copy"><strong>${confirmed}${capacity ? ` / ${capacity}` : ''}</strong> ${confirmed > 1 ? 'inscrits' : 'inscrit'}${waiting ? ` · <em>${waiting} en attente</em>` : ''}${full && !waiting ? ' · <em>complet</em>' : ''}</span><span class="solo-fill-bar" aria-hidden="true"><span style="width:${Math.round(ratio * 100)}%"></span></span></span>`;
