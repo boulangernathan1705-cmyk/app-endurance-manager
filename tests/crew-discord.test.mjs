@@ -4,7 +4,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import scheduledWorker, {scheduledJob} from '../server/worker-with-migrations.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, crewVoiceName, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
+import {rememberDisplayEmojis} from '../server/discord-display-emojis.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -36,6 +37,7 @@ function fakeDiscord(){
     if(method==='DELETE'&&state.deleteStatus)return reply(state.deleteStatus,{code:50013});
     if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
+    if(method==='GET'&&path==='/applications/app-id/emojis')return reply(200,{items:[]});
     if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return state.botAbsent?reply(404,{code:10007}):reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
@@ -235,7 +237,7 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   assert.equal((await sync(startsAt-30*24*HOUR)).opened,0);assert.deepEqual(created(discord.calls,mark),[]);
   assert.equal((await sync(RACE_MONDAY)).opened,1);
   const channels=created(discord.calls,mark);
-  assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'🏎️ LMU · 6h SPA · Les Tondeuz',type:2,permission_overwrites:BOT_ACCESS});
+  assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'#Les Tondeuz · Voiture à choisir · GT3',type:2,permission_overwrites:BOT_ACCESS});
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.ok(row.voice_id&&row.message_id);assert.equal(row.text_id,null);assert.equal(row.category_id,null);
   const recap=discord.calls.slice(mark).find(call=>call.path===`/channels/${row.voice_id}/messages`);
@@ -245,7 +247,7 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   const card=recap.body.embeds[0];
   assert.equal(recap.body.content,'');assert.match(card.description,/^Équipage \*\*Les Tondeuz\*\* · 🔓/);
   // One column for the narrow chat of a voice: no side-by-side boxes, no side picture, the start in Paris words.
-  assert.match(card.description,/\nAlice · responsable/);assert.equal(card.fields,undefined);assert.equal(card.thumbnail,undefined);
+  assert.match(card.description,/\nAlice(?:\n|$)/);assert.doesNotMatch(card.description,/responsable/);assert.equal(card.fields,undefined);assert.equal(card.thumbnail,undefined);
   assert.match(card.description,/🟢 \*\*\S+ \d+ \S+ · \d+h\d\d\*\*/);assert.doesNotMatch(card.description,/<t:\d+:F>/);
   assert.equal(recap.body.components[0].components[0].url,card.url);assert.match(card.url,new RegExp(`#event=${event.id}$`));
   // Nothing changed: nothing sent.
@@ -274,22 +276,22 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR);
   const changed=discord.calls.slice(mark);
-  // The recap is edited; the voice is only read (its name has not changed), never renamed.
-  assert.deepEqual(changed.map(call=>`${call.method} ${call.path}`),[`PATCH /channels/${row.voice_id}/messages/${row.message_id}`,`GET /channels/${row.voice_id}`]);assert.match(JSON.stringify(changed[0].body),/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
+  // The recap and voice name follow the selected car.
+  assert.deepEqual(changed.map(call=>`${call.method} ${call.path}`),[`PATCH /channels/${row.voice_id}/messages/${row.message_id}`,`GET /channels/${row.voice_id}`,`PATCH /channels/${row.voice_id}`]);assert.equal(changed[2].body.name,'#Les Tondeuz · Ferrari 296 · GT3');assert.match(JSON.stringify(changed[0].body),/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
 
   // The crew is renamed: the recap and the voice follow, once, without a new channel.
   crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Faucheuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR+60_000);
   const renamed=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
-  assert.deepEqual(renamed.map(call=>call.body),[{name:'🏎️ LMU · 6h SPA · Les Faucheuz'}]);assert.deepEqual(created(discord.calls,mark),[]);
+  assert.deepEqual(renamed.map(call=>call.body),[{name:'#Les Faucheuz · Ferrari 296 · GT3'}]);assert.deepEqual(created(discord.calls,mark),[]);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR+120_000);
   assert.ok(!discord.calls.slice(mark).some(call=>call.method==='PATCH'),'renamed once');
   // And back.
   crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR+180_000);
-  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).map(call=>call.body),[{name:'🏎️ LMU · 6h SPA · Les Tondeuz'}]);
+  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).map(call=>call.body),[{name:'#Les Tondeuz · Ferrari 296 · GT3'}]);
 
   // 24 h before: a reminder in the voice channel's chat and on the bell (with the channel); sent once.
   mark=discord.calls.length;await sync(startsAt-23*HOUR);
@@ -465,7 +467,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,null);
   mark=discord.calls.length;await sync(at+4*HOUR);
   const again=discord.calls.slice(mark).filter(call=>call.method!=='GET');
-  assert.deepEqual(again[0].body,{name:'🏎️ LMU · 6h SPA · Retour',type:2,permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(again[0].body,{name:'#Retour · Voiture à choisir · GT3',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
 });
 
@@ -486,7 +488,7 @@ test('the admins choose where the voice channels are made, as soon as they turn 
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Rangés',category:'GT3'},'pilot')).status,201);
   let mark=discord.calls.length;await sync(at);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'🏎️ LMU · 6h SPA · Rangés',type:2,parent_id:'500000000000000002',permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Rangés · Voiture à choisir · GT3',type:2,parent_id:'500000000000000002',permission_overwrites:BOT_ACCESS});
   // The category is deleted on Discord: the choice is forgotten, the admins are told, the next one goes on top.
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   discord.state.goneCategory='500000000000000002';
@@ -496,7 +498,7 @@ test('the admins choose where the voice channels are made, as soon as they turn 
   const setting=DB.db.prepare('SELECT * FROM community_crew_discord').get();
   assert.equal(setting.voice_category_id,null);assert.match(setting.last_error,/n’existe plus/);
   mark=discord.calls.length;await sync(at+3*HOUR);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'🏎️ LMU · 6h SPA · Rangés',type:2,permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Rangés · Voiture à choisir · GT3',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal((await req('/api/community/modules','PATCH',{crewCategory:''},'admin')).status,200);
 });
 
@@ -518,14 +520,14 @@ test('when the recap gives each race its category, the crews\' voice channels go
   discord.state.channels.push({id:'600000000000000001',type:4,name:'Course'});
   DB.db.prepare("UPDATE discord_recap_publications SET category_id='600000000000000001'").run();
   mark=discord.calls.length;await sync(at+2*HOUR);
-  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH').map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'Avant',permission_overwrites:BOT_ACCESS}]]);
+  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH').map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'#Avant · Voiture à choisir · GT3',permission_overwrites:BOT_ACCESS}]]);
   mark=discord.calls.length;await sync(at+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   // A crew made afterwards is created there directly.
   await login('444444444444444444','third','Chloé');
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'third')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'third')).status,201);
   mark=discord.calls.length;await sync(at+4*HOUR);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Après · Voiture à choisir · GT3',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
 });
 
 test('with « Une catégorie par course », a new crew\'s voice channel waits for its race\'s category, at most an hour', async () => {
@@ -543,13 +545,13 @@ test('with « Une catégorie par course », a new crew\'s voice channel waits fo
   discord.state.channels.push({id:'600000000000000001',type:4,name:'Course'});
   DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'600000000000000001','m')").run(DEV,event.id,GUILD);
   mark=discord.calls.length;await sync(at+40*60_000);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Attente',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Attente · Voiture à choisir · GT3',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
   assert.ok(!discord.calls.slice(mark).some(call=>call.method==='PATCH'&&call.path.startsWith('/channels/')&&call.body?.parent_id),'never moved');
   // No category after an hour (recap failing): made where the admins chose.
   DB.db.prepare('DELETE FROM discord_recap_publications').run();DB.db.prepare('DELETE FROM crew_discord').run();
   mark=discord.calls.length;await sync(at+2*HOUR);assert.deepEqual(created(discord.calls,mark),[]);
   mark=discord.calls.length;await sync(at+3*HOUR+60_000);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'🏎️ LMU · 6h SPA · Attente',type:2,permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Attente · Voiture à choisir · GT3',type:2,permission_overwrites:BOT_ACCESS});
 });
 
 test('a race category deleted on Discord is forgotten: no error, the recap makes it again', async () => {
@@ -583,7 +585,7 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Fil',category:'GT3'},'pilot')).status,201);
   let mark=discord.calls.length;await sync(at);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'🏎️ LMU · 6h SPA · Fil',type:2,parent_id:'600000000000000007',permission_overwrites:BOT_ACCESS});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'#Fil · Voiture à choisir · GT3',type:2,parent_id:'600000000000000007',permission_overwrites:BOT_ACCESS});
   // An iRacing race with « LMU » only: no voice.
   DB.db.prepare("UPDATE events SET circuit='iracing-spa' WHERE id=?").run(event.id);
   DB.db.prepare('DELETE FROM crew_discord').run();
@@ -656,7 +658,7 @@ test('an empty crew gets its voice channel from the Monday of its race\'s week',
   const monday=Date.parse('2090-10-08T22:00:00Z');
   assert.equal((await sync(monday-1)).opened,0);
   assert.equal((await sync(monday)).opened,1);
-  assert.deepEqual(created(discord.calls,mark).map(call=>call.body.name),['🏎️ LMU · 6h SPA · Sans pilote']);
+  assert.deepEqual(created(discord.calls,mark).map(call=>call.body.name),['#Sans pilote · Voiture à choisir · GT3']);
 });
 
  test('Discord deletion failures keep the tracking row for a scheduled retry', async () => {
@@ -801,7 +803,7 @@ test('private voice destination blocks activation before writes; an admin except
   const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
   await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Pilotes privés',category:'GT3'},'admin');
   assert.equal((await sync(Date.now())).opened,1);
-  const voice=discord.state.channels.find(item=>item.name==='🏎️ LMU · 6h SPA · Pilotes privés');
+  const voice=discord.state.channels.find(item=>item.name==='#Pilotes privés · Voiture à choisir · GT3');
   assert.deepEqual(voice.permission_overwrites.slice(0,2),[{id:GUILD,type:0,allow:'2080965379087937',deny:'0'},original[1]]);
   assert.deepEqual(voice.permission_overwrites.at(-1),BOT_ACCESS[0]);
   // A vocal made by the previous version is opened on the next sync, without recreation.
@@ -890,7 +892,7 @@ test('a voice channel made before the admins chose « Vocaux d’équipage » mo
   assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'admin')).status,200);
   const mark=discord.calls.length;await sync(at+HOUR);
   const moves=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
-  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'🏎️ LMU · 6h SPA · Anciens');
+  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'#Anciens · Voiture à choisir · GT3');
   assert.equal(DB.db.prepare('SELECT parent_id FROM crew_discord').get().parent_id,'500000000000000002');
   const again=discord.calls.length;await sync(at+2*HOUR);
   assert.equal(discord.calls.slice(again).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).length,0,'moved once');
@@ -915,7 +917,7 @@ test('switching to « récap de la semaine » takes the voices out of their race
   assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'admin')).status,200);
   const mark=discord.calls.length;await sync(at+HOUR);
   const moves=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
-  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'🏎️ LMU · 6h SPA · Équipage A');
+  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'#Équipage A · Voiture à choisir · GT3');
 });
 
 test('voices turned off: the voice channel goes, and comes back if they are turned on again before the race', async () => {
@@ -1036,4 +1038,47 @@ test('a refused deletion of a historical archived text channel retains its id', 
   discord.state.deleteStatus=null;
   assert.equal((await sync(now+60_000)).purged,1);
   assert.equal(DB.db.prepare("SELECT archived_id FROM crew_discord WHERE crew_id='old-archive'").get().archived_id,null);
+});
+
+
+test('compact names retain simulator categories and a visible vehicle even for long crew names',()=>{
+  assert.equal(crewVoiceName({crew_name:'TDZ 01',car:'Toyota GR010 Hybrid',category:'Hypercar'}),'#TDZ 01 · Toyota GR010 · HY');
+  assert.equal(crewVoiceName({crew_name:'TDZ 02',car:'Oreca 07 Gibson ELMS',category:'LMP2 ELMS'}),'#TDZ 02 · Oreca 07 ELMS · LMP2 ELMS');
+  assert.equal(crewVoiceName({crew_name:'TDZ 03',car:'Porsche 963 GTP',category:'GTP',circuit:'iracing-spa'}),'#TDZ 03 · Porsche 963 · GTP');
+  const long=crewVoiceName({crew_name:'X'.repeat(180),car:'Ferrari 296 LMGT3',category:'GT3'});
+  assert.ok(long.length<=100);assert.ok(long.endsWith(' · Ferrari 296 · GT3'));
+});
+
+
+test('a vocal with application logos keeps its exact identity for orphan cleanup',async()=>{
+  const {DB,env,req,login,discord,sync}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${departure.id}`;
+  await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot');
+  const crew=await req(base+'/crews','POST',{name:'TDZ Logo',category:'GT3'},'pilot');assert.equal(crew.status,201);
+  DB.db.prepare("UPDATE crews SET car='Ferrari 296 LMGT3' WHERE id=?").run(crew.data.id);
+  DB.db.prepare("UPDATE community_crew_discord SET voice_category_id='500000000000000002' WHERE community_id=?").run(DEV);
+  rememberDisplayEmojis(env,{em_gt3:'111',em_brand_ferrari:'222'});
+  try{
+    assert.equal((await sync(RACE_MONDAY)).opened,1);
+    const row=DB.db.prepare('SELECT * FROM crew_discord WHERE crew_id=?').get(crew.data.id);
+    const card=discord.calls.find(call=>call.method==='POST'&&call.path===`/channels/${row.voice_id}/messages`).body.embeds[0];
+    assert.match(card.description,/<:em_brand_ferrari:222> Ferrari 296 LMGT3 · <:em_gt3:111>/);
+    assert.doesNotMatch(card.description,/responsable/);
+    const voice=discord.state.channels.find(item=>item.id===row.voice_id);
+    assert.equal(voice.name,'#TDZ Logo · Ferrari 296 · GT3');
+    // Simulate a historical duplicate: same bot card, same exact name, no tracking row.
+    const orphan='700000000000000099';discord.state.channels=[{id:orphan,type:2,name:voice.name,parent_id:'500000000000000002'}];
+    discord.state.messages=[{author:{id:env.DISCORD_CLIENT_ID,bot:true},embeds:[card]}];
+    const original=globalThis.fetch;globalThis.fetch=discord.handler;
+    try{
+      assert.equal(await cleanupOrphanCrewDiscord(env),0,'a living crew is protected');
+      DB.db.prepare('DELETE FROM crews WHERE id=?').run(crew.data.id);
+      assert.equal(await cleanupOrphanCrewDiscord(env),1,'the bot can still identify the orphan with custom emojis');
+      assert.ok(discord.calls.some(call=>call.method==='DELETE'&&call.path===`/channels/${orphan}`));
+    }finally{globalThis.fetch=original;}
+  }finally{rememberDisplayEmojis(env,{});}
 });

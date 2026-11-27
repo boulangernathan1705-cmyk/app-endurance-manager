@@ -36,7 +36,7 @@ function supervisionMarkup(result, esc, diagWhen) {
   const problems=result.communities.filter(item=>['error','attention'].includes(item.state)).length;
   return `<p class="members-help">Relevé : ${esc(when(result.generatedAt))} · ${result.communities.length} communauté(s) · ${problems} à surveiller.</p>
     ${result.development?'<p class="members-help">DEV : les tâches planifiées sont désactivées. Les dates ne prouvent pas une panne.</p>':''}
-    ${result.development&&result.testPreviewAvailable?'<div class="setup-actions"><button type="button" class="secondary-button" data-discord-test-preview>Envoyer un aperçu Discord</button><button type="button" class="secondary-button" data-discord-test-diagnostic>Vérifier le webhook</button><span role="status" class="settings-status" data-preview-status></span></div><p class="members-help">Trois messages fictifs dans le salon du webhook de test. Aucun vocal créé, aucune inscription, aucun ping.</p>':''}
+    ${result.development&&result.testPreviewAvailable?'<div class="setup-actions"><button type="button" class="secondary-button" data-discord-test-preview>Envoyer un vrai test Discord</button><button type="button" class="secondary-button" data-discord-test-logos>Préparer les logos</button><button type="button" class="secondary-button" data-discord-test-diagnostic>Vérifier le webhook</button><span role="status" class="settings-status" data-preview-status></span></div><p class="members-help">Rendus exacts du bot : deux vrais fils et sept vocaux dans une catégorie isolée. Données fictives, boutons désactivés, aucun ping. Préparer les logos manquants avant le test. Supprimer uniquement les salons de test après validation.</p>':''}
     ${!result.botConfigured?'<p class="settings-status" role="alert">Le token du bot n’est pas configuré.</p>':''}
     ${rows||'<p class="members-help">Aucun serveur lié.</p>'}`;
 }
@@ -67,13 +67,15 @@ export function installDiscordSupervision(app, {api, esc, diagWhen}) {
     } catch(error) {status.textContent=error.message;}
     finally {button.disabled=false;}
   }
-  async function sendPreview(button,diagnose=false){
-    if(!diagnose&&!confirm('Envoyer les trois aperçus fictifs dans le salon Discord de test ?'))return;
+  async function sendPreview(button,action='APERÇU'){
+    const diagnose=action==='DIAGNOSTIC',logos=action==='PREPARER_LOGOS';
+    if(logos&&!confirm('Ajouter les logos manquants à l’application Discord du bot ? Si le bot est partagé avec la production, ces nouveaux emojis seront aussi disponibles en production. Aucun emoji existant ne sera modifié.'))return;
+    if(!diagnose&&!logos&&!confirm('Créer les vrais fils et vocaux de test, uniquement dans le salon privé et une catégorie isolée ? Aucun événement ou équipage réel ne sera créé.'))return;
     const area=button.parentElement,status=area.querySelector('[data-preview-status]'),buttons=area.querySelectorAll('button');
-    buttons.forEach(item=>item.disabled=true);status.textContent=diagnose?'Vérification…':'Envoi…';
+    buttons.forEach(item=>item.disabled=true);status.textContent=diagnose?'Vérification…':logos?'Préparation des logos…':'Création des salons et envoi…';
     try{
-      const result=await api('/api/platform/discord/test-preview','POST',{confirm:diagnose?'DIAGNOSTIC':'APERÇU'});
-      status.textContent=result.ok?(diagnose?'Webhook valide. Salon de destination : ':`${result.sent} messages envoyés dans Discord.`):`${result.stage||'Envoi'} : ${result.error}${diagnose?'':` (${result.sent||0} message(s) confirmé(s))`}`;
+      const result=await api('/api/platform/discord/test-preview','POST',{confirm:action});
+      status.textContent=result.ok?(diagnose?'Webhook valide. Salon de destination : ':logos?`${result.added.length} logo(s) ajouté(s).`:`${result.sent} messages, ${result.created.threads.length} fils et ${result.created.voices.length} vocaux créés.`):`${result.stage||'Envoi'} : ${result.error}${result.missing?.length?' ('+result.missing.join(', ')+')':''}${diagnose||logos?'':` (${result.sent||0} message(s) confirmé(s))`}`;
       if(diagnose&&result.ok&&/^https:\/\/discord\.com\/channels\/\d{15,22}\/\d{15,22}$/.test(result.channelUrl||'')){
         const link=document.createElement('a');link.href=result.channelUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ouvrir le salon';status.append(link);
       }
@@ -84,7 +86,9 @@ export function installDiscordSupervision(app, {api, esc, diagWhen}) {
     const preview=event.target.closest('[data-discord-test-preview]');
     if(preview){sendPreview(preview);return;}
     const diagnostic=event.target.closest('[data-discord-test-diagnostic]');
-    if(diagnostic){sendPreview(diagnostic,true);return;}
+    if(diagnostic){sendPreview(diagnostic,'DIAGNOSTIC');return;}
+    const logos=event.target.closest('[data-discord-test-logos]');
+    if(logos){sendPreview(logos,'PREPARER_LOGOS');return;}
     const thread=event.target.closest('[data-supervision-thread]');
     if(thread)verifySupervisionThread(thread);
     const button=event.target.closest('[data-supervision-refresh]');
