@@ -26,3 +26,14 @@ test('failed registry or asset fetch is cosmetic',async()=>{
   assert.equal(await readDisplayEmojis(env,fail,100000),null);
   assert.doesNotReject(()=>registerOneDisplayEmoji(env,[brandEmojiAsset('Toyota GR010 Hybrid')],fail,100000));
 });
+
+
+test('a missing asset does not block other brands',async()=>{
+  const env={DISCORD_CLIENT_ID:'display-test-3',ASSETS:{fetch:async request=>new URL(request.url).pathname.includes('toyota')?new Response('',{status:404}):new Response(readFileSync(new URL('..'+new URL(request.url).pathname,import.meta.url)))}};
+  const calls=[];const request=async(method,path,body)=>{calls.push({method,path,body});return method==='GET'?{items:[]}:{id:'321'};};
+  await readDisplayEmojis(env,request,100000);
+  const assets=[brandEmojiAsset('Toyota GR010 Hybrid'),brandEmojiAsset('Ferrari 296 LMGT3')];
+  await registerOneDisplayEmoji(env,assets,request,100000);
+  await registerOneDisplayEmoji(env,assets,request,100000+31*60000);
+  assert.equal(calls.length,2);assert.equal(calls[1].body.name,'em_brand_ferrari');
+});

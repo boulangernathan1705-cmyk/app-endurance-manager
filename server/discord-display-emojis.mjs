@@ -5,7 +5,7 @@ const cache=new Map(), brandLogos=new Set(CAR_BRAND_LOGOS);
 function stateOf(env){
   const app=String(env?.DISCORD_CLIENT_ID||'');
   if(!app)return null;
-  if(!cache.has(app))cache.set(app,{ids:null,readAt:0,retryAt:0,uploadAt:0,loading:null,uploading:null});
+  if(!cache.has(app))cache.set(app,{ids:null,readAt:0,retryAt:0,uploadAt:0,loading:null,uploading:null,assetRetry:new Map()});
   return cache.get(app);
 }
 const validId=id=>typeof id==='string' && /^\d+$/.test(id);
@@ -58,9 +58,11 @@ function validAsset(bytes,mime){
 export async function registerOneDisplayEmoji(env,assets,request,now=Date.now()){
   const state=stateOf(env);
   if(!state?.ids||!env.ASSETS||state.uploading||now<state.uploadAt)return;
-  const asset=assets.find(item=>item&&!state.ids[item.name]);
+  const asset=assets.find(item=>item&&!state.ids[item.name]&&now>=(state.assetRetry.get(item.name)||0));
   if(!asset)return;
   state.uploadAt=now+RETRY;
+  // A missing/bad asset must not monopolize all future logo attempts.
+  state.assetRetry.set(asset.name,now+6*HOUR);
   state.uploading=(async()=>{
     try{
       const file=await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN||'https://endurance-manager.app'}${asset.path}`));

@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import scheduledWorker, {scheduledJob} from '../server/worker-with-migrations.mjs';
 import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, crewVoiceName, CLOSE_AFTER, KEEP_ARCHIVES, CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
+import {rememberDisplayEmojis} from '../server/discord-display-emojis.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -1046,4 +1047,38 @@ test('compact names retain simulator categories and a visible vehicle even for l
   assert.equal(crewVoiceName({crew_name:'TDZ 03',car:'Porsche 963 GTP',category:'GTP',circuit:'iracing-spa'}),'#TDZ 03 · Porsche 963 · GTP');
   const long=crewVoiceName({crew_name:'X'.repeat(180),car:'Ferrari 296 LMGT3',category:'GT3'});
   assert.ok(long.length<=100);assert.ok(long.endsWith(' · Ferrari 296 · GT3'));
+});
+
+
+test('a vocal with application logos keeps its exact identity for orphan cleanup',async()=>{
+  const {DB,env,req,login,discord,sync}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${departure.id}`;
+  await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot');
+  const crew=await req(base+'/crews','POST',{name:'TDZ Logo',category:'GT3'},'pilot');assert.equal(crew.status,201);
+  DB.db.prepare("UPDATE crews SET car='Ferrari 296 LMGT3' WHERE id=?").run(crew.data.id);
+  DB.db.prepare("UPDATE community_crew_discord SET voice_category_id='500000000000000002' WHERE community_id=?").run(DEV);
+  rememberDisplayEmojis(env,{em_gt3:'111',em_brand_ferrari:'222'});
+  try{
+    assert.equal((await sync(RACE_MONDAY)).opened,1);
+    const row=DB.db.prepare('SELECT * FROM crew_discord WHERE crew_id=?').get(crew.data.id);
+    const card=discord.calls.find(call=>call.method==='POST'&&call.path===`/channels/${row.voice_id}/messages`).body.embeds[0];
+    assert.match(card.description,/<:em_brand_ferrari:222> Ferrari 296 LMGT3 · <:em_gt3:111>/);
+    assert.doesNotMatch(card.description,/responsable/);
+    const voice=discord.state.channels.find(item=>item.id===row.voice_id);
+    assert.equal(voice.name,'#TDZ Logo · Ferrari 296 · GT3');
+    // Simulate a historical duplicate: same bot card, same exact name, no tracking row.
+    const orphan='700000000000000099';discord.state.channels=[{id:orphan,type:2,name:voice.name,parent_id:'500000000000000002'}];
+    discord.state.messages=[{author:{id:env.DISCORD_CLIENT_ID,bot:true},embeds:[card]}];
+    const original=globalThis.fetch;globalThis.fetch=discord.handler;
+    try{
+      assert.equal(await cleanupOrphanCrewDiscord(env),0,'a living crew is protected');
+      DB.db.prepare('DELETE FROM crews WHERE id=?').run(crew.data.id);
+      assert.equal(await cleanupOrphanCrewDiscord(env),1,'the bot can still identify the orphan with custom emojis');
+      assert.ok(discord.calls.some(call=>call.method==='DELETE'&&call.path===`/channels/${orphan}`));
+    }finally{globalThis.fetch=original;}
+  }finally{rememberDisplayEmojis(env,{});}
 });

@@ -284,11 +284,11 @@ test('plusieurs départs : chaque pilote sans équipage une seule fois, avec ses
   starts.push({...base,departureId:'d24',startsAt:Date.parse('2026-10-16T22:00:00Z'),unassignedPilots:[{name:'Léo',categories:['GT3']}]});
   const [,race]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
   assert.equal(race.fields.length,1);
-  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> WEC · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
+  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> ELMS · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
   // Registered on every start: one word.
   starts[3].unassignedPilots.push({name:'Nathan',categories:['LMP2 ELMS']});
   const [,all]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
-  assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> · tous les départs$/m);
+  assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> ELMS · tous les départs$/m);
 });
 
 test('deux départs et beaucoup de pilotes : le récap choisit automatiquement la vue par créneau',()=>{
