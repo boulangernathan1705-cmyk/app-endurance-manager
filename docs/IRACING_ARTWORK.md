@@ -1,6 +1,6 @@
 # Visuels des circuits iRacing — inventaire de référence
 
-Sélection issue de la recherche du 27 novembre 2026. 44 identifiants du catalogue Endurance Manager, hors circuit aléatoire et circuit à préciser. Les URL sont des références de travail, non des ressources à charger depuis le navigateur. Leur disponibilité, correspondance visuelle exacte et licence doivent être revérifiées avant import. Aucun fichier image ajouté. Tous les droits de republication restent non confirmés.
+Sélection issue de la recherche du 27 novembre 2026. 44 identifiants du catalogue Endurance Manager, hors circuit aléatoire et circuit à préciser. Les URL sont des références de travail, non des ressources à charger depuis le navigateur. Leur disponibilité, correspondance visuelle exacte et licence doivent être revérifiées avant import. Aucune des captures officielles du tableau n’est intégrée : leurs droits de republication restent non confirmés. L’essai séparé décrit en fin de document utilise trois photos de circuits réels sous licence libre.
 
 Sources : [catalogue iRacing](https://www.iracing.com/tracks/), [catalogue communautaire Muntrume](https://muntru.me/tracks/), [conditions d'utilisation](https://iracingstudios.com/legal/conditions-of-use/), [note développeurs tiers](https://support.iracing.com/support/solutions/articles/31000179757-third-party-development-please-review-the-iracing-terms).
 
