@@ -15,3 +15,7 @@ pilote, que la fiche mémo ne permet pas d'identifier. Les vues sont en trois-qu
 avant. Les modèles et évolutions non reconnus gardent la silhouette de catégorie.
 Ces images sont réservées au sélecteur LMU, sans changement du catalogue,
 des identifiants de combos ni du plugin.
+
+Conserver les fichiers originaux sans retouche, recadrage, retournement,
+recompression ni changement de proportions. L'affichage adapte uniquement
+la taille par CSS (`object-fit: contain`), sans voile sur les livrées.
