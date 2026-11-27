@@ -196,6 +196,56 @@ test('TDZ agenda groups Paris days, uses one filter bar and ignores obsolete adv
   await expect(page.locator('[data-group="kinds"]')).toHaveCount(0);
 });
 
+test('opening TDZ home resets dates, while browsing and switching views preserves the selected week',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.clock.setFixedTime(Date.parse('2030-11-26T08:00:00Z'));
+  const event=race('lmu',{format:'solo',sim:'lmu',name:'Solo OPEN',access:'open',official:false,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],details:{type:'OPEN'},categories:[],departures:[{...start(),date:'2030-11-27',startsAt:Date.parse('2030-11-27T12:00:00Z')}]});
+  await boot(page,'lmu',[event]);
+  await page.locator('#navigation .nav-week-button').click();
+  const label=page.locator('.week-label');
+  const prev=page.getByRole('button',{name:'Semaine précédente'});
+  const next=page.getByRole('button',{name:'Semaine suivante'});
+  const view=name=>page.getByRole('button',{name,exact:true});
+  await expect(label).toContainText('Cette semaine');
+  await view('Tout').click();
+  await prev.click();
+  await expect(label).toContainText('La semaine dernière');
+  await view('Liste').click();
+  await expect(label).toContainText('La semaine dernière');
+  await view('Mois').click();
+  await expect(page.locator('.cal-month.on')).toHaveAttribute('data-month','2030-11');
+  await view('Semaine').click();
+  await expect(label).toContainText('La semaine dernière');
+  await page.locator('#navigation .nav-week-button').click();
+  await expect(label).toContainText('Cette semaine');
+  await expect(view('Tout')).toHaveAttribute('aria-pressed','true');
+  await view('Mois').click();
+  await view('Liste').click();
+  await expect(label).toContainText('Cette semaine');
+  await expect(page.locator('.tdz-agenda')).toContainText('Solo OPEN');
+  await next.click();
+  await expect(label).toContainText('La semaine prochaine');
+  await page.locator('#navigation [data-action="my-entries"]').click();
+  await expect(page).toHaveURL(/#inscriptions$/);
+  await page.locator('#navigation .nav-week-button').click();
+  await expect(view('Liste')).toHaveAttribute('aria-pressed','true');
+  await expect(label).toContainText('Cette semaine');
+  await view('Mois').click();
+  await page.locator('.cal-shift').first().click();
+  await expect(page.locator('.cal-month.on')).toHaveAttribute('data-month','2030-10');
+  await page.locator('#navigation .nav-week-button').click();
+  await expect(page.locator('.cal-month.on')).toHaveAttribute('data-month','2030-11');
+  await page.locator('.cal-num[data-day="2030-11-12"]').click();
+  await view('Semaine').click();
+  await expect(label).toContainText('du 11 novembre');
+  await page.locator('#navigation [data-action="my-entries"]').click();
+  await expect(page).toHaveURL(/#inscriptions$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/#accueil$/);
+  await expect(label).toContainText('Cette semaine');
+  await expect(view('Tout')).toHaveAttribute('aria-pressed','true');
+});
+
 test('community choices update the whole race view and never hide a private event',async({page})=>{
   const event=race('lmu',{absences:[{name:'Absent Alpha'},{name:'Absent Beta',communityId:'beta'}],departures:[start(),{...start('next'),date:'2090-10-16',startsAt:Date.parse('2090-10-16T12:00:00Z')}]});
   for(const departure of event.departures)departure.availability=[{id:`a-${departure.id}`,participantId:'a',name:'Pilot Alpha',mine:true,status:'whole',category:'GT3',carAny:true,community:alpha},{id:`b-${departure.id}`,participantId:'b',name:'Pilot Beta',status:'whole',category:'GT3',carAny:true,community:beta}];
