@@ -15,7 +15,9 @@ function webhook(env){
 }
 export const discordPreviewAvailable=env=>Boolean(webhook(env));
 const errorCodes={10003:'Salon introuvable',10015:'Webhook introuvable ou supprimé',50001:'Accès manquant',50013:'Permission refusée',50027:'Token du webhook invalide',50035:'Format du message refusé',50083:'Fil archivé',220001:'Webhook de forum : un fil est requis'};
+// Workers supports manual redirects, not the standard error mode. Never forward a webhook token.
 async function refusal(response,stage){
+  if(response.status>=300&&response.status<400)return {ok:false,stage,httpStatus:response.status,discordCode:0,error:'Redirection Discord refusée pour protéger le webhook.'};
   const data=await response.json().catch(()=>null);
   const code=Number.isSafeInteger(data?.code)&&data.code>0?data.code:0;
   const explanation=errorCodes[code]||({400:'Requête refusée',401:'Authentification refusée',403:'Accès refusé',404:'Webhook ou salon introuvable',429:'Limite Discord atteinte'}[response.status]||'Réponse Discord inattendue');
@@ -25,11 +27,11 @@ function networkError(stage,error){
   const timeout=error?.name==='TimeoutError'||error?.name==='AbortError';
   return {ok:false,stage,error:timeout?'Discord ne répond pas dans le délai imparti.':'Connexion à Discord impossible depuis le Worker.'};
 }
-export async function diagnoseDiscordPreview(env,request=fetch){
+export async function diagnoseDiscordPreview(env,request=(url,init)=>fetch(url,init)){
   const url=webhook(env);
   if(!url)return {ok:false,stage:'configuration',error:String(env?.DISCORD_TEST_WEBHOOK||'').trim()?'Format du secret incorrect : colle uniquement l’URL Discord du webhook.':'Secret DISCORD_TEST_WEBHOOK absent ou vide.'};
   try{
-    const response=await request(url.href,{method:'GET',redirect:'error',signal:AbortSignal.timeout(8000)});
+    const response=await request(url.href,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(8000)});
     if(!response.ok)return await refusal(response,'connexion');
     const data=await response.json().catch(()=>null);
     if(!safeId(data?.channel_id)||!safeId(data?.guild_id)||data?.type!==1)return {ok:false,stage:'connexion',error:'Le webhook ne correspond pas à un webhook entrant lié à un salon de serveur.'};
@@ -73,14 +75,14 @@ export function discordPreviewMessages(){
 }
 // Only the configured webhook may receive these fixed messages. No user-provided content or destination.
 // No automatic retry: after a timeout a Discord message may already exist.
-export async function sendDiscordPreview(env,request=fetch){
+export async function sendDiscordPreview(env,request=(url,init)=>fetch(url,init)){
   const url=webhook(env);
   if(!url)return {ok:false,sent:0,error:'Webhook de test non configuré sur dev.'};
   url.searchParams.set('wait','true');
   const messages=[];
   for(const payload of discordPreviewMessages()){
     try{
-      const response=await request(url.href,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),redirect:'error',signal:AbortSignal.timeout(8000)});
+      const response=await request(url.href,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(8000)});
       if(!response.ok)return {...await refusal(response,`message ${messages.length+1}/3`),sent:messages.length,messages};
       const data=await response.json();
       if(!safeId(data?.id)||!safeId(data?.channel_id))return {ok:false,sent:messages.length,error:'Envoi non confirmé par Discord. Vérifie le salon avant de réessayer.',messages};
