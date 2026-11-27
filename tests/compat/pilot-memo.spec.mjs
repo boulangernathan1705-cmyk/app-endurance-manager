@@ -94,6 +94,54 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   await expect(page.getByText('Notes de l’équipe',{exact:true})).toBeHidden();
 });
 
+test('memo circuit picker loads parent artwork and selects the exact layout',async({page})=>{
+  const variants=[['Monza','monza'],['Monza Curva Grande Circuit','monza'],['Paul Ricard - ELMS','paul-ricard'],['Sebring School Circuit','sebring'],['Circuit de la Sarthe','le-mans'],['Spa-Francorchamps','spa'],['Fuji Speedway','fuji']];
+  const items=[...variants.map(([track])=>({...combo,track})),{...combo,track:'Unknown layout'}];
+  const requests=[];
+  await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:here}));
+  await page.route(url=>url.pathname==='/api/combos/link',route=>route.fulfill({json:{linked:true}}));
+  await page.route(url=>url.pathname==='/api/combos',route=>route.fulfill({json:{combos:items,preferenceScope:'artwork-test'}}));
+  await page.route(url=>url.pathname==='/api/combos/sheet',route=>{
+    const params=new URL(route.request().url()).searchParams;
+    requests.push(Object.fromEntries(params));
+    return route.fulfill({json:{...sheet,combo:{...combo,track:params.get('track')}}});
+  });
+  await page.goto('/simhub.html#memo');
+  await page.locator('[data-picker=track]').click();
+  const box=page.getByRole('dialog');
+  await expect(box.locator('[data-track-choice]')).toHaveCount(items.length);
+  for(const [track,id] of variants){
+    const img=box.locator(`[data-track-choice="${track}"] .cb-tile-art img`);
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toHaveAttribute('src',`/images/endurance/lmu-pano/${id}.webp`);
+    await expect.poll(()=>img.evaluate(node=>node.complete && node.naturalWidth>0)).toBe(true);
+  }
+  await expect(box.locator('[data-track-choice="Unknown layout"] .cb-tile-art img')).toHaveCount(0);
+  await box.locator('[data-track-choice="Monza Curva Grande Circuit"]').click();
+  await expect(page.locator('[data-picker=track]')).toContainText('Monza Curva Grande Circuit');
+  expect(requests.at(-1)).toMatchObject({track:'Monza Curva Grande Circuit',car:combo.car});
+  await expect(page.locator('[data-picker=track] .cb-tile-art img')).toHaveAttribute('src','/images/endurance/lmu-pano/monza.webp');
+});
+
+test('memo car picker loads LMU liveries and keeps category fallbacks',async({page})=>{
+  const cars=[['Ferrari 499P','Hypercar','ferrari-499p'],['Oreca 07 Gibson ELMS','LMP2','oreca-elms'],['Ferrari 296 LMGT3','LMGT3','ferrari-296'],['Ferrari 488 GTE','GTE','ferrari-488'],['Unknown prototype','Hypercar',null],['Unknown GT','LMGT3',null]];
+  const items=cars.map(([car,carClass])=>({...combo,car,carClass}));
+  await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:here}));
+  await page.route(url=>url.pathname==='/api/combos/link',route=>route.fulfill({json:{linked:true}}));
+  await page.route(url=>url.pathname==='/api/combos',route=>route.fulfill({json:{combos:items,preferenceScope:'car-artwork-test'}}));
+  await page.route(url=>url.pathname==='/api/combos/sheet',route=>route.fulfill({json:sheet}));
+  await page.goto('/simhub.html#memo');
+  await expect(page.locator('[data-picker=car] .cb-tile-art img')).toHaveAttribute('src','/images/memo-cars/ferrari-499p.webp');
+  await page.locator('[data-picker=car]').click();
+  const box=page.getByRole('dialog');
+  for(const [car,carClass,id] of cars){
+    const img=box.getByRole('button',{name:new RegExp(car)}).locator('.cb-tile-art img');
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toHaveAttribute('src',id?`/images/memo-cars/${id}.webp`:carClass==='Hypercar'?'/images/memo-prototype.svg':'/images/memo-gt.svg');
+    await expect.poll(()=>img.evaluate(node=>node.complete && node.naturalWidth>0)).toBe(true);
+  }
+});
+
 test('disabled memo hides pilot navigation and never fetches downloads, sheet or wall data',async({page})=>{
   const paths=[];
   await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:{...here,combos:false}}));

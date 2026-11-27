@@ -1,18 +1,9 @@
 import {carBrand} from '../shared/car-brands.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
-import {memoCandidates} from '../shared/memo-links.mjs';
+import {memoTrackImage,memoCarImage} from '../shared/memo-links.mjs';
 
 const catalog = catalogForGame('lmu');
 const fold = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr');
-const circuits = new Map();
-
-function trackImage(track) {
-  if (!circuits.has(track)) {
-    const circuit = catalog.circuits.find(item => !item.random && memoCandidates([{track}],new URLSearchParams({circuit:item.id})).length);
-    circuits.set(track,circuit ? '/images/endurance/lmu-pano/'+circuit.id+'.webp' : '');
-  }
-  return circuits.get(track);
-}
 
 function category(combo) {
   const match = Object.keys(catalog.cars).find(key => catalog.cars[key].some(name => fold(name)===fold(combo.car)));
@@ -27,9 +18,9 @@ export function memoPicker({view,esc,comboKey,openCombo,dialog}) {
   function tile(kind, name, detail, attrs, combo) {
     const group=combo && category(combo);
     const brand=combo && carBrand(combo.car);
-    let image=kind==='track' ? trackImage(name) : '';
-    if (['Hypercar','LMP2','LMP3'].includes(group)) image='/images/memo-prototype.svg';
-    if (['GTE','LMGT3'].includes(group)) image='/images/memo-gt.svg';
+    let image=kind==='track' ? memoTrackImage(name) : memoCarImage(name);
+    if (!image && ['Hypercar','LMP2','LMP3'].includes(group)) image='/images/memo-prototype.svg';
+    if (!image && ['GTE','LMGT3'].includes(group)) image='/images/memo-gt.svg';
     const logo=brand?.logo ? `<img class="cb-brand" src="/images/brands/${brand.logo}.webp" alt="">` : '';
     return `<button type="button" class="cb-tile is-${kind}" ${attrs}>
       <span class="cb-tile-art">${image?`<img src="${image}" alt="" loading="lazy">`:''}</span>
