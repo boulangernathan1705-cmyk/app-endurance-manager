@@ -270,14 +270,6 @@ export {simChosen,openSimChooser} from '../sim-chooser.mjs';
 
 export {mySituation} from '../race-filters.mjs';
 
-// Fit the desktop agenda to the actual space below the navigation and filters, not an assumed header height.
-function fitTdzAgenda(){
-  const agenda=app.querySelector('.tdz-agenda');
-  if(!agenda)return;
-  const top=agenda.getBoundingClientRect().top+window.scrollY;
-  agenda.style.setProperty('--tdz-agenda-available',Math.max(0,Math.floor(window.innerHeight-top-16))+'px');
-}
-if(typeof window!=='undefined')window.addEventListener('resize',fitTdzAgenda);
 // Unified month and list reuse the existing TDZ calendar and native event cards.
 export function renderTdzCalendar(message=''){
   state.page='week';state.currentEventId=null;
@@ -307,19 +299,14 @@ export function renderTdzCalendar(message=''){
     const days=agendaDays(visible,monday),now=Date.now(),today=parisDay(now);
     const weekday=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'long'});
     const date=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
-    let ideal=0;
-    const daySizing=count=>{const weight=Math.max(1,Math.min(3,count));ideal+=weight*82+8;return ' style="--tdz-day-weight:'+weight+'"';};
     const list=days.map(({day,events})=>{
       const label=new Date(day*86400000),items=events.flatMap(decorate).map(event=>eventSchedule(event,now))
         .sort((a,b)=>Number(a.event.departures[0].startsAt)-Number(b.event.departures[0].startsAt));
-      return '<section class="tdz-agenda-day'+(day===today?' is-today':'')+'" aria-labelledby="tdz-day-'+day+'" data-day="'+label.toISOString().slice(0,10)+'"'+daySizing(items.length)+'><h2 class="tdz-agenda-date" id="tdz-day-'+day+'"><span>'+esc(weekday.format(label))+'</span><small>'+esc(date.format(label))+'</small>'+(day===today?'<small class="tdz-agenda-today">Aujourd’hui</small>':'')+'</h2><div class="event-list tdz-agenda-cards" role="group" aria-labelledby="tdz-day-'+day+'">'+items.map(item=>eventCard(item,{agenda:true})).join('')+'</div></section>';
+      return '<section class="tdz-agenda-day'+(day===today?' is-today':'')+'" aria-labelledby="tdz-day-'+day+'" data-day="'+label.toISOString().slice(0,10)+'"><h2 class="tdz-agenda-date" id="tdz-day-'+day+'"><span>'+esc(weekday.format(label))+'</span><small>'+esc(date.format(label))+'</small>'+(day===today?'<small class="tdz-agenda-today">Aujourd’hui</small>':'')+'</h2><div class="event-list tdz-agenda-cards">'+items.map(item=>eventCard(item,{agenda:true})).join('')+'</div></section>';
     }).join('');
     const pending=visible.filter(event=>event.schedulePending||!event.departures.some(d=>!d.tbd&&d.date));
     const pendingList=pending.map(event=>eventCard(eventSchedule(event,now),{agenda:true})).join('');
-    const pendingSection=pendingList?'<section class="tdz-agenda-day tdz-agenda-pending"'+daySizing(pending.length)+' aria-labelledby="tdz-pending-date"><h2 class="tdz-agenda-date" id="tdz-pending-date">Dates à confirmer</h2><div class="event-list tdz-agenda-cards" role="group" aria-labelledby="tdz-pending-date">'+pendingList+'</div></section>':'';
-    app.innerHTML='<div class="page-head home-head">'+head+homeWeekNav()+menu+'</div>'+bar+notice+'<div class="event-agenda tdz-agenda'+(days.length||pending.length?' has-days':'')+'" style="--tdz-agenda-ideal:'+ideal+'px">'+(list||'<div class="empty">Aucun événement cette semaine.</div>')+pendingSection+'</div>';
-    fitTdzAgenda();
-    requestAnimationFrame(fitTdzAgenda);
+    app.innerHTML='<div class="page-head home-head">'+head+homeWeekNav()+menu+'</div>'+bar+notice+'<div class="event-agenda tdz-agenda">'+(list||'<div class="empty">Aucun événement cette semaine.</div>')+(pendingList?'<section class="tdz-agenda-day tdz-agenda-pending"><h2 class="tdz-agenda-date">Dates à confirmer</h2><div class="event-list tdz-agenda-cards">'+pendingList+'</div></section>':'')+'</div>';
   }
   notifyRender();
 }
