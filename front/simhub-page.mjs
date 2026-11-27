@@ -24,7 +24,7 @@ async function call(path, method = 'GET') {
 
 // The wall's own tabs write their name in the address (#board, #chrono…): they belong to the « Mur des stands » tab.
 const WALL = ['mur', 'board', 'chrono', 'car', 'tele', 'map'];
-const PAGES = {memo:'/front/combos-page.mjs?v=28', wall:'/front/pit-wall.mjs?v=23'};
+const PAGES = {memo:'/front/combos-page.mjs?v=29', wall:'/front/pit-wall.mjs?v=23'};
 const loaded = new Set();
 let allowed=false;
 function show(panel, write = false) {

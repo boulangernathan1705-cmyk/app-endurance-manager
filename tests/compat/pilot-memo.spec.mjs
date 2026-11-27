@@ -36,20 +36,33 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   await page.goto('/simhub.html?circuit=spa&car=Ferrari+499P&crew='+crewId+'&race='+raceId+'#memo');
   const prep=page.locator('.cb-prep');
   await expect(prep).toContainText('6 h de Spa');
-  await expect(page.getByRole('button',{name:'Mon équipage'})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByLabel('Périmètre des statistiques')).toHaveValue('crew');
   await expect(page.getByRole('button',{name:'Statistiques',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Analyse',exact:true})).toHaveCount(0);
   await expect(prep).toContainText('2:05,000');
   await expect(prep).toContainText('2:04,500 – 2:05,500');
   await expect(prep.locator('.cb-wheel-diagram')).toHaveCount(0);
   await expect(prep.locator('.cb-relay-bars .cb-meter')).toHaveCount(3);
+  await expect(prep.locator('[data-field=tyreInitial]')).toHaveCount(0);
+  await expect(prep.locator('[data-fold=memo-notes]')).not.toHaveAttribute('open','');
+  const initialViewport=page.viewportSize();
+  for(const size of [{width:1920,height:1080},{width:1366,height:900}]){
+    await page.setViewportSize(size);
+    const panels=await prep.locator('.cb-memo-panel').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom};}));
+    expect(panels).toHaveLength(4);
+    expect(Math.abs(panels[0].y-panels[1].y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(panels[2].y-panels[3].y)).toBeLessThanOrEqual(1);
+    expect(panels[1].x).toBeGreaterThan(panels[0].x);
+    expect((await prep.locator('.cb-memo-footer').boundingBox()).y+(await prep.locator('.cb-memo-footer').boundingBox()).height).toBeLessThanOrEqual(size.height);
+  }
+  if(initialViewport)await page.setViewportSize(initialViewport);
   await expect(page.locator('.cb-overview')).toBeVisible();
   await expect(page.locator('.cb-context > .cb-drivers')).toHaveCount(0);
   await expect(prep).toContainText('Nathan');
   await expect(prep).not.toContainText('Lucas');
   expect(history).toBe(0);
   expect(links).toBe(1);
-  await page.getByRole('button',{name:'Communauté',exact:true}).click();
+  await page.getByLabel('Périmètre des statistiques').selectOption('all');
   await expect(prep).toContainText('Lucas');
   await prep.getByLabel('Réserve du plein (%)').fill('10');
   await prep.getByLabel('Réserve du plein (%)').press('Tab');
@@ -59,6 +72,7 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   await page.reload();
   await expect(page.getByRole('button',{name:'Retirer des favoris'})).toBeVisible();
   await expect(prep).toContainText('réserve 10 %');
+  await page.locator('[data-fold=memo-notes] > summary').click();
   await page.getByText('+ Nouvelle note',{exact:true}).click();
   await page.getByLabel('Thème').selectOption('tyres');
   await page.getByLabel('Portée').selectOption(raceId);
@@ -133,6 +147,7 @@ test('chooses an available pair explicitly and applies advanced filters in one r
   await box.getByRole('button',{name:'Fermer'}).click();
   expect(requests).toHaveLength(3);
   await expect(page).toHaveURL(/tmax=30/);
+  await page.getByLabel('Autres actions').click();
   await page.getByRole('button',{name:'Accès rapides'}).click();
   await box.getByRole('button',{name:/Ferrari/}).click();
   await expect(page.locator('[data-picker=track]')).toContainText(combo.track);
