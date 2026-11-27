@@ -714,3 +714,26 @@ test('the same pilot cannot acknowledge a receipt from another community',async(
   assert.equal((await plugin('/api/combos/plugin/session',second,'POST',next)).status,201);
   assert.equal((await req('/api/combos/link','GET',null,MANAGER)).data.lastSession.startedAt,next.at);
 });
+
+test('website endurance reference excludes qualifying, warmup and short best laps without changing legacy statistics',async()=>{
+  const {signIn,req,plugin}=harness();
+  signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+  const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+  const at=1790000000000;
+  for(const data of [
+    {...session({at,laps:8,t:210,ve:8}),session:2},
+    {...session({at:at+100000,laps:8,t:180,ve:10}),session:5},
+    {...session({at:at+200000,laps:8,t:190,ve:9}),session:9},
+    {...session({at:at+300000,laps:2,t:175,ve:10}),session:2}
+  ]) assert.equal((await plugin('/api/combos/plugin/session',key,'POST',data)).status,201);
+  const query=new URLSearchParams({track:TRACK,car:CAR});
+  const response=await req('/api/combos/sheet?'+query,'GET',null,NATHAN);
+  assert.equal(response.status,200);
+  const prep=response.data.conditions.dry.endurance;
+  assert.equal(prep.drivers[0].laps,7);
+  assert.equal(prep.drivers[0].avg,210.25);
+  assert.equal(prep.drivers[0].q25,210.15);
+  assert.equal(prep.drivers[0].q75,210.35);
+  assert.equal(prep.drivers[0].ve,8);
+  assert.equal(prep.compounds.Medium.laps,7);
+});
