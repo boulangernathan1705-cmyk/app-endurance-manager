@@ -254,28 +254,28 @@
     },
     {
       "id": "iracing-le-mans",
-      "requestedTitle": "File:Le Mans Classic Circuit.jpg",
-      "fileTitle": "File:Le Mans Classic Circuit.jpg",
-      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Le_Mans_Classic_Circuit.jpg",
-      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/80/Le_Mans_Classic_Circuit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-      "sha256": "dc934f359c459687fbae85558acaeb3213ef25406add9c4c11760d98f58c910e",
+      "requestedTitle": "File:Dunlop-circuit des 24 h du Mans.jpg",
+      "fileTitle": "File:Dunlop-circuit des 24 h du Mans.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dunlop-circuit_des_24_h_du_Mans.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/38/Dunlop-circuit_des_24_h_du_Mans.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "cd213308ba43aa2ca0ee6d9de8dabfa2eca0b4e8523303842614f7ce06c79092",
       "originalDimensions": [
-        2576,
-        1716
+        2560,
+        1536
       ],
       "focus": [
         0.5,
         0.5
       ],
-      "coverBytes": 111946,
-      "panoramaBytes": 163424,
-      "license": "Public domain",
-      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-      "artist": "Brato",
+      "coverBytes": 9980,
+      "panoramaBytes": 24368,
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "OldLion",
       "attribution": "",
-      "credit": "Le fichier vient de l'appareil photo numérique avec lequel j'ai pris cette photo",
+      "credit": "Own work",
       "restrictions": "",
-      "description": "Photo of the circuit of Mans, at the time of “Le Mans Classic\" on 11, 12 an 13 July 2008. Portion of the circuit beetween the baffle at the end of the straight line of the stands, after the platform ACO, and the Dunlop footbridge."
+      "description": "Dunlop - Circuit 24 heures of Le Mans"
     },
     {
       "id": "iracing-cota",
@@ -529,28 +529,28 @@
     },
     {
       "id": "iracing-sebring",
-      "requestedTitle": "File:Sebring sunrise 448813409.jpg",
-      "fileTitle": "File:Sebring sunrise 448813409.jpg",
-      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sebring_sunrise_448813409.jpg",
-      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fc/Sebring_sunrise_448813409.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-      "sha256": "057002cd2f1a69dfa08579984945fb35ad88f28e67d0b750a905c0e22d2da716",
+      "requestedTitle": "File:2022 1 000 Miles of Sebring Start of the race.jpg",
+      "fileTitle": "File:2022 1 000 Miles of Sebring Start of the race.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:2022_1_000_Miles_of_Sebring_Start_of_the_race.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c2/2022_1_000_Miles_of_Sebring_Start_of_the_race.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "5ecceb670eb21391be434e787354c808c68eec2985c578e5f924af9111989a76",
       "originalDimensions": [
-        2305,
-        912
+        6000,
+        4000
       ],
       "focus": [
         0.5,
         0.5
       ],
-      "coverBytes": 35138,
-      "panoramaBytes": 85290,
+      "coverBytes": 52390,
+      "panoramaBytes": 91588,
       "license": "CC BY-SA 2.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
-      "artist": "Chuck Schultz from Anniston, AL, USA, upload by Herrick",
+      "artist": "United Autosports",
       "attribution": "",
-      "credit": "Sebring Sunrise",
+      "credit": "https://www.flickr.com/photos/unitedautosports/51946544172/",
       "restrictions": "",
-      "description": "Sunrise at Sebring racetrack"
+      "description": "Début de la course des 1 000 Miles de Sebring 2022"
     },
     {
       "id": "iracing-silverstone",
@@ -1004,28 +1004,28 @@
     },
     {
       "id": "iracing-the-bend",
-      "requestedTitle": "File:The Bend Motorsport Park (Aerial).jpg",
-      "fileTitle": "File:The Bend Motorsport Park (Aerial).jpg",
-      "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_Bend_Motorsport_Park_(Aerial).jpg",
-      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/4e/The_Bend_Motorsport_Park_%28Aerial%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-      "sha256": "5272ac8d0807e946986bff84ecdc19edca6aa71fb422a82d0b44d1ad718c10c9",
+      "requestedTitle": "File:Whincup 2018 The Bend SuperSprint.jpg",
+      "fileTitle": "File:Whincup 2018 The Bend SuperSprint.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Whincup_2018_The_Bend_SuperSprint.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/04/Whincup_2018_The_Bend_SuperSprint.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "54e200ad24f1afebd5c3e2386d39cbdacbb7eebbb7be779aaf90eef55b3e6b3b",
       "originalDimensions": [
-        2650,
-        1491
+        4608,
+        3456
       ],
       "focus": [
         0.5,
         0.5
       ],
-      "coverBytes": 58372,
-      "panoramaBytes": 116080,
+      "coverBytes": 57136,
+      "panoramaBytes": 100684,
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-      "artist": "Nathan Fenn",
+      "artist": "SchueyFan",
       "attribution": "",
       "credit": "Own work",
       "restrictions": "",
-      "description": "Aerial Photograph of the Bend Motorsport Park, Captured by passing aircraft."
+      "description": "Jamie Whincup at the 2018 The Bend SuperSprint at The Bend Motorsport Park."
     }
   ],
   "errors": {}
