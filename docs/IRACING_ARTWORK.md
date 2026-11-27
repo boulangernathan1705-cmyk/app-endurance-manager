@@ -123,3 +123,7 @@ Les références officielles du tableau ne sont pas utilisées. Les photos réel
 - iracing-the-bend: [Whincup 2018 The Bend SuperSprint.jpg](https://commons.wikimedia.org/wiki/File:Whincup_2018_The_Bend_SuperSprint.jpg) — SchueyFan, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0).
 
 Le manifeste `docs/iracing-photo-import.json` conserve les dimensions, empreintes, sources et métadonnées des 41 ajouts. Les positions des nouveaux visuels sont centrées sur les recadrages validés à l'import ; les trois visuels de l'essai restent inchangés.
+
+### Références visuelles
+
+L'activation du catalogue modifie volontairement les photos de l'accueil, des listes et des bandeaux iRacing ainsi que les dimensions des bandeaux et de la planche de cartes de circuit. Actualiser les références via la procédure de `DEPLOYMENT.md`, examiner les différences, conserver les contrôles fonctionnels et relancer la CI sur le commit de références avant fusion.
