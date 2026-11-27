@@ -43,7 +43,7 @@ export async function platformApi({path, method, request, env, actor, community,
   }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    return json({...await discordSupervision(env),testPreviewAvailable:new URL(request.url).origin==='https://dev.endurance-manager.app'&&discordPreviewAvailable(env)});
+    return json({...await discordSupervision(env),testPreviewAvailable:discordPreviewAvailable(env)&&Boolean(request?.url)&&new URL(request.url).origin==='https://dev.endurance-manager.app'});
   }
   if (path === '/api/platform/discord/supervision/thread' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
