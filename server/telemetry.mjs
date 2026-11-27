@@ -1,4 +1,4 @@
-import {json, siteOrigin, fail, rateLimit} from './core.mjs';
+import {json, siteOrigin, fail, rateLimit, readLimitedText} from './core.mjs';
 import {currentCommunity} from './community.mjs';
 
 const DAY=86400;
@@ -28,10 +28,11 @@ export async function ingestClientError(request,env) {
 
   let input;
   try {
-    const raw=await request.text();
+    // Preserve the existing 8192-character limit, including multibyte UTF-8 text.
+    const raw=await readLimitedText(request, 3 * 8192);
     if (raw.length>8192) return new Response(null,{status:413});
     input=JSON.parse(raw||'{}');
-  } catch { return new Response(null,{status:204}); }
+  } catch (error) { return new Response(null,{status:error?.status===413 ? 413 : 204}); }
   const createdAt=Math.floor(Date.now()/1000);
   try {
     const community=await currentCommunity(env, request);

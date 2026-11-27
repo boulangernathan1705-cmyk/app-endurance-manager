@@ -1,0 +1,258 @@
+[
+  {
+    "id": "alpine-a424",
+    "names": [
+      "Alpine A424"
+    ],
+    "source": "start/images/cars/FrontThumbnail/35_24_ALPI50635F93_frontAngle.webp"
+  },
+  {
+    "id": "aston-valkyrie",
+    "names": [
+      "Aston Martin Valkyrie AMR LMH",
+      "Aston Martin Valkyrie LMH"
+    ],
+    "source": "start/images/cars/FrontThumbnail/007_25_THO10AE91D8_frontAngle.webp"
+  },
+  {
+    "id": "bmw-hybrid",
+    "names": [
+      "BMW M Hybrid V8"
+    ],
+    "source": "start/images/cars/FrontThumbnail/15_24_WRT_5DDA4461_frontAngle.webp"
+  },
+  {
+    "id": "cadillac",
+    "names": [
+      "Cadillac V-Series.R"
+    ],
+    "source": "start/images/cars/FrontThumbnail/101_25_WTR714D5323_frontAngle.webp"
+  },
+  {
+    "id": "ferrari-499p",
+    "names": [
+      "Ferrari 499P"
+    ],
+    "source": "start/images/cars/FrontThumbnail/50_25_AFCOF0EA6E7C_frontAngle.webp"
+  },
+  {
+    "id": "genesis",
+    "names": [
+      "Genesis GMR-001 LMDh",
+      "Genesis GMR-001",
+      "Genesis GMR001"
+    ],
+    "source": "start/images/cars/FrontThumbnail/17_26_GENE14CD51B0_frontAngle.webp"
+  },
+  {
+    "id": "glickenhaus",
+    "names": [
+      "Glickenhaus SCG 007",
+      "Glickenhaus SCG007"
+    ],
+    "source": "start/images/cars/FrontThumbnail/708_GLICKEB391B421_frontAngle.webp"
+  },
+  {
+    "id": "isotta",
+    "names": [
+      "Isotta Fraschini Tipo 6-C",
+      "Isotta Fraschini TIPO6"
+    ],
+    "source": "start/images/cars/FrontThumbnail/11_24_ISOTTA_A715S6_frontAngle.webp"
+  },
+  {
+    "id": "lamborghini-sc63",
+    "names": [
+      "Lamborghini SC63"
+    ],
+    "source": "start/images/cars/FrontThumbnail/19_24_IRONF799DF42_frontAngle.webp"
+  },
+  {
+    "id": "peugeot-9x8",
+    "names": [
+      "Peugeot 9X8",
+      "Peugeot 9x8"
+    ],
+    "source": "start/images/cars/FrontThumbnail/93_PEUGEOT1713C81C_frontAngle.webp"
+  },
+  {
+    "id": "peugeot-9x8-evo",
+    "names": [
+      "Peugeot 9X8 Evo"
+    ],
+    "source": "start/images/cars/FrontThumbnail/93_25_PEUG354B9ECA_frontAngle.webp"
+  },
+  {
+    "id": "porsche-963",
+    "names": [
+      "Porsche 963"
+    ],
+    "source": "start/images/cars/FrontThumbnail/12_24_JOTAA5525C5E_frontAngle.webp"
+  },
+  {
+    "id": "toyota-gr010",
+    "names": [
+      "Toyota GR010 Hybrid",
+      "Toyota GR010"
+    ],
+    "source": "start/images/cars/FrontThumbnail/7_25_TOYOT346367BA_frontAngle.webp"
+  },
+  {
+    "id": "vanwall",
+    "names": [
+      "Vanwall Vandervell 680",
+      "Vanwall 680"
+    ],
+    "source": "start/images/cars/FrontThumbnail/4_VANWALLLB1210E3_frontAngle.webp"
+  },
+  {
+    "id": "oreca-elms",
+    "names": [
+      "Oreca 07 Gibson ELMS"
+    ],
+    "source": "start/images/cars/FrontThumbnail/3_25_DKR_EA051AD3A_frontAngle.webp"
+  },
+  {
+    "id": "oreca-wec",
+    "names": [
+      "Oreca 07 Gibson",
+      "Oreca 07"
+    ],
+    "source": "start/images/cars/FrontThumbnail/199_25_AO_2FC07322_frontAngle.webp"
+  },
+  {
+    "id": "ligier",
+    "names": [
+      "Ligier JS P325"
+    ],
+    "source": "start/images/cars/FrontThumbnail/11_25_EURO50DECB8E_frontAngle.webp"
+  },
+  {
+    "id": "ginetta",
+    "names": [
+      "Ginetta G61-LT-P3",
+      "Ginetta G61-LT-P325 Evo"
+    ],
+    "source": "start/images/cars/FrontThumbnail/4_25_DKR_E8E7FBE8C_frontAngle.webp"
+  },
+  {
+    "id": "duqueine",
+    "names": [
+      "Duqueine D09",
+      "Duqueine D09 P3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/12_25_WTM_7FC250D8_frontAngle.webp"
+  },
+  {
+    "id": "adess",
+    "names": [
+      "Adess AD25",
+      "ADESS AD25 LMP3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/46_25_ADES20619231_frontAngle.webp"
+  },
+  {
+    "id": "aston-gt3",
+    "names": [
+      "Aston Martin Vantage AMR LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/10_25_RSLM1720DFDA_frontAngle.webp"
+  },
+  {
+    "id": "bmw-gt3",
+    "names": [
+      "BMW M4 LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/31_24_WRT_6CBE4475_frontAngle.webp"
+  },
+  {
+    "id": "corvette-gt3",
+    "names": [
+      "Chevrolet Corvette Z06 LMGT3.R"
+    ],
+    "source": "start/images/cars/FrontThumbnail/13_25_AWA_ED286DBB_frontAngle.webp"
+  },
+  {
+    "id": "ferrari-296",
+    "names": [
+      "Ferrari 296 LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/150_25_AFC7978CC2F_frontAngle.webp"
+  },
+  {
+    "id": "ford",
+    "names": [
+      "Ford Mustang LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/44_24_PROT92DCFAD4_frontAngle.webp"
+  },
+  {
+    "id": "lamborghini-gt3",
+    "names": [
+      "Lamborghini Huracán LMGT3",
+      "Lamborghini Huracan LMGT3 Evo2"
+    ],
+    "source": "start/images/cars/FrontThumbnail/60_24_IRONA76DF02F_frontAngle.webp"
+  },
+  {
+    "id": "lexus",
+    "names": [
+      "Lexus RC F LMGT3",
+      "Lexus RCF LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/78_24_AKKO607B9E80_frontAngle.webp"
+  },
+  {
+    "id": "mercedes",
+    "names": [
+      "Mercedes-AMG LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/60_25_IRON3680959B_frontAngle.webp"
+  },
+  {
+    "id": "mclaren",
+    "names": [
+      "McLaren 720S LMGT3",
+      "McLaren 720S LMGT3 Evo"
+    ],
+    "source": "start/images/cars/FrontThumbnail/10_26_GARA16926271_frontAngle.webp"
+  },
+  {
+    "id": "porsche-gt3",
+    "names": [
+      "Porsche 911 GT3 R LMGT3"
+    ],
+    "source": "start/images/cars/FrontThumbnail/54_26_HIGH62031041_frontAngle.webp"
+  },
+  {
+    "id": "aston-gte",
+    "names": [
+      "Aston Martin Vantage GTE",
+      "Aston Martin Vantage AMR"
+    ],
+    "source": "start/images/cars/FrontThumbnail/25_ORTLMA14S6SD_frontAngle.webp"
+  },
+  {
+    "id": "corvette-gte",
+    "names": [
+      "Chevrolet Corvette C8.R",
+      "Corvette C8.R GTE"
+    ],
+    "source": "start/images/cars/FrontThumbnail/33_CORVETT80C98836_frontAngle.webp"
+  },
+  {
+    "id": "ferrari-488",
+    "names": [
+      "Ferrari 488 GTE",
+      "Ferrari 488 GTE EVO"
+    ],
+    "source": "start/images/cars/FrontThumbnail/100_WALKEN1B80023E_frontAngle.webp"
+  },
+  {
+    "id": "porsche-gte",
+    "names": [
+      "Porsche 911 RSR-19"
+    ],
+    "source": "start/images/cars/FrontThumbnail/16_PROTON9F4BBEF5_frontAngle.webp"
+  }
+]

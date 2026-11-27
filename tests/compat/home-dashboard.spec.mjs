@@ -4,12 +4,14 @@ import {test,expect} from '@playwright/test';
 for(const width of [1440,390])test(`the home shows the week and the next race at ${width}px`,async({page})=>{
  await page.setViewportSize({width,height:1000});
  // Both starts in a few minutes: always in this week.
- const now=Date.now(),soon=now+5*60000;
+ const now=Date.parse('2030-11-06T09:00:00Z'),soon=now+5*60000;
+ await page.clock.setFixedTime(now);
  const reg={id:'reg-1',participantId:'pilot',name:'Nathan',mine:true,category:'Hypercar',status:'whole',cars:[],carAny:true};
  const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'special',capacity:30,categories:['Hypercar'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:'15:00',startsAt,availability,crews}]});
  const lmu=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',soon,[reg],[{id:'crew',name:'Apex Racing',category:'Hypercar',registrationIds:['reg-1']}]);
- const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+60000);
+ lmu.departures.unshift({...lmu.departures[0],id:'spa-live',startsAt:now-3600000,endsAt:now+3600000,availability:[],crews:[]});
+ const iracing=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Production Endurance Challenge','iracing-sebring',soon+24*3600000);
  await page.route('**/api/**',route=>{
   const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
   if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance'],community:{id:'test',slug:'test',name:'Test',appearance:{}},communities:[]};
@@ -26,37 +28,56 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  // No cards repeating the navigation bar.
  await expect(page.locator('.home-card')).toHaveCount(0);
  await expect(page.locator('.week-block')).toHaveCount(2);
+ await page.waitForLoadState('networkidle');
  await expect(page.locator('.week-block.is-endurance .endurance-card-head')).toHaveCount(2);
  // Both static photos must load from our own site and the mobile card must leave room for its body.
  for (const sim of ['lmu','iracing']) {
   const card=page.locator('.week-block.is-'+sim);
   const art=card.locator('.endurance-card-head');
-  const caption=art.locator('.endurance-card-caption');
-  await expect(caption).toBeVisible();
-  const [artBox,captionBox]=await Promise.all([art.boundingBox(),caption.boundingBox()]);
-  expect(Math.abs(artBox.y+artBox.height-captionBox.y-captionBox.height)).toBeLessThanOrEqual(3);
-  expect(captionBox.height).toBeLessThanOrEqual(artBox.height*.45);
-  expect(await caption.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('/images/endurance/'+sim+'.webp');
-  expect(await page.evaluate(async sim=>{
-   const image=new Image();image.src='/images/endurance/'+sim+'.webp';
-   try {await image.decode();return image.naturalWidth>=400;} catch {return false;}
-  },sim)).toBe(true);
-  if(width===390){
-   if(sim==='lmu')expect(await caption.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain('linear-gradient');
+  const badge=card.locator('.week-block-title .endurance-card-identity');
+  await expect(card.locator('.week-endurance-schedule .endurance-card-duration')).toHaveText('6 h');
+  await expect(badge).toHaveText(sim==='lmu'?'LMU Endurance':'iRacing Endurance');
+  await expect(art.locator('.endurance-card-caption')).toHaveCount(0);
+  await expect(card.locator('.circuit-visual')).toHaveCount(0);
+  await expect(card.locator('.week-endurance-schedule .endurance-start-icon')).toHaveCount(sim==='lmu'?2:1);
+  if(sim==='lmu'){
+   const live=card.locator('.week-endurance-heading .week-chip.is-live');
+   await expect(live).toBeVisible();
+   if(width===390){
+    const [statusBox,badgeBox]=await Promise.all([live.boundingBox(),badge.boundingBox()]);
+    expect(Math.abs(statusBox.y+statusBox.height/2-badgeBox.y-badgeBox.height/2)).toBeLessThan(1);
+    expect(statusBox.x+statusBox.width).toBeLessThanOrEqual(badgeBox.x);
+   }
+  }
+  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing/iracing-sebring.webp';
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
+  await card.evaluate(el=>el.classList.add('is-panorama-preview'));
+  await expect(card.locator('.circuit-visual')).toHaveCount(0);
+  expect(await card.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing-pano/iracing-sebring.webp');
+  await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
+  expect(await page.evaluate(async artwork=>{
+   const image=new Image();image.src=artwork;
+   try {await image.decode();return image.naturalWidth>=250;} catch {return false;}
+  },artwork)).toBe(true);
+  {
+   expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
+   expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
    const a=await art.boundingBox(),b=await card.locator('.week-block-body').boundingBox();
    expect(a.x+a.width).toBeLessThanOrEqual(b.x+1);
-   expect(b.width).toBeGreaterThan(150);
+   expect((await badge.boundingBox()).x).toBeGreaterThanOrEqual(b.x);
+   expect(b.width).toBeGreaterThan(width===390?150:80);
   }
  }
- await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveCount(0);
- await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6H');
+ await expect(page.locator('.week-block.is-lmu .endurance-card-duration')).toHaveText('6 h');
+ await expect(page.locator('.week-block.is-iracing .endurance-card-duration')).toHaveText('6 h');
  await expect(page.locator('.week-block.is-endurance .week-block-logo')).toHaveCount(0);
  await expect(page.locator('.week-block.is-endurance .week-block-plan:visible')).toHaveCount(2);
  await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');
  await expect(page.locator('.week-block').filter({hasText:'Production Endurance Challenge'})).toContainText(/iRacing[\s\S]*Sebring International Raceway/);
  // No end time on the cards (Nathan 2026-11-01): the circuit instead.
  await expect(page.locator('.week-grid')).not.toContainText('fin ');
+ await expect(page.locator('.week-block.is-endurance .week-plan-row em')).toHaveCount(0);
+ await expect(page.locator('.week-block.is-endurance .week-plan-time i')).toHaveCount(0);
  await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);

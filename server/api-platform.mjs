@@ -1,5 +1,5 @@
 // The platform managers' actions: showcase, official community, communities (called by server/worker.mjs).
-import {fail, now, baseDomain, json, body, text} from './core.mjs';
+import {fail, now, baseDomain, json, body, text, rateLimit} from './core.mjs';
 import {closeCommunityRequest} from './community-requests.mjs';
 import {allCommunities, communityUrl, communitySlug} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
@@ -7,12 +7,46 @@ import {discordGuild} from './access.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 import {botInvite} from './api-community.mjs';
+import {syncIracingEvents} from './iracing-import.mjs';
+import {iracingSupervision, resolveIracingConflict} from './iracing-supervision.mjs';
 import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
+import {discordPreviewAvailable,diagnoseDiscordPreview} from './discord-test-preview.mjs';
+import {realDiscordPreview} from './discord-real-preview.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
+  if (path === '/api/platform/iracing' && ['GET','POST','PATCH'].includes(method)) {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    if (method === 'GET') return json(await iracingSupervision(env));
+    if (method === 'PATCH') {
+      const input = await body(request);
+      if (typeof input.key !== 'string' || input.key.length > 150 || !Number.isSafeInteger(input.revision))
+        fail(400, 'Conflit invalide.');
+      return json(await resolveIracingConflict(env,input.key,input.revision,input.action));
+    }
+    try {
+      const result = await syncIracingEvents(env);
+      return json(result, result.busy ? 409 : 200);
+    } catch {
+      fail(502, 'Le calendrier iRacing est momentanément indisponible. Consulte le suivi des sources.');
+    }
+  }
+  if (path === '/api/platform/discord/test-preview') {
+    if (!isDevelopment(env) || new URL(request.url).origin !== 'https://dev.endurance-manager.app') fail(404,'Fonction indisponible.');
+    if (!actor.user || !actor.manager) fail(403,'Réservé aux gestionnaires de la plateforme.');
+    if (method !== 'POST') fail(405,'Méthode non autorisée.');
+    if (request.headers.get('Origin') !== 'https://dev.endurance-manager.app') fail(403,'Origine refusée.');
+    const input = await body(request,256);
+    if (!['APERÇU','DIAGNOSTIC','PREPARER_LOGOS'].includes(input.confirm) || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
+    const diagnose=input.confirm==='DIAGNOSTIC';
+    await rateLimit(request,env,diagnose?'discord-test-diagnostic':'discord-test-preview',diagnose?8:4);
+    const result=diagnose?{...await diagnoseDiscordPreview(env),sent:0}:await realDiscordPreview(env,actor,input.confirm);
+    // Deliberately log only safe status fields: never the webhook URL, token, raw Discord response or user data.
+    console.log('discord-test-preview',{action:diagnose?'diagnostic':input.confirm==='PREPARER_LOGOS'?'logos':'send',ok:result.ok,stage:result.stage||'finished',httpStatus:result.httpStatus||0,discordCode:result.discordCode||0,sent:result.sent||0});
+    return json(result);
+  }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    return json(await discordSupervision(env));
+    return json({...await discordSupervision(env),testPreviewAvailable:isDevelopment(env)&&Boolean(request?.url)&&new URL(request.url).origin==='https://dev.endurance-manager.app',testPreviewConfigured:discordPreviewAvailable(env)});
   }
   if (path === '/api/platform/discord/supervision/thread' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');

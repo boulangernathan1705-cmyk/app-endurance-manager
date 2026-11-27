@@ -284,11 +284,11 @@ test('plusieurs départs : chaque pilote sans équipage une seule fois, avec ses
   starts.push({...base,departureId:'d24',startsAt:Date.parse('2026-10-16T22:00:00Z'),unassignedPilots:[{name:'Léo',categories:['GT3']}]});
   const [,race]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
   assert.equal(race.fields.length,1);
-  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
+  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> ELMS · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
   // Registered on every start: one word.
   starts[3].unassignedPilots.push({name:'Nathan',categories:['LMP2 ELMS']});
   const [,all]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
-  assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> · tous les départs$/m);
+  assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> ELMS · tous les départs$/m);
 });
 
 test('deux départs et beaucoup de pilotes : le récap choisit automatiquement la vue par créneau',()=>{
@@ -355,4 +355,23 @@ test('le calendrier du salon : une ligne par jour comme dans le fil, puis le nom
   const [monza,ricard]=card.description.split('\n\n');
   assert.equal(monza,['<#11>','📍 Autodromo Nazionale Monza · ⏱️ 6 h · 🏷️ Événement spécial','📅 **ven. 20 nov.** · 3h, 10h','📅 **sam. 21 nov.** · 13h','📅 **dim. 22 nov.** · 18h','👤 3 pilotes inscrits'].join('\n'));
   assert.equal(ricard.split('\n').length,3,'personne d’inscrit : pas de ligne de pilotes');
+});
+
+
+test('race categories are shown even without crews, with separate ELMS and WEC labels',()=>{
+  const departure={eventId:'race',eventName:'Test',circuit:'spa',startsAt:Date.parse('2090-10-15T12:00Z'),categories:['Hypercar','LMP2 ELMS','LMP2 WEC','GT3'],crews:[],unassignedPilots:[]};
+  const snapshot={futureDepartures:[departure],currentDepartures:[],periodLabel:'semaine'};
+  const emojis={em_hypercar:'111',em_lmp2:'222'};
+  const thread=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',emojis,{alone:true});
+  assert.match(thread.embeds[0].description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
+  const recap=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',emojis,{threads:{race:'123'},head:false});
+  assert.match(recap.embeds.at(-1).description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
+});
+
+
+test('constructor emoji replaces generic car emoji when registered and keeps full car text',()=>{
+  const departure={eventId:'race',eventName:'Spa',circuit:'spa',startsAt:Date.parse('2090-10-15T12:00Z'),crews:[{name:'TDZ',category:'Hypercar',car:'Toyota GR010 Hybrid',pilots:['Alice']}],unassignedPilots:[]};
+  const snapshot={futureDepartures:[departure],currentDepartures:[],periodLabel:'semaine'};
+  const payload=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',{em_hypercar:'111',em_brand_toyota:'222'},{alone:true});
+  assert.match(payload.embeds[0].fields[0].value,/<:em_hypercar:111> \*\*TDZ\*\* 🔓\n<:em_brand_toyota:222> Toyota GR010 Hybrid/);
 });

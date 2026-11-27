@@ -1,4 +1,6 @@
-import {enduranceHeader, enduranceSim} from '../endurance-card.mjs';
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter,filterHomeEvents} from './tdz-home-state.mjs';
+import {memoHref} from '../../shared/memo-links.mjs';
+import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
 // for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
@@ -78,7 +80,7 @@ function streamLine(event,starts=[]){
 }
 
 // The card's schedule on a phone (Nathan 2026-11-02, option G): one line per moment, start → end: the stream (with its
-// link), then the race, each round set or each start of an endurance. An endurance ends 30 min after its race time.
+// link), then the race, each round set or each start of an endurance, without its finish time.
 const parisMinutes=timestamp=>{const [h,m]=clock.format(timestamp).split(':').map(Number);return h*60+m;};
 const clockMinutes=time=>{const [h,m]=String(time||'').split(':').map(Number);return Number.isFinite(h)?h*60+(m||0):0;};
 const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
@@ -97,15 +99,15 @@ function planOf(item){
     const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
-      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:`${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
-        from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:solo?'🏁':'',label:solo?(starts.length>1?`Course ${index+1}`:name):'',
+        from:pending?'à définir':hour(start.startsAt),to:!solo||pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
   if(!rows.length)return {plan:'',band:'',live:''};
   rows.sort((a,b)=>a.key-b.key);
   const time=row=>`<span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>`;
   // On a phone: one line per moment, the stream's link at the end of its own line (Nathan 2026-11-02).
-  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.icon)}<em> ${esc(row.label)}</em></span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
+  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span${row.label?'':' aria-label="Départ"'}>${row.icon?esc(row.icon):enduranceStartIcon}${row.label?`<em> ${esc(row.label)}</em>`:''}</span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
   // On a computer (option P1): the race's times in the coloured band on top, the start big; the stream in its own
   // purple line with its link on the same line.
   const live=rows.find(row=>row.cls==='is-stream'),races=rows.filter(row=>row!==live),shown=races.length?races:[live];
@@ -154,31 +156,32 @@ function block(item,now){
   // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
   // championship endurances. Other races keep their simulator's colour.
   const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
-  const cls=`week-block is-${kind.key}${sim2}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  const panorama=solo?'':endurancePreviewClass(event,enduSim);
+  const cls=`week-block is-${kind.key}${sim2}${panorama}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
   const access=state.eventTdz&&solo&&!stream?(event.access==='safe'?'SAFE':'OPEN'):'';
   const kindLine=[sim,solo?kind.label:'Endurance',access].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
+  const liveStatus=live?'<span class="week-chip is-live">● En cours</span>':'';
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${!solo?enduranceHeader(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    ${!solo?enduranceArtwork(event,enduSim):sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${solo?plan.band:''}
     <span class="week-block-body">
     <span class="week-block-title">
-    ${live?'<span class="week-chip is-live">● En cours</span>':''}
-    ${solo?`<span class="week-block-kind">${esc(kindLine)}</span>`:''}
+    ${solo?`${liveStatus}<span class="week-block-kind">${esc(kindLine)}</span>`:`<span class="week-endurance-heading">${liveStatus}${enduranceCardIdentity(event,enduSim)}</span>`}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event,starts):''}
-    ${plan.plan}${solo?plan.live:''}
+    ${solo?plan.plan+plan.live:`<span class="week-endurance-schedule">${plan.plan}${enduranceCardDuration(event)}</span>`}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>
@@ -204,8 +207,9 @@ const FILTERS_KEY='em_week_filters';
 const kindKey=item=>item.kind.key==='endurance'?simOf(item.event):'event';
 // A streamed endurance (« Je streame ce départ ») is also a stream: « Events » keeps it (Nathan, 2026-11-08).
 const streamedItem=item=>item.kind.key==='endurance'&&item.starts.some(start=>(start.departure.availability||[]).some(reg=>reg.streamTime&&reg.status!=='unavailable'));
-const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item))||(chosen.has('event')&&streamedItem(item)));
+const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item))||(chosen.has('event')&&streamedItem(item))||(chosen.has('stream')&&(item.kind.key==='stream'||streamedItem(item)||Boolean(item.event.details?.streamTime))));
 export function weekFilters(){
+  if(fusedTdzHome())return homeFilters();
   if(!(state.weekFilters instanceof Set)){
     let saved=[];try{saved=JSON.parse(localStorage.getItem(FILTERS_KEY)||'[]');}catch{}
     state.weekFilters=new Set((Array.isArray(saved)?saved:[]).filter(key=>FILTERS.some(([known])=>known===key&&key!=='all')));
@@ -213,6 +217,7 @@ export function weekFilters(){
   return state.weekFilters;
 }
 export function toggleWeekFilter(key){
+  if(fusedTdzHome()){selectHomeFilter(key);return;}
   const chosen=weekFilters();
   if(key==='all')chosen.clear();else if(chosen.has(key))chosen.delete(key);else chosen.add(key);
   try{localStorage.setItem(FILTERS_KEY,JSON.stringify([...chosen]));}catch{}
@@ -260,7 +265,7 @@ function nextBox(all,now){
   return `<aside class="home-next-box"><h2 class="home-next-label">${live?'En course':'Ta prochaine course'}</h2>
     <p class="home-next-name">${esc(event.name)}</p><p class="home-next-when">${esc(when(startsAt))} · ${esc(hour(startsAt))}</p>
     ${rows.length?`<dl class="home-next-rows">${rows.map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}
-    ${go}</aside>`;
+    ${go}${state.combos && memoHref(event,crew?.car,crew?.id) ? `<a class="home-next-go" href="${esc(memoHref(event,crew?.car,crew?.id))}">Fiche mémo →</a>` : ''}</aside>`;
 }
 
 // « Équipages à former » (organisers): the starts where pilots wait for a crew or ask for one, and the way to the
@@ -276,13 +281,19 @@ function crewsBox(){
     ${button('crews-page','Voir les équipages →','','home-next-go')}</aside>`;
 }
 
-export function renderWeek(){
+// The home view composes the optional TDZ month/list and advanced filters. Register those renderers
+// from home-view rather than importing it here: the weekly calendar remains an independent module.
+let tdzViews;
+export function configureTdzViews(views){tdzViews=views;}
+
+export function renderWeek(message=''){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
+  if(fusedTdzHome()&&tdzViews&&homeView()!=='week'){tdzViews.renderCalendar(message);return;}
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,chosen))}));
+  const days=weekStarts(fusedTdzHome()?filterHomeEvents(all):all,monday).map(day=>({...day,items:day.items.filter(item=>fusedTdzHome()||keep(item,chosen))}));
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
@@ -304,11 +315,11 @@ export function renderWeek(){
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
   const create=can('create_race')&&state.soloRaces?`<div class="home-create">${addMenu([['create','🏁 Événement','data-format="solo"'],['create-stream','🎙 Stream']])}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
-  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
+  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>${fusedTdzHome()?homeViewSwitch():''}
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
-    <div class="home-layout${box?'':' is-full'}">
+    ${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
-        <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
+        ${fusedTdzHome()?homeFilterBar():`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
         <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
       </section>
       ${box}

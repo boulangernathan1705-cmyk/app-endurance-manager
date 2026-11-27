@@ -22,7 +22,7 @@ const LOCK = -0.15, SPIN = 0.15;
 
 // Distances from the line, never going back: the first samples can still read the end of the previous lap.
 export function prepare(trace) {
-  if (!trace?.time?.length || !trace.dist?.length) return null;
+  if (!trace?.time?.length || trace.time.length!==trace.dist?.length || trace.time.some((value,i)=>!Number.isFinite(value)||(i>0&&value<trace.time[i-1])) || Math.max(...trace.dist)<100) return null;
   const dist = trace.dist.slice(), end = Math.max(...dist);
   for (let i = 0; i < Math.min(dist.length, 50) && dist[i] > end * 0.5; i++) dist[i] = 0;
   for (let i = 1; i < dist.length; i++) if (dist[i] < dist[i - 1]) dist[i] = dist[i - 1];
@@ -198,12 +198,14 @@ function charts(a, b, colorA, colorB, size, picked) {
 function headToHead(sides) {
   const [a, b] = sides;
   const traced = side => side.trace ? (side.data.list || []).find(lap => lap.n === side.data.trace.lap) : null;
+  const condition = b?.item.trace?.cond;
+  const stats = side => condition ? (side.data.byCondition?.[condition] || {}) : side.data.laps;
   const ROWS = [
     ['Tour comparé', '', side => side.trace ? side.data.trace.lapTime : null, 'lap'],
     ['Secteur 1', 's', side => traced(side)?.s1, 'time'], ['Secteur 2', 's', side => traced(side)?.s2, 'time'], ['Secteur 3', 's', side => traced(side)?.s3, 'time'],
-    ['Meilleur tour', '', side => side.data.laps.best, 'lap'], ['Moyenne', '', side => side.data.laps.avg, 'lap'],
-    ['Écart entre tours', 's', side => side.data.laps.spread, 'time'], ['Tours propres', '', side => side.data.laps.count, 'count'],
-    ['Énergie / tour', '%', side => side.data.laps.ve, 'fig'], ['Carbu / tour', 'L', side => side.data.laps.fuel, 'fig'], ['Vitesse max', 'km/h', side => side.data.laps.top, 'speed']];
+    ['Meilleur tour', '', side => stats(side).best, 'lap'], ['Moyenne', '', side => stats(side).avg, 'lap'],
+    ['Écart entre tours', 's', side => stats(side).spread, 'time'], ['Tours propres', '', side => stats(side).count, 'count'],
+    ['Énergie / tour', '%', side => stats(side).ve, 'fig'], ['Carbu / tour', 'L', side => stats(side).fuel, 'fig'], ['Vitesse max', 'km/h', side => stats(side).top, 'speed']];
   const show = (value, kind) => !known(value) ? '—' : kind === 'lap' ? lapTime(value) : kind === 'time' ? fr(value, 3) : kind === 'count' ? String(value)
     : kind === 'speed' ? fr(value, 0) : fr(value, 2);
   const gap = (x, y, kind) => {
@@ -262,6 +264,7 @@ function gapList(legs, sides, picked, sort) {
 }
 
 // Every lap of the session looked at and whether it counts: its pilot takes a test lap out, or puts it back.
+const CONDITIONS = {dry:'Sec',damp:'Humide',rain:'Pluie'};
 const OUT = {'':'compté', slow:'trop lent', pit:'stand', invalid:'invalide', untimed:'sans chrono', ignored:'retiré', short:'relais court'};
 function lapList(side) {
   const list = side.data.list || [];
@@ -271,8 +274,8 @@ function lapList(side) {
   const all = mine ? `<div class="cb-actions">${list.some(lap => lap.out !== 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all">Retirer toute la séance</button>' : ''}${list.some(lap => lap.out === 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all" data-back="1">Tout remettre</button>' : ''}</div>` : '';
   return `<details class="cb-card an-laps" data-fold="laps"${side.lapsOpen ? ' open' : ''}><summary>Tours de la séance<span>${counted} compté${counted > 1 ? 's' : ''} sur ${list.length}</span></summary>
     <p class="cb-src">${mine ? 'Un relais de moins de 3 tours chronométrés ne compte pas, sauf ton meilleur tour. Un autre tour de test ou pas roulé pour de vrai : retire-le, il reste enregistré mais ne compte plus dans les fiches ni dans l’analyse.' : 'Seul le pilote de la séance peut retirer ses tours.'}</p>
-    <div class="cb-wrap"><table><thead><tr><th>Tour</th><th>Temps</th><th>S1</th><th>S2</th><th>S3</th><th>Énergie (%)</th><th>Carbu (L)</th><th>Gomme</th><th>État</th>${mine ? '<th></th>' : ''}</tr></thead>
-    <tbody>${list.map(lap => `<tr class="${lap.out ? 'an-out' : ''}"><td>${lap.n}</td><td>${lapTime(lap.t)}</td><td>${fr(lap.s1, 3)}</td><td>${fr(lap.s2, 3)}</td><td>${fr(lap.s3, 3)}</td><td>${fr(lap.ve, 2)}</td><td>${fr(lap.fuel, 2)}</td><td>${esc(lap.compound || '')}</td><td>${OUT[lap.out] ?? esc(lap.out)}</td>${action(lap)}</tr>`).join('')}</tbody></table></div>${all}</details>`;
+    <div class="cb-wrap"><table><thead><tr><th>Relais</th><th>Tour</th><th>Piste</th><th>Temps</th><th>S1</th><th>S2</th><th>S3</th><th>Énergie (%)</th><th>Carbu (L)</th><th>Gomme</th><th>État</th>${mine ? '<th></th>' : ''}</tr></thead>
+    <tbody>${list.map(lap => `<tr class="${lap.out ? 'an-out' : ''}"><td>${lap.stint ?? '—'}</td><td>${lap.n}</td><td>${CONDITIONS[lap.cond] || '—'}</td><td>${lapTime(lap.t)}</td><td>${fr(lap.s1, 3)}</td><td>${fr(lap.s2, 3)}</td><td>${fr(lap.s3, 3)}</td><td>${fr(lap.ve, 2)}</td><td>${fr(lap.fuel, 2)}</td><td>${esc(lap.compound || '')}</td><td>${OUT[lap.out] ?? esc(lap.out)}</td>${action(lap)}</tr>`).join('')}</tbody></table></div>${all}</details>`;
 }
 
 // The whole tab below its choices. sides: [mine, other?], each {data, trace (prepared), color, label, short}.
@@ -290,8 +293,8 @@ export function analysisBody(sides, metric, pick, size = 450, picked = null, sor
       <div class="an-lap"><div class="an-map-box">${map.svg}${legendHtml(map.legend)}<p class="an-readout" data-readout>Survole le tracé ou les courbes pour lire chaque point.</p></div>
       ${gapList(legs, b?.trace ? sides : [a], picked, sort)}</div>
       <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color, size, picked)}</div></section>`;
-  })() : `<section><div class="cb-head"><h2>Analyse du tour</h2></div><p class="cb-empty">Pas de tracé pour cette séance : le plugin 1.2 enregistre le meilleur tour propre de chaque séance.</p></section>`;
-  return `${headToHead(sides)}${lap}${lapList(a)}${expert(sides)}`;
+  })() : `<section><div class="cb-head"><h2>Analyse du tour</h2></div><p class="cb-empty">Aucun tracé valide disponible pour cette séance.</p></section>`;
+  return `${lap}${headToHead(sides)}${lapList(a)}<details class="cb-fold" data-fold="expert"${a.expertOpen?' open':''}><summary><h2>Mesures expertes</h2></summary><div class="cb-fold-body">${expert(sides)}</div></details>`;
 }
 
 // ---------- Following the pointer ----------

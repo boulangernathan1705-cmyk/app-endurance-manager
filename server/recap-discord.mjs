@@ -5,18 +5,19 @@ import {administrators} from './core.mjs';
 import {notify} from './notifications.mjs';
 import {communityAdmins} from './access.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
-import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
+import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly-snapshot.mjs';
 import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES, nextStartsRecap} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
+import {brandEmojiAsset,knownDisplayEmojis,rememberDisplayEmojis,registerOneDisplayEmoji} from './discord-display-emojis.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
 const DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
-const RECAP_FORMAT = 14;
+const RECAP_FORMAT = 15;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n, EVERYONE = 131072n;
@@ -292,7 +293,7 @@ export function eventDeletionTime(event) {
   // A tbd entry is an event-level waiting area kept for registrations, not an actual start.
   // Once the schedule is published, only real departures determine the Discord lifecycle.
   const departures = parse(event?.departures).filter(item => !item?.tbd);
-  if (!departures.length || event?.schedule_pending || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
+  if (!departures.length || event?.schedule_pending || event?.official_schedule_status === 'postponed' || departures.some(item => !Number.isFinite(Number(item?.startsAt)) || Number(item?.startsAt) <= 0)) return null;
   const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
   if (!(minutes > 0)) return null;
   // A race's thread goes with its week, when the next one turns (Monday 7h30, Paris): the channel never shows two weeks
@@ -304,13 +305,13 @@ export function eventDeletionTime(event) {
 export function racesOpenNow(events, scope, timestamp) {
   return events.filter(event => {
     const iracing = isIracing(event);
-    if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
+    if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending || event.official_schedule_status) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
     return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && raceWeekOpen(item.startsAt, timestamp));
   }).map(event => event.id);
 }
 // The endurances (the calendar's events have their own message).
-const raceEvents = (env, community) => env.DB.prepare(`SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE (community_id=? OR community_id='official') AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ORDER BY created_at,id`)
+const raceEvents = (env, community) => env.DB.prepare(`SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,official_schedule_status,community_id FROM events WHERE (community_id=? OR community_id='official') AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ORDER BY created_at,id`)
   .bind(community.id).all().then(result => result.results || []);
 // The races where this community has an entry, an absence or a crew.
 async function enteredRaces(env, community) {
@@ -336,6 +337,7 @@ export async function expectedRaceThreads(env, community, settings, timestamp = 
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
+export const raceThreadName = event => raceCategoryName(event).replace(/^(?:🏎️|🏁) /u, '');
 // The race categories follow the category chosen for their sim: LMU first, then iRacing, each by date of its first start
 // (one request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, settings, budget) {
@@ -394,7 +396,7 @@ async function placeCategories(env, community, guildId, channels, category, sett
 // The crews' voices in each category: LMU first, then iRacing, each by its start (server/crew-discord.mjs sorts them when one
 // is made, a pass that can stop on the way). Other voices stay first, as they are. One request, only when out of order.
 async function placeVoices(env, community, guildId, channels, budget) {
-  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, c.name AS crew_name, e.name AS event_name, e.circuit, e.departures FROM crew_discord d
+  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, c.name AS crew_name, c.car, c.category, e.name AS event_name, e.circuit, e.departures FROM crew_discord d
     JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL`).bind(community.id).all()).results || [];
   // Named as now wanted (the race's logo in front since it came; a crew renamed on the site).
   for (const item of rows) {
@@ -563,6 +565,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
     if (!app || !env.ASSETS) return ids;
     const list = await discord(env,'GET',`/applications/${app}/emojis`,null,budget);
     for (const emoji of list?.items || []) ids[emoji.name] = emoji.id;
+    if (Array.isArray(list?.items)) rememberDisplayEmojis(env,ids);
     for (const name of CATEGORY_EMOJI_NAMES.filter(name => !ids[name])) {
       const file = await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN || 'https://endurance-manager.app'}/images/discord-emojis/${name.slice(3)}.png`));
       if (!file.ok) continue;
@@ -570,6 +573,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
       let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
       ids[name] = (await discord(env,'POST',`/applications/${app}/emojis`,{name,image:`data:image/png;base64,${btoa(binary)}`},budget)).id;
     }
+    if (Array.isArray(list?.items)) rememberDisplayEmojis(env,ids);
     categoryEmojis = {at:timestamp, ids};
   } catch {
     // Without them the categories keep their colour; retried half an hour later.
@@ -580,7 +584,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
 // alone: a race's thread (its block only).
 // threads: « un fil par course », the week's message lists the races with a link to their threads ({eventId: thread}).
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, sims = null) {
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, sims = null, budget = null) {
   if (kind?.startsWith('head')) {
     const scope = sims?.length > 1 ? 'all' : kind.slice(5);
     const {periodLabel} = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope === 'all' ? 'lmu' : scope);
@@ -594,7 +598,13 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   }
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
-  const emojis = await botCategoryEmojis(env, timestamp);
+  const categoryIds = await botCategoryEmojis(env, timestamp);
+  const brandAssets = [...snapshot.currentDepartures,...snapshot.futureDepartures].flatMap(departure=>departure.crews.map(crew=>brandEmojiAsset(crew.car))).filter(Boolean);
+  // The preview does not register brands. Ordinary publication retains its existing request budget.
+  if (budget?.left >= 6 && brandAssets.length) await registerOneDisplayEmoji(env,brandAssets,(method,path,body)=>discord(env,method,path,body,budget));
+  const allIds = {...categoryIds,...knownDisplayEmojis(env)};
+  const relevant = new Set([...CATEGORY_EMOJI_NAMES,...brandAssets.map(asset=>asset.name)]);
+  const emojis = Object.fromEntries([...relevant].filter(name=>allIds[name]).map(name=>[name,allIds[name]]));
   const place = {head:!sims?.length || sims[0] === kind};
   const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, absent:discordAbsentButton(env), ...place});
   // Message edits are silent; never turn driver names into mentions.
@@ -620,7 +630,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
     if (previews.length === 10) break;
     const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId, null, null, Boolean(layout));
     // An official race without any entry of this community gets no category.
-    if (snapshot.futureDepartures.length) previews.push({eventId,name:raceCategoryName(events.find(item => item.id === eventId)),payload});
+    if (snapshot.futureDepartures.length) previews.push({eventId,name:(layout ? raceThreadName : raceCategoryName)(events.find(item => item.id === eventId)),payload});
   }
   return previews;
 }
@@ -714,8 +724,24 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
+  const {payload, hash:payloadHash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims,budget);
+  // Store the checked thread name with the content hash: routine edits need no extra Discord read.
+  const nameTag = threaded ? `thread-name-v1:${await digest(raceThreadName(event))}:` : '';
+  const hash = nameTag + payloadHash;
   if (!repair && row.message_id && row.content_hash === hash) return;
+  // Rename once (or after the event changes its name), never recreate a thread for its name.
+  if (threaded && row.message_id && !String(row.content_hash || '').startsWith(nameTag)) {
+    const existing = await discord(env,'GET',`/channels/${channel}`,null,budget).catch(error => { if (error.status !== 404 || error.code !== 10003) throw error; return null; });
+    const wanted = raceThreadName(event);
+    if (existing?.name && existing.name !== wanted) {
+      const rename = () => discord(env,'PATCH',`/channels/${channel}`,{name:wanted},budget);
+      await rename().catch(async error => {
+        if (error.code !== 50083) throw error;
+        await discord(env,'PATCH',`/channels/${channel}`,{archived:false},budget);
+        await rename();
+      });
+    }
+  }
   // A race's thread quiet for 6 days (addThreadMembers): its card sent again at the bottom, then the old one deleted. The
   // thread gets a message, so Discord does not archive it, and keeps one clean card.
   if (threaded && row.message_id && row.content_hash === REPOST) {
@@ -805,7 +831,7 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
   }
   if (!row.channel_id || !row.in_thread) {
     // Open a week (Discord's longest): a quiet thread is archived, opened again on its next change.
-    const thread = await discord(env,'POST',`/channels/${week.channel_id}/threads`,{name:raceCategoryName(event),type:11,auto_archive_duration:10080},budget).catch(error => {
+    const thread = await discord(env,'POST',`/channels/${week.channel_id}/threads`,{name:raceThreadName(event),type:11,auto_archive_duration:10080},budget).catch(error => {
       if (error.status === 403) throw Object.assign(new Error('Pour ouvrir le fil de chaque course, le bot doit pouvoir « Créer des fils publics » et « Envoyer des messages dans les fils » dans # endurances-de-la-semaine : invite-le à nouveau avec ses droits.'), {rights:true});
       throw error;
     });
@@ -822,7 +848,7 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     const later = error => { if (error.budget || error.status === 429) throw error; return null; };
     const recent = await discord(env,'GET',`/channels/${week.channel_id}/messages?limit=100`,null,budget).catch(later);
     for (const item of (recent || []).filter(item => Number(item.type) === 18 && item.author?.id === env.DISCORD_CLIENT_ID
-      && (item.message_reference?.channel_id === row.channel_id || item.content === raceCategoryName(event))))
+      && (item.message_reference?.channel_id === row.channel_id || [raceCategoryName(event),raceThreadName(event)].includes(item.content))))
       await discord(env,'DELETE',`/channels/${week.channel_id}/messages/${item.id}`,null,budget).catch(later);
     row.thread_notice_gone = 1;
     await env.DB.prepare('UPDATE discord_recap_publications SET thread_notice_gone=1 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
@@ -966,7 +992,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
-      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,Boolean(layout));
+      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,Boolean(layout),null,null,budget);
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
       await publish(env,timestamp,community,settings,row,event,budget,prepared,test);
@@ -1070,12 +1096,14 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
   let added = 0;
   for (const thread of threads) {
     // On the server, with « Accès Endurance Manager » (a role, @everyone, or a Discord admin).
+    // Read the race's registered Discord users once. Exclude guest registrations so that
+    // membership in this set sorts as 0 or 1 for every pilot.
     const pilots = (await env.DB.prepare(`SELECT m.user_id FROM memberships m WHERE m.community_id=? AND m.status='member'
       AND NOT EXISTS (SELECT 1 FROM discord_thread_members t WHERE t.community_id=m.community_id AND t.event_id=? AND t.user_id=m.user_id)
       AND (m.discord_admin=1 OR m.user_id IN (SELECT value FROM json_each(?)) OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
         AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
         AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value IN ('access','admin'))))
-      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
+      ORDER BY (m.user_id IN (SELECT g.user_id FROM registrations g WHERE g.event_id=? AND g.user_id IS NOT NULL)) DESC, m.user_id LIMIT 50`)
       .bind(thread.community_id,thread.event_id,JSON.stringify(administrators(env)),thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
       // Discord archives a thread nobody wrote in for a week and takes it out of its members' list, for good: opening it
@@ -1128,7 +1156,7 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.
 export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const rows = (await env.DB.prepare(`SELECT p.*,s.destination_id AS anchor_id,s.iracing_destination_id AS iracing_anchor_id,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending
+  const rows = (await env.DB.prepare(`SELECT p.*,s.destination_id AS anchor_id,s.iracing_destination_id AS iracing_anchor_id,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending,e.official_schedule_status
     FROM discord_recap_publications p LEFT JOIN community_recap_settings s ON s.community_id=p.community_id LEFT JOIN events e ON e.id=p.event_id
     WHERE p.event_id NOT LIKE 'week:%' AND p.event_id<>'' AND p.closed_at IS NULL`).all()).results || [];
   const due = rows.map(row => ({...row,expiry:row.current_event_id ? eventDeletionTime(row) : row.delete_after}))
@@ -1147,7 +1175,7 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
     attempted++;
     try {
       // Configuration synchronisations cannot race this deletion; recheck the event after taking the lock.
-      const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
+      const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending,official_schedule_status FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
       await removeRaceChannels(env,row,[row.anchor_id,row.iracing_anchor_id].filter(Boolean),{left:3});

@@ -58,14 +58,12 @@ test('names, tracks and classes of the schedule match the site catalog', () => {
   assert.deepEqual(weekStarts({date_start:'2026-10-17', date_end:'2026-10-18'}, {'5':['10:00']}), [Date.parse('2026-10-17T10:00:00Z')]);
 });
 
-test('special events missing from the schedule data are added, with their official duration', () => {
+test('the feed does not invent a special event or an unknown duration', () => {
   const plans = planIracingEvents({championships:[], special_events:[
     {slug:'pcc-vir', name:'THE Production Car Challenge @ViR', date_start:'2099-12-18', date_end:'2099-12-19', track_name:'ViR Grand Course', car_class:'Production Car Challenge Cars'}
   ]}, NOW);
-  assert.equal(plans.find(plan => plan.externalId.startsWith('special:pcc-vir')).input.durationMinutes, 240);
-  const cup = plans.find(plan => plan.externalId.startsWith('special:992-endurance-cup'));
-  assert.equal(cup.input.durationMinutes, 720);
-  assert.deepEqual(cup.input.categories, ['Porsche Cup']);
+  assert.deepEqual(plans.map(plan=>plan.input.name), ['THE Production Car Challenge @ViR']);
+  assert.equal(plans[0].input.durationMinutes, null);
 });
 
 test('special event time slots are read from the iracing.com article of the race week', async () => {
@@ -97,16 +95,16 @@ test('a special event article using the short name of the slug is found (Indy 8 
   assert.match(articleFor(two, {name:'Bathurst 1000', slug:'bathurst-1000', dateStart:'2099-10-16', dateEnd:'2099-10-18'}).title.rendered, /Bathurst/);
 });
 
-test('a special event article with another name is still found when it is the only one of the race week', async () => {
+test('an unrelated special event article is never used even when it is the only one of the race week', async () => {
   const {articleFor} = await import('../server/iracing-import.mjs');
   const posts = [{date:'2099-10-12T09:00:00', title:{rendered:'THIS WEEK: iRacing Brickyard Sprint presented by Someone | Special Event'}, content:{rendered:''}}];
   const special = {name:'8 Hours of Indianapolis', slug:'indy-8hr', dateStart:'2099-10-16', dateEnd:'2099-10-18'};
-  assert.ok(articleFor(posts, special));
+  assert.equal(articleFor(posts, special),null);
   assert.equal(articleFor([...posts, {...posts[0], title:{rendered:'THIS WEEK: Other Race | Special Event'}}], special), null, 'two articles: no guess');
   assert.equal(articleFor([{...posts[0], date:'2099-10-08T09:00:00'}], special), null, 'last week article is not taken');
 });
 
-test('a lap race whose schedule entry gives a few minutes keeps a real duration (Bathurst 1000)', () => {
+test('a lap race whose schedule only gives a session placeholder has no verified duration', () => {
   const HALF_HOURS = Array.from({length:48}, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
   const plans = planIracingEvents({
     championships:[{name:'2026 Bathurst 1000 AU Presented by Next Level Racing', category:'SPORTS CAR', typical_session_duration_minutes:15,
@@ -116,8 +114,7 @@ test('a lap race whose schedule entry gives a few minutes keeps a real duration 
   }, NOW);
   const bathurst = plans.filter(plan => plan.externalId.startsWith('special:bathurst-1000'));
   assert.equal(bathurst.length, 1, 'one race, not one per schedule entry');
-  assert.equal(bathurst[0].input.durationMinutes, 360);
-  assert.ok(validateEvent(bathurst[0].input));
+  assert.equal(bathurst[0].input.durationMinutes, null);
 });
 
 test('a special event listed as a series with real-looking times still gives one race', () => {
@@ -180,9 +177,7 @@ test('invalid source clock values are ignored and duplicate slots do not drop a 
   assert.deepEqual(starts,[Date.parse('2099-10-17T04:00:00Z')]);
 });
 
-test('992 Endurance Cup uses the officially announced Spa circuit and Creventic classes omit TCR',()=>{
-  const plan=planIracingEvents({championships:[],special_events:[]},NOW).find(p=>p.input.name==='992 Endurance Cup');
-  assert.equal(plan.input.circuit,'iracing-spa');
+test('Creventic classes retain the verified catalogue',()=>{
   assert.deepEqual(categoriesFor('Creventic Endurance Series'),['GT3','Porsche Cup','GT4']);
 });
 
@@ -194,4 +189,49 @@ test('solo import requires a verified endurance series and at least 90 minutes o
   for(const minutes of [90,120])assert.equal(solo({...base,typical_session_duration_minutes:minutes}).length,1);
   assert.equal(solo({...base,name:'GT Sprint Championship',typical_session_duration_minutes:180}).length,0);
   assert.equal(solo({...base,typical_session_duration_minutes:120,weeks:[{...base.weeks[0],duration_minutes:60}]}).length,0,'race duration wins over the typical session length');
+});
+
+test('source reconciliation keeps unchanged departure IDs and historical departures',async()=>{
+  const {reconcileStarts}=await import('../server/iracing-sync.mjs');
+  const old=[{id:'past',startsAt:10},{id:'same',startsAt:30},{id:'removed',startsAt:40}];
+  const incoming=[{startsAt:30},{startsAt:50}];
+  const result=reconcileStarts(old,incoming,20);
+  assert.deepEqual(result.map(d=>d.startsAt),[10,30,50]);
+  assert.equal(result[0].id,'past');assert.equal(result[1].id,'same');
+  assert.notEqual(result[2].id,'removed');
+});
+test('invalid times in an official article are ignored',async()=>{
+  const {specialStarts}=await import('../server/iracing-import.mjs');
+  assert.deepEqual(specialStarts('Timeslot #1: Saturday at 25:00 GMT Timeslot #2: Saturday at 12:99 GMT','2099-10-16','2099-10-18'),[]);
+});
+
+
+test('verified official supplements fill omissions but respect a live report or cancellation',async()=>{
+  const {supplementSpecialEvents}=await import('../server/iracing-import.mjs');
+  const supplemented=supplementSpecialEvents([], '2026S4');
+  assert.equal(supplemented.length,2);
+  assert.equal(supplemented.find(item=>item.slug==='992-endurance-cup').duration_minutes,720);
+  const listed={slug:'992-endurance-cup',name:'992 Endurance Cup',date_start:'2026-12-04',date_end:'2026-12-06',status:'postponed',duration_minutes:600};
+  const result=supplementSpecialEvents([listed], '2026S4');
+  assert.equal(result.filter(item=>item.slug===listed.slug).length,1);
+  assert.deepEqual(result.find(item=>item.slug===listed.slug),listed);
+  assert.deepEqual(supplementSpecialEvents([], '2027S4'),[]);
+  const pcc=supplementSpecialEvents([{slug:'pcc-vir',name:'THE Production Car Challenge @ViR',date_start:'2026-12-18',date_end:'2026-12-19'}], '2026S4');
+  assert.equal(pcc.find(item=>item.slug==='pcc-vir').duration_minutes,240);
+});
+
+
+test('an official sports-car endurance missing from the feed is flagged for review, not blindly created',async()=>{
+  const {unmatchedOfficialSpecials}=await import('../server/iracing-import.mjs');
+  const post={id:123,date:'2026-11-23T09:00:00',title:{rendered:'THIS WEEK: iRacing 992 Endurance Cup | Special Event'},
+    link:'https://www.iracing.com/this-week-iracing-creventic-992-endurance-cup-special-event/',
+    content:{rendered:'<p>12 hours of team racing</p><h3>TRACK: CIRCUIT DE SPA-FRANCORCHAMPS</h3><h3>CAR COMPETING:</h3><p>Porsche 911 Cup (992.2)</p><p>Timeslot #1: Friday at 22:00 GMT</p><p>Timeslot #2: Saturday at 07:00 GMT</p>'}};
+  const unrelated={...post,id:124,title:{rendered:'THIS WEEK: Winter Derby | Special Event'},content:{rendered:'<p>Stock car racing</p><p>Timeslot #1: Saturday at 07:00 GMT</p>'}};
+  const at=Date.parse('2026-11-26T12:00:00Z');
+  const findings=unmatchedOfficialSpecials([post,unrelated],[],at);
+  assert.equal(findings.length,1);assert.equal(findings[0].externalId,'official-article:123');
+  assert.equal(findings[0].value.durationMinutes,720);
+  assert.deepEqual(findings[0].value.starts,['2026-11-27T22:00:00.000Z','2026-11-28T07:00:00.000Z']);
+  assert.deepEqual(unmatchedOfficialSpecials([post],[{special:{name:'992 Endurance Cup',slug:'992-endurance-cup',dateStart:'2026-11-27',dateEnd:'2026-11-29'}}],at),[]);
+  assert.deepEqual(unmatchedOfficialSpecials([post],[],Date.parse('2026-12-01T12:00:00Z')),[]);
 });

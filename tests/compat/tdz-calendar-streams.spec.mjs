@@ -47,16 +47,23 @@ for(const width of [1440,390])test(`EVENT TDZ month: streamed endurances, one st
   // The stream announced during the streamed start is that start's; the endurance nobody streams stays in Endurance.
   await expect(page.locator('.cal')).not.toContainText('Stream du Nurburgring');
   await expect(page.locator('.cal')).not.toContainText('6h de Spa');
+  await expect(page.getByRole('button',{name:'Events TDZ',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'Tout',exact:true}).click();
+  await expect(page.locator('.cal')).toContainText('6h de Spa');
+  await page.getByRole('button',{name:'Events TDZ',exact:true}).click();
+  await expect(page.locator('.cal')).not.toContainText('6h de Spa');
   // The day number selects the day; clicking an event itself opens that race.
   await grid.locator(`${width>700?".cal-num":".cal-tap"}[data-day="${month}-08"]`).click();
   await expect(page.locator('.cal-side')).toContainText('Stream 13h30 · départ 14h · Équipage 01 · La Praline · Paul');
   if(info.project.name.startsWith('chromium'))await page.screenshot({path:test.info().outputPath(`calendrier-${width}.png`),fullPage:true});
+  await page.getByRole('button',{name:'Events TDZ',exact:true}).click();
   await page.getByRole('button',{name:'📺 Streams'}).click();
   await expect(page.locator('.cal')).not.toContainText('OPEN LMU Monza');
   await expect(page.locator('.cal')).toContainText('Soirée setups');
-  await page.getByRole('button',{name:'Events',exact:true}).click();
+  await page.getByRole('button',{name:'📺 Streams'}).click();
+  await page.getByRole('button',{name:'Events TDZ',exact:true}).click();
   await expect(page.locator('.cal')).toContainText('OPEN LMU Monza');
-  await expect(page.locator('.cal')).not.toContainText('Soirée setups');
+  await expect(page.locator('.cal')).toContainText('Soirée setups');
   expect(errors).toEqual([]);
 });
 
@@ -83,10 +90,12 @@ test('a streamed iRacing endurance shows in the events list and under the home �
   });
   await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('calendar-view:solo','list');localStorage.setItem('em_week_filters','["event"]');document.cookie='em_sim=lmu; Path=/';});
   await page.goto('/events/');
+  if(nextWeek)await page.getByRole('button',{name:'Semaine suivante'}).click();
   const list=page.locator('.event-agenda');
   await expect(list).toContainText('📺 Stream 13h30 · Nurburgring Endurance Championship');
   await expect(list).not.toContainText('Stream du Nurburgring');
   await page.goto('/lmu/#accueil');
+  await page.getByRole('button',{name:'Semaine',exact:true}).click();
   if(nextWeek)await page.getByRole('button',{name:'Semaine suivante'}).click();
   await expect(page.locator('.week-block').filter({hasText:'Nurburgring Endurance Championship'})).toBeVisible();
   await expect(page.locator('.week-grid')).not.toContainText('Stream du Nurburgring');

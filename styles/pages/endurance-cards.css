@@ -1,0 +1,832 @@
+/* Shared endurance identity: community cards keep their original bands and logos. */
+.endurance-sim-lmu { --endurance-color: var(--em-kind-lmu); }
+.endurance-sim-iracing { --endurance-color: var(--em-kind-iracing); }
+.endurance-card-head {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: var(--em-space-1); min-width: 0; min-height: 30px; box-sizing: border-box;
+  padding: var(--em-space-1) var(--em-space-2);
+  background: var(--em-panel); border-bottom: 2px solid var(--endurance-color);
+  color: color-mix(in srgb, var(--endurance-color) 65%, var(--em-text-strong));
+}
+.endurance-card-label { display: flex; align-items: center; gap: var(--em-space-1); min-width: 0; font-size: var(--em-text-xs); font-weight: 850; line-height: 1.2; }
+.endurance-card-label svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.endurance-card-duration { flex: none; color: var(--em-text-strong); border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); padding: 2px 5px; background: var(--em-panel-2); font-size: var(--em-text-sm); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.week-block.is-endurance { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; background: var(--em-panel-2); border-color: color-mix(in srgb, var(--endurance-color, var(--kind)) 40%, var(--em-border)); }
+.week-block.is-endurance.is-lmu { --endurance-color: var(--em-kind-lmu); }
+.week-block.is-endurance.is-iracing { --endurance-color: var(--em-kind-iracing); }
+.week-block.is-endurance::before { display: none; }
+.week-block.is-endurance .week-block-band { display: none; }
+.week-block.is-endurance:hover { background: color-mix(in srgb, var(--endurance-color) 6%, var(--em-panel-2)); }
+.week-block.is-endurance .week-block-body { display: grid; gap: var(--em-space-1); padding: var(--em-space-2); }
+.week-block.is-endurance .week-block-title { display: grid; grid-column: auto; grid-row: auto; gap: 2px; }
+.week-block.is-endurance .week-block-plan { display: grid; grid-column: auto; gap: 3px; margin: 0; padding: var(--em-space-1) 0 0; border-top: 1px solid var(--em-border); background: none; }
+.week-block.is-endurance .week-plan-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 6px; min-width: 0; color: var(--em-muted); font-size: var(--em-text-xs); font-weight: 700; }
+.week-block.is-endurance .week-plan-row em { display: inline; font-style: normal; }
+.week-block.is-endurance .week-plan-time { white-space: nowrap; color: var(--em-text-strong); font-variant-numeric: tabular-nums; }
+.week-block.is-endurance .week-plan-row b { font-size: var(--em-text-sm); }
+.week-block.is-endurance .week-plan-row i { font-style: normal; opacity: .65; }
+.week-block.is-endurance .week-block-facts { grid-column: auto; }
+.week-block.is-endurance .week-plan-row.is-stream > span:first-child { color: var(--em-kind-stream); }
+.week-block.is-endurance .week-plan-row .week-stream-link { font-size: inherit; }
+.race-card.is-endurance .endurance-card-head { width: 100%; margin-bottom: var(--em-space-1); border-radius: var(--em-radius-sm) var(--em-radius-sm) 0 0; }
+.cal-side .cal-ev.is-endurance { grid-template-columns: minmax(0,1fr) auto; padding: 0 0 var(--em-space-2); border: 1px solid var(--em-border); overflow: hidden; }
+.cal-side .cal-ev.is-endurance .endurance-card-head { grid-column: 1/-1; }
+.cal-side .cal-ev.is-endurance > b, .cal-side .cal-ev.is-endurance > small { grid-column: 1; margin-inline: var(--em-space-2); white-space: normal; overflow-wrap: anywhere; }
+.cal-side .cal-ev.is-endurance .cal-go { grid-column: 2; grid-row: 2/4; margin-right: var(--em-space-2); }
+.cal-side .cal-ev.is-endurance .cal-live { grid-column: 1/-1; margin-inline: var(--em-space-2); }
+.cal-side .cal-start-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px var(--em-space-1);
+  margin-block: 2px;
+}
+.cal-side .cal-start-times > strong {
+  padding: 1px var(--em-space-1);
+  border: 1px solid var(--em-border);
+  border-radius: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cal-cell.is-endurance { grid-template-columns: minmax(0,1fr); padding: 0 0 var(--em-space-1); background: var(--em-panel-2); border: 1px solid var(--em-border); overflow: hidden; }
+.cal-cell.is-endurance .endurance-card-head { min-height: 0; padding: 2px 4px; }
+.cal-cell.is-endurance .endurance-card-label { font-size: 10px; }
+.cal-cell.is-endurance .endurance-card-label svg { display: none; }
+.cal-cell.is-endurance .endurance-card-duration { font-size: 10px; padding: 0 3px; }
+.cal-cell.is-endurance > b, .cal-cell.is-endurance > small { margin-inline: var(--em-space-1); }
+
+/* Local circuit images for LMU, simulator images as fallback. */
+.endurance-sim-lmu { --endurance-photo: url('/images/endurance/lmu.webp'); --endurance-focus: 49% center; }
+.endurance-sim-iracing { --endurance-photo: url('/images/endurance/iracing.webp'); --endurance-focus: 43% center; }
+.endurance-card-head {
+  position: relative; isolation: isolate; overflow: hidden; display: flex;
+  align-items: flex-end; justify-content: space-between; flex-wrap: wrap;
+  min-height: 66px; padding: 6px 8px; gap: 3px;
+  color: #fff; background: #171d23; border-bottom: 2px solid var(--endurance-color);
+}
+.endurance-card-head::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background-image: linear-gradient(0deg, rgba(9,14,20,.96), rgba(9,14,20,.08) 76%), var(--endurance-photo);
+  background-size: cover; background-position: var(--endurance-focus, center);
+}
+.endurance-card-label { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 1px; color: #fff; }
+.endurance-card-brand { font-size: 19px; line-height: 1; font-weight: 900; font-style: italic; white-space: nowrap; letter-spacing: -.035em; }
+.endurance-card-kind { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.endurance-card-duration { color: #fff; background: #1a2028; border-color: #737b84; font-size: 11px; }
+.week-block.is-endurance .week-block-body { min-width: 0; }
+@media (max-width: 760px) {
+  .week-block.is-endurance { display: grid; grid-template-columns: minmax(76px, 29%) minmax(0,1fr); align-items: stretch; }
+  .week-block.is-endurance > .endurance-card-head {
+    grid-column: 1; grid-row: 1; align-self: stretch; justify-content: flex-end; flex-direction: column; align-items: flex-start;
+    min-height: 92px; padding: 8px 12px 9px 7px; border: 0;
+    --endurance-cut: 10%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
+  }
+
+  .week-block.is-endurance .week-block-body { grid-column: 2; grid-row: 1; align-content: center; padding: 8px 8px 8px 3px; }
+  .week-block.is-endurance .endurance-card-brand { font-size: clamp(15px, 5vw, 23px); }
+  .week-block.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
+}
+.endurance-card-aside { flex: 0 0 auto; width: clamp(72px, 21%, 104px); min-width: 0; display: grid; align-content: start; gap: 4px; }
+.race-card.is-endurance .endurance-card-aside > .race-date { width: 100%; max-width: 100%; box-sizing: border-box; }
+.race-card.is-endurance .endurance-card-aside > .endurance-card-head { min-height: 76px; margin: 0; padding: 5px 6px; border-radius: 5px; }
+.race-card.is-endurance .endurance-card-aside .endurance-card-brand { font-size: 16px; }
+.race-card.is-endurance .endurance-card-aside .endurance-card-kind { font-size: 7px; letter-spacing: .03em; }
+@media (max-width: 760px) {
+  .race-card.is-endurance .race-head { min-width: 0; overflow-wrap: anywhere; }
+}
+/* Month cells are intentionally text-only: images would compete with dates in a dense grid. */
+.cal-cell.is-endurance .endurance-card-head { min-height: 0; color: var(--em-text-strong); background: var(--em-panel); align-items: center; }
+.cal-cell.is-endurance .endurance-card-head::before { display: none; }
+.cal-cell.is-endurance .endurance-card-label { flex-direction: row; align-items: center; color: inherit; gap: 3px; }
+.cal-cell.is-endurance .endurance-card-brand { font-size: 10px; font-style: normal; letter-spacing: 0; }
+.cal-cell.is-endurance .endurance-card-kind { font-size: 9px; letter-spacing: 0; text-transform: none; }
+
+/* Endurance list only: the date sits above the name. */
+/* Same simulator border as the home agenda, independent of event type. */
+html[data-game] #app button.race-card.is-endurance {
+  --event-accent: var(--endurance-color);
+  border-color: color-mix(in srgb, var(--endurance-color) 40%, var(--em-border));
+}
+html[data-game] #app button.race-card.is-endurance::before {
+  background: var(--endurance-color);
+  box-shadow: none;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top { gap: 10px; align-items: stretch; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+  flex: 0 0 clamp(82px, 25%, 112px); width: auto; min-width: 0; min-height: 90px; margin: 0;
+  align-items: flex-start; justify-content: flex-end; flex-direction: column;
+  padding: 8px 12px 8px 8px; border: 0; border-radius: 5px 0 0 5px;
+  --endurance-cut: 9%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
+}
+html[data-game] #app button.race-card.is-endurance .endurance-card-brand { font-size: clamp(16px, 4.5vw, 20px); }
+html[data-game] #app button.race-card.is-endurance .endurance-card-kind { font-size: 8px; letter-spacing: .02em; }
+html[data-game] #app button.race-card.is-endurance .race-head { padding: 0; min-width: 0; justify-content: center; }
+html[data-game] #app button.race-card.is-endurance .race-head .race-date {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start;
+  gap: 3px 4px; width: auto !important; min-width: 0; max-width: 100%; height: auto;
+  align-self: flex-start; border: 0; border-radius: 0; padding: 0 !important; background: none;
+  line-height: 1.2; margin: 0 0 3px;
+}
+html[data-game] #app button.race-card.is-endurance .race-head .race-date strong {
+  font-size: 13px; white-space: nowrap; color: var(--em-text);
+}
+html[data-game] #app button.race-card.is-endurance .race-head .race-date small {
+  font-size: 12px; white-space: nowrap; color: var(--em-muted);
+}
+@media (max-width: 760px) {
+  html[data-game] #app button.race-card.is-endurance > .race-card-body {
+    display: grid !important; grid-template-columns: minmax(0,1fr) 64px; gap: 8px !important;
+    align-items: start; padding: 10px 12px 12px !important;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-card-content { display: contents; }
+  html[data-game] #app button.race-card.is-endurance .race-card-top { grid-column: 1/-1; grid-row: 1; }
+  html[data-game] #app button.race-card.is-endurance .race-starts { grid-column: 1; grid-row: 2; min-width: 0; }
+  html[data-game] #app button.race-card.is-endurance .race-situation,
+  html[data-game] #app button.race-card.is-endurance .race-fill { grid-column: 1/-1; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-name { font-size: 19px !important; }
+  html[data-game] #app button.race-card.is-endurance .race-head .event-type-badge { max-width: 100%; white-space: normal; }
+}
+
+/* The artwork stays visible: a single small, dark caption at its lower edge.
+   Calendar cells remain text-only, and narrow artwork can wrap its label. */
+.endurance-card-head { padding: 0; align-items: stretch; justify-content: flex-end; flex-direction: column; flex-wrap: nowrap; }
+.endurance-card-head::before { background-image: linear-gradient(0deg, rgba(9,14,20,.12), transparent 55%), var(--endurance-photo); }
+.endurance-card-caption {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  gap: 3px; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 6px;
+  background: rgba(9,14,20,.78);
+}
+.endurance-card-caption .endurance-card-label {
+  display: flex; flex-direction: row; justify-content: flex-start; flex-wrap: wrap;
+  align-items: baseline; gap: 1px 3px; min-width: 0;
+}
+.endurance-card-caption .endurance-card-brand,
+.week-block.is-endurance .endurance-card-caption .endurance-card-brand,
+.race-card.is-endurance .endurance-card-caption .endurance-card-brand {
+  order: 0; font-size: 11px; font-style: normal; font-weight: 850; letter-spacing: 0; line-height: 1.1;
+}
+.endurance-card-caption .endurance-card-kind,
+.week-block.is-endurance .endurance-card-caption .endurance-card-kind,
+.race-card.is-endurance .endurance-card-caption .endurance-card-kind {
+  order: 1; font-size: 7px; letter-spacing: .02em; line-height: 1.1; white-space: nowrap;
+}
+.endurance-card-caption .endurance-card-duration {
+  padding: 0; border: 0; border-radius: 0; background: none; font-size: 10px; line-height: 1.1;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head,
+.race-card.is-endurance .endurance-card-aside > .endurance-card-head { padding: 0; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head { align-items: stretch; }
+html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 11px; }
+html[data-game] #app button.race-card.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 7px; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head > .endurance-card-caption {
+  padding-right: 14%;
+}
+@media (max-width: 760px) {
+  .week-block.is-endurance > .endurance-card-head { padding: 0; align-items: stretch; }
+  .week-block.is-endurance .endurance-card-caption { padding-right: 15%; }
+}
+.cal-cell.is-endurance .endurance-card-head { padding: 2px 4px; }
+.cal-cell.is-endurance .endurance-card-caption { padding: 0; background: none; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-label { color: var(--em-text-strong); }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-brand { font-size: 10px; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-kind { font-size: 9px; text-transform: none; }
+.cal-cell.is-endurance .endurance-card-caption .endurance-card-duration { color: var(--em-text-strong); }
+
+/* Keep the LMU home caption over the actual capture rather than a solid footer.
+   iRacing's approved home artwork remains untouched. */
+.week-block.is-endurance.is-lmu > .endurance-card-head {
+  --endurance-focus: 49% 58%;
+}
+
+/* The list has one common artwork size per viewport, regardless of simulator,
+   title length, badges or number of starts. Keep the caption at its bottom. */
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+  flex-basis: clamp(90px,32%,138px);
+  height: 150px; min-height: 150px; max-height: 150px; align-self: flex-start;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-lmu {
+  --endurance-focus: 49% 56%;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-sim-iracing {
+  --endurance-focus: 46% 50%;
+}
+@media (max-width: 760px) {
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+    height: clamp(126px,37vw,150px); min-height: 0; max-height: none;
+  }
+}
+
+/* Detailed endurance: a diagonal separates the local photo from the existing
+   circuit map. Only the detailed endurance header uses this composition. */
+html[data-game] #app .race-header.is-endurance-detail {
+  display: grid; grid-template-columns: minmax(0,1fr); gap: 0; padding: 0 !important;
+  border: 1px solid color-mix(in srgb,var(--endurance-color) 40%,var(--em-border));
+  border-radius: var(--em-radius-lg); overflow: hidden; background: var(--em-panel-2);
+}
+.endurance-detail-hero {
+  position: relative; isolation: isolate; min-width: 0; display: grid;
+  grid-template-columns: minmax(0,7fr) minmax(0,3fr); background: #131b20;
+  height: clamp(172px,22vw,240px);
+}
+.endurance-detail-hero > .endurance-card-head {
+  grid-column: 1; grid-row: 1; height: 100%; min-height: 0; border: 0; border-radius: 0;
+  --endurance-cut: 12%; background: #171d23; clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
+}
+.endurance-detail-hero > .endurance-card-head::before {
+  background-image: var(--endurance-photo);
+  background-size: cover; background-position: center 52%; background-repeat: no-repeat;
+}
+.endurance-detail-hero > .endurance-card-head > .endurance-card-caption {
+  padding: 7px calc(12% + 10px) 7px 12px;
+}
+.endurance-detail-hero .endurance-card-caption .endurance-card-brand { font-size: 15px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 10px; }
+.endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 14px; }
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual {
+  grid-column: 2; grid-row: 1; position: static !important; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; width: 100% !important;
+  height: 100% !important; min-width: 0 !important; min-height: 0 !important; max-width: none;
+  margin: 0 !important; padding: 10px; background: none; border: 0; transform: none !important;
+}
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual img {
+  position: static !important; inset: auto !important; flex: none;
+  width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%;
+  margin: 0 !important; object-fit: contain; object-position: center;
+  transform: translate(var(--circuit-x,0%),var(--circuit-y,0%)) scale(var(--circuit-scale,.9)) !important;
+}
+.endurance-detail-hero:not(:has(> .circuit-visual)) { grid-template-columns: minmax(0,1fr); }
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head { clip-path: none; --endurance-cut: 0%; }
+.endurance-detail-hero:not(:has(> .circuit-visual)) > .endurance-card-head::after { display: none; }
+.endurance-detail-hero:not(:has(> .circuit-visual)) .endurance-card-caption { padding-right: 12px; }
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content {
+  display: block; padding: 12px 16px; min-width: 0; border: 0;
+}
+html[data-game] #app .race-header.is-endurance-detail .race-head { gap: 6px; }
+.endurance-detail-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; width: 100%; min-width: 0; }
+html[data-game] #app .race-header.is-endurance-detail .endurance-detail-meta > .race-date {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start;
+  width: auto !important; min-width: 0; height: auto; gap: 4px; padding: 0 !important; margin: 0;
+  border: 0; border-radius: 0; background: none; align-self: center;
+}
+html[data-game] #app .race-header.is-endurance-detail .race-date strong { font-size: 14px; }
+html[data-game] #app .race-header.is-endurance-detail .race-date small { font-size: 13px; }
+html[data-game] #app .race-header.is-endurance-detail .race-badges { min-width: 0; justify-content: flex-end; gap: 4px; }
+html[data-game] #app .race-header.is-endurance-detail .race-badges > * { margin: 0; max-width: 100%; white-space: normal; font-size: 10px; }
+html[data-game] #app .race-header.is-endurance-detail .event-title {
+  color: var(--em-text-strong, #f4f6f5) !important; border: 0; padding: 0 !important; margin: 0;
+  text-indent: 0; overflow-wrap: anywhere;
+}
+html[data-game] #app .race-header.is-endurance-detail .event-title::before { content: none; }
+html[data-game] #app .race-header.is-endurance-detail .race-info-chips {
+  width: 100%; margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--em-border);
+}
+@media (max-width:760px) {
+  .endurance-detail-hero { height: clamp(138px,39vw,190px); }
+  .endurance-detail-hero > .endurance-card-head > .endurance-card-caption { padding-block: 6px; padding-left: 9px; }
+  .endurance-detail-hero .endurance-card-caption .endurance-card-brand,
+  .endurance-detail-hero .endurance-card-caption .endurance-card-duration { font-size: 13px; }
+  .endurance-detail-hero .endurance-card-caption .endurance-card-kind { font-size: 9px; }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-content { padding: 10px 12px 12px; }
+  html[data-game] #app .race-header.is-endurance-detail .race-badges > * { font-size: 9px; }
+}
+
+/* One clipping plane for the photo and the complete caption. Draw the thin
+   accent above both layers so no translucent wedge appears next to duration. */
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head::after,
+.endurance-detail-hero > .endurance-card-head::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: var(--endurance-color);
+  clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
+}
+@media (max-width:760px) {
+  .week-block.is-endurance > .endurance-card-head::after {
+    content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background: var(--endurance-color);
+    clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
+  }
+  html[data-game] #app .race-header.is-endurance-detail .endurance-detail-hero > .circuit-visual { padding: 7px; }
+}
+
+/* LMU Assister covers, optimized and served locally. */
+.endurance-card-head.endurance-track-bahrain { --endurance-photo: url('/images/endurance/lmu/bahrain.webp'); --track-focus-compact: 50% 35%; --track-focus-wide: 50% 29%; --track-focus-detail: 50% 30%; }
+.endurance-card-head.endurance-track-barcelona { --endurance-photo: url('/images/endurance/lmu/barcelona.webp'); --track-focus-compact: 50% 72%; --track-focus-wide: 50% 78%; --track-focus-detail: 50% 70%; }
+.endurance-card-head.endurance-track-cota { --endurance-photo: url('/images/endurance/lmu/cota.webp'); --track-focus-compact: 50% 30%; --track-focus-wide: 50% 73%; --track-focus-detail: 50% 67%; }
+.endurance-card-head.endurance-track-daytona { --endurance-photo: url('/images/endurance/lmu/daytona.webp'); --track-focus-compact: 50% 64%; --track-focus-wide: 50% 62%; --track-focus-detail: 50% 65%; }
+.endurance-card-head.endurance-track-fuji { --endurance-photo: url('/images/endurance/lmu/fuji.webp'); --track-focus-compact: 50% 78%; --track-focus-wide: 50% 70%; --track-focus-detail: 50% 76%; }
+.endurance-card-head.endurance-track-imola { --endurance-photo: url('/images/endurance/lmu/imola.webp'); --track-focus-compact: 50% 34%; --track-focus-wide: 50% 41%; --track-focus-detail: 50% 40%; }
+.endurance-card-head.endurance-track-interlagos { --endurance-photo: url('/images/endurance/lmu/interlagos.webp'); --track-focus-compact: 50% 52%; --track-focus-wide: 50% 37%; --track-focus-detail: 50% 45%; }
+.endurance-card-head.endurance-track-laguna-seca { --endurance-photo: url('/images/endurance/lmu/laguna-seca.webp'); --track-focus-compact: 50% 44%; --track-focus-wide: 50% 62%; --track-focus-detail: 50% 53%; }
+.endurance-card-head.endurance-track-le-mans { --endurance-photo: url('/images/endurance/lmu/le-mans.webp'); --track-focus-compact: 50% 34%; --track-focus-wide: 50% 45%; --track-focus-detail: 50% 40%; }
+.endurance-card-head.endurance-track-long-beach { --endurance-photo: url('/images/endurance/lmu/long-beach.webp'); --track-focus-compact: 50% 66%; --track-focus-wide: 50% 65%; --track-focus-detail: 50% 62%; }
+.endurance-card-head.endurance-track-lusail { --endurance-photo: url('/images/endurance/lmu/lusail.webp'); --track-focus-compact: 50% 63%; --track-focus-wide: 50% 58%; --track-focus-detail: 50% 63%; }
+.endurance-card-head.endurance-track-monza { --endurance-photo: url('/images/endurance/lmu/monza.webp'); --track-focus-compact: 50% 36%; --track-focus-wide: 50% 39%; --track-focus-detail: 50% 39%; }
+.endurance-card-head.endurance-track-paul-ricard { --endurance-photo: url('/images/endurance/lmu/paul-ricard.webp'); --track-focus-compact: 50% 49%; --track-focus-wide: 50% 55%; --track-focus-detail: 50% 48%; }
+.endurance-card-head.endurance-track-portimao { --endurance-photo: url('/images/endurance/lmu/portimao.webp'); --track-focus-compact: 50% 45%; --track-focus-wide: 50% 49%; --track-focus-detail: 50% 44%; }
+.endurance-card-head.endurance-track-road-atlanta { --endurance-photo: url('/images/endurance/lmu/road-atlanta.webp'); --track-focus-compact: 50% 57%; --track-focus-wide: 50% 57%; --track-focus-detail: 50% 55%; }
+.endurance-card-head.endurance-track-sebring { --endurance-photo: url('/images/endurance/lmu/sebring.webp'); --track-focus-compact: 50% 48%; --track-focus-wide: 50% 52%; --track-focus-detail: 50% 54%; }
+.endurance-card-head.endurance-track-silverstone { --endurance-photo: url('/images/endurance/lmu/silverstone.webp'); --track-focus-compact: 50% 23%; --track-focus-wide: 50% 18%; --track-focus-detail: 50% 27%; }
+.endurance-card-head.endurance-track-spa { --endurance-photo: url('/images/endurance/lmu/spa.webp'); --track-focus-compact: 50% 28%; --track-focus-wide: 50% 30%; --track-focus-detail: 50% 28%; }
+
+/* Portrait covers need different crops for the almost square cards and the
+   horizontal desktop banners. Each focus was chosen from the original cover:
+   track/kerb or recognisable landmark, above the caption. No image is stretched. */
+.endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-compact); }
+.week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before,
+.cal-side .endurance-card-head[class*="endurance-track-"]::before,
+.endurance-detail-hero > .endurance-card-head[class*="endurance-track-"]::before {
+  background-position: var(--track-focus-wide);
+}
+@media (max-width: 760px) {
+  .week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-compact); }
+  .endurance-detail-hero > .endurance-card-head[class*="endurance-track-"]::before { background-position: var(--track-focus-detail); }
+}
+
+/* Panoramic hero on the race detail page. */
+.endurance-pano.endurance-track-bahrain { --endurance-panorama: url('/images/endurance/lmu-pano/bahrain.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-barcelona { --endurance-panorama: url('/images/endurance/lmu-pano/barcelona.webp'); --panorama-focus: 55% 50%; }
+.endurance-pano.endurance-track-cota { --endurance-panorama: url('/images/endurance/lmu-pano/cota.webp'); --panorama-focus: 48% 50%; }
+.endurance-pano.endurance-track-daytona { --endurance-panorama: url('/images/endurance/lmu-pano/daytona.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-fuji { --endurance-panorama: url('/images/endurance/lmu-pano/fuji.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-imola { --endurance-panorama: url('/images/endurance/lmu-pano/imola.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-interlagos { --endurance-panorama: url('/images/endurance/lmu-pano/interlagos.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-laguna-seca { --endurance-panorama: url('/images/endurance/lmu-pano/laguna-seca.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-le-mans { --endurance-panorama: url('/images/endurance/lmu-pano/le-mans.webp'); --panorama-focus: 54% 50%; }
+.endurance-pano.endurance-track-long-beach { --endurance-panorama: url('/images/endurance/lmu-pano/long-beach.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-lusail { --endurance-panorama: url('/images/endurance/lmu-pano/lusail.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-monza { --endurance-panorama: url('/images/endurance/lmu-pano/monza.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-paul-ricard { --endurance-panorama: url('/images/endurance/lmu-pano/paul-ricard.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-portimao { --endurance-panorama: url('/images/endurance/lmu-pano/portimao.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-road-atlanta { --endurance-panorama: url('/images/endurance/lmu-pano/road-atlanta.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-sebring { --endurance-panorama: url('/images/endurance/lmu-pano/sebring.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-silverstone { --endurance-panorama: url('/images/endurance/lmu-pano/silverstone.webp'); --panorama-focus: 50% 50%; }
+.endurance-pano.endurance-track-spa { --endurance-panorama: url('/images/endurance/lmu-pano/spa.webp'); --panorama-focus: 49% 50%; }
+.endurance-pano {
+  --panorama-shade: linear-gradient(90deg,rgba(7,12,17,.94) 0%,rgba(7,12,17,.76) 31%,rgba(7,12,17,.20) 66%,rgba(7,12,17,.49) 100%);
+}
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endurance-card-head {
+  display: flex; flex: none; min-height: 0; max-height: none; height: auto; width: 100%; margin: 0;
+  padding: 0; border: 0; border-radius: 0; background: none; clip-path: none;
+  align-items: stretch; justify-content: flex-start;
+}
+.endurance-pano .endurance-card-head::before,
+.endurance-pano .endurance-card-head::after { display: none; }
+.endurance-pano .endurance-card-caption {
+  align-items: center; padding: 6px 8px !important; background: none; color: #fff;
+}
+.endurance-pano .endurance-card-caption .endurance-card-label {
+  background: rgba(8,13,19,.83); border-radius: 5px; padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,.18); gap: 5px;
+}
+.endurance-pano .endurance-card-caption .endurance-card-brand { color: #fff; background: #c92438; padding: 3px 5px; border-radius: 3px; }
+.endurance-pano.endurance-sim-iracing .endurance-card-caption .endurance-card-brand { background: var(--em-kind-iracing); }
+.endurance-pano .endurance-card-caption .endurance-card-duration { background: rgba(8,13,19,.8); padding: 4px 7px; border-radius: 5px; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero {
+  grid-template-columns: minmax(0,7fr) minmax(0,3fr); grid-template-rows: auto minmax(0,1fr);
+  min-height: 0; height: clamp(220px,23vw,280px); align-items: stretch;
+  background-image: var(--panorama-shade), linear-gradient(0deg,rgba(7,12,17,.65),transparent 70%), var(--endurance-panorama);
+  background-size: cover; background-position: var(--panorama-focus); background-repeat: no-repeat;
+}
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endurance-card-head { grid-column: 1/-1; grid-row: 1; padding: 3px 8px; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endurance-detail-content {
+  grid-column: 1; grid-row: 2; display: flex; align-items: center; padding: 10px 14px 14px;
+  background: none; min-width: 0;
+}
+html[data-game] #app .race-header.endurance-pano .endurance-detail-content .race-head { width: 100%; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-content .race-meta { color: #fff; text-shadow: 0 1px 4px #000; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-content .event-title { text-shadow: 0 1px 5px #000; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-meta { justify-content: flex-start; }
+html[data-game] #app .race-header.endurance-pano .race-info-chips { border-top-color: rgba(255,255,255,.24); }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual {
+  grid-column: 2; grid-row: 2; align-self: stretch; background: none; min-height: 0 !important; height: auto !important; overflow: hidden;
+}
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual img { filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14) drop-shadow(0 1px 3px #000); }
+@media (max-width:760px) {
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero { height: auto; min-height: 186px; grid-template-rows: auto auto; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .circuit-visual { height: 130px !important; align-self: center; }
+html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endurance-detail-content { padding: 5px 8px 12px; }
+}
+
+/* Compact cards: the panorama is a visual layer only; no geometry changes. */
+.endurance-preview-lmu { --endurance-panorama: url('/images/endurance/lmu.webp'); }
+.endurance-preview-iracing { --endurance-panorama: url('/images/endurance/iracing.webp'); }
+.endurance-preview-track-bahrain { --endurance-panorama: url('/images/endurance/lmu-pano/bahrain.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-barcelona { --endurance-panorama: url('/images/endurance/lmu-pano/barcelona.webp'); --panorama-focus: 55% 50%; }
+.endurance-preview-track-cota { --endurance-panorama: url('/images/endurance/lmu-pano/cota.webp'); --panorama-focus: 48% 50%; }
+.endurance-preview-track-daytona { --endurance-panorama: url('/images/endurance/lmu-pano/daytona.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-fuji { --endurance-panorama: url('/images/endurance/lmu-pano/fuji.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-imola { --endurance-panorama: url('/images/endurance/lmu-pano/imola.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-interlagos { --endurance-panorama: url('/images/endurance/lmu-pano/interlagos.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-laguna-seca { --endurance-panorama: url('/images/endurance/lmu-pano/laguna-seca.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-le-mans { --endurance-panorama: url('/images/endurance/lmu-pano/le-mans.webp'); --panorama-focus: 54% 50%; }
+.endurance-preview-track-long-beach { --endurance-panorama: url('/images/endurance/lmu-pano/long-beach.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-lusail { --endurance-panorama: url('/images/endurance/lmu-pano/lusail.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-monza { --endurance-panorama: url('/images/endurance/lmu-pano/monza.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-paul-ricard { --endurance-panorama: url('/images/endurance/lmu-pano/paul-ricard.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-portimao { --endurance-panorama: url('/images/endurance/lmu-pano/portimao.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-road-atlanta { --endurance-panorama: url('/images/endurance/lmu-pano/road-atlanta.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-sebring { --endurance-panorama: url('/images/endurance/lmu-pano/sebring.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-silverstone { --endurance-panorama: url('/images/endurance/lmu-pano/silverstone.webp'); --panorama-focus: 50% 50%; }
+.endurance-preview-track-spa { --endurance-panorama: url('/images/endurance/lmu-pano/spa.webp'); --panorama-focus: 49% 50%; }
+.endurance-preview {
+  --preview-shade: linear-gradient(90deg,rgba(7,12,17,.22),rgba(7,12,17,.78) 40%,rgba(7,12,17,.88));
+}
+.week-block.is-endurance.endurance-preview.is-panorama-preview, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview > .race-card-body {
+  background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);
+  background-size: cover; background-position: var(--panorama-focus,center); background-repeat: no-repeat;
+  color: #fff;
+}
+.week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head {
+  background: transparent; border-color: transparent; clip-path: none;
+}
+.week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head::before, .week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head::after,
+html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head::before, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head::after { opacity: 0; }
+.week-block.is-endurance.endurance-preview.is-panorama-preview .week-block-name, .week-block.is-endurance.endurance-preview.is-panorama-preview .week-block-circuit, .week-block.is-endurance.endurance-preview.is-panorama-preview .week-plan-row,
+html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-head .event-name, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-head .race-meta {
+  color: #fff; text-shadow: 0 1px 3px #000;
+}
+
+@media (hover:hover) and (pointer:fine) {
+
+.week-block.is-endurance.endurance-preview:hover, html[data-game] #app button.race-card.is-endurance.endurance-preview:hover > .race-card-body {
+  background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);
+  background-size: cover; background-position: var(--panorama-focus,center); background-repeat: no-repeat;
+  color: #fff;
+}
+.week-block.is-endurance.endurance-preview:hover > .endurance-card-head, html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race-card-top > .endurance-card-head {
+  background: transparent; border-color: transparent; clip-path: none;
+}
+.week-block.is-endurance.endurance-preview:hover > .endurance-card-head::before, .week-block.is-endurance.endurance-preview:hover > .endurance-card-head::after,
+html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race-card-top > .endurance-card-head::before, html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race-card-top > .endurance-card-head::after { opacity: 0; }
+.week-block.is-endurance.endurance-preview:hover .week-block-name, .week-block.is-endurance.endurance-preview:hover .week-block-circuit, .week-block.is-endurance.endurance-preview:hover .week-plan-row,
+html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race-head .event-name, html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race-head .race-meta {
+  color: #fff; text-shadow: 0 1px 3px #000;
+}
+}
+
+
+/* Review branch: common compact card, using the existing live markup and assets.
+   All other pages, event types and calendar column sizes are untouched. */
+.week-block.is-endurance {
+  display: grid; grid-template-columns: minmax(72px, 29%) minmax(0,1fr);
+  align-items: stretch;
+}
+.week-block.is-endurance > .endurance-card-head {
+  grid-column: 1; grid-row: 1; align-self: stretch;
+  min-height: 104px; padding: 0; border: 0; align-items: stretch;
+  --endurance-cut: 10%; background: #171d23;
+  clip-path: polygon(0 0,100% 0,calc(100% - var(--endurance-cut)) 100%,0 100%);
+}
+.week-block.is-endurance > .endurance-card-head::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: var(--endurance-color);
+  clip-path: polygon(calc(100% - 2px) 0,100% 0,calc(100% - var(--endurance-cut)) 100%,calc(100% - var(--endurance-cut) - 2px) 100%);
+}
+.week-block.is-endurance > .endurance-card-head[class*="endurance-track-"]::before {
+  background-position: var(--track-focus-compact);
+}
+.week-block.is-endurance .week-block-body {
+  grid-column: 2; grid-row: 1; align-content: center;
+  min-width: 0; padding: 7px 7px 7px 3px;
+}
+.week-block.is-endurance .week-plan-row:not(.is-stream) { justify-content: flex-start; gap: 5px; }
+.week-block.is-endurance .week-block-facts, .week-block.is-endurance .week-chip { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.endurance-card-identity {
+  display: inline-grid;
+  gap: 2px;
+  padding: 3px var(--em-space-2);
+  border: 1px solid color-mix(in srgb, var(--endurance-color) 66%, var(--em-border));
+  border-inline-start: 3px solid var(--endurance-color);
+  border-radius: var(--em-radius-sm);
+  background: color-mix(in srgb, var(--endurance-color) 23%, var(--em-panel));
+  color: var(--em-text-strong);
+  line-height: 1;
+  text-align: left;
+}
+.endurance-card-identity > b {
+  font-size: var(--em-text-md);
+  font-weight: 900;
+}
+.endurance-card-identity > span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.endurance-card-duration.endurance-card-duration-pill {
+  padding: 2px var(--em-space-2);
+  border: 1px solid color-mix(in srgb, var(--endurance-color) 42%, var(--em-border));
+  background: var(--em-panel);
+  font-size: var(--em-text-lg);
+  font-weight: 900;
+  line-height: 1.15;
+}
+.endurance-start-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -.12em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .75;
+}
+.week-block.is-endurance .week-endurance-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--em-space-1);
+  padding-top: var(--em-space-1);
+  border-top: 1px solid var(--em-border);
+}
+.week-block.is-endurance .week-endurance-schedule .week-block-plan {
+  flex: 1 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+}
+.week-block.is-endurance .week-endurance-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--em-space-1);
+}
+.week-block.is-endurance .week-endurance-heading > .week-chip { margin: 0; }
+.week-block.is-endurance .week-endurance-heading > .endurance-card-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+  padding: 2px var(--em-space-1);
+  border-inline-start-width: 2px;
+}
+.week-block.is-endurance .endurance-card-identity > b { font-size: 12px; }
+.week-block.is-endurance .endurance-card-identity > span { font-size: 7.5px; }
+.week-block.is-endurance .endurance-card-duration.endurance-card-duration-pill {
+  margin-inline-start: auto;
+  padding: 2px var(--em-space-1);
+  font-size: var(--em-text-sm);
+}
+@media (max-width:760px) {
+  .week-block.is-endurance { grid-template-columns: minmax(76px,29%) minmax(0,1fr); }
+}
+html[data-game] #app button.race-card.is-endurance > .race-card-body {
+  display: grid !important; grid-template-columns: clamp(86px,28%,132px) minmax(0,1fr) !important;
+  grid-template-rows: auto auto auto auto auto !important; gap: 3px 6px !important;
+  align-items: start; padding: 0 7px 0 0 !important; width: 100%; min-width: 0; box-sizing: border-box;
+}
+html[data-game] #app button.race-card.is-endurance .race-card-content,
+html[data-game] #app button.race-card.is-endurance .race-card-top { display: contents !important; }
+html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+  grid-column: 1 !important; grid-row: 1/6 !important; align-self: stretch; width: 100% !important; height: auto !important;
+  min-height: 104px; max-height: none; margin: 0; padding: 0;
+  border-radius: 5px 0 0 5px; --endurance-cut: 10%;
+}
+html[data-game] #app button.race-card.is-endurance .race-head {
+  grid-column: 2/-1 !important; grid-row: 1 !important; min-width: 0; width: auto !important; justify-self: stretch; padding: 6px 0 0 !important;
+}
+html[data-game] #app button.race-card.is-endurance .race-head .event-name {
+  font-size: 15.5px !important; line-height: 1.2; overflow-wrap: anywhere;
+}
+html[data-game] #app button.race-card.is-endurance .race-head .race-meta { font-size: 12.5px; line-height: 1.25; }
+html[data-game] #app button.race-card.is-endurance .race-starts { grid-column: 2 !important; grid-row: 2 !important; min-width: 0; }
+html[data-game] #app button.race-card.is-endurance .race-endurance-date,
+html[data-game] #app button.race-card.is-endurance .race-endurance-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px var(--em-space-1);
+  width: 100%;
+  min-width: 0;
+}
+html[data-game] #app button.race-card.is-endurance .race-endurance-meta { flex-wrap: nowrap; }
+html[data-game] #app button.race-card.is-endurance .race-endurance-types {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 1px var(--em-space-1);
+}
+html[data-game] #app button.race-card.is-endurance .race-endurance-date { flex-wrap: nowrap; }
+html[data-game] #app button.race-card.is-endurance .race-endurance-date > .race-date {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  align-self: center;
+  margin: 0;
+}
+html[data-game] #app button.race-card.is-endurance .race-endurance-date > .endurance-card-identity {
+  flex: 0 0 auto;
+}
+html[data-game] #app button.race-card.is-endurance .race-endurance-meta > .endurance-card-duration {
+  margin-inline-start: auto;
+}
+html[data-game] #app button.race-card.is-endurance .race-start .endurance-start-icon { margin-inline-end: 3px; }
+html[data-game] #app button.race-card.is-endurance .race-situation { grid-column: 2/-1 !important; grid-row: 3 !important; min-width: 0; }
+html[data-game] #app button.race-card.is-endurance .race-fill { grid-column: 2/-1 !important; grid-row: 4 !important; min-width: 0; padding-bottom: 8px; }
+html[data-game] #app button.race-card.is-endurance .event-card-status { grid-column: 2/-1 !important; grid-row: 5 !important; min-width: 0; }
+html[data-game] #app button.race-card.is-endurance .event-category-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+
+/* Keep the photo with the title. The schedule can then use the whole card. */
+@media (max-width:760px) {
+  html[data-game] #app button.race-card.is-endurance > .race-card-body {
+    grid-template-columns: clamp(82px,27%,112px) minmax(0,1fr) !important;
+    gap: 3px var(--em-space-2) !important;
+    padding-right: 0 !important;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
+    grid-row: 1 !important;
+    min-width: 0;
+    min-height: 82px;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-head {
+    align-self: center;
+    flex-flow: row wrap;
+    justify-content: flex-start;
+    align-items: baseline;
+    gap: 1px var(--em-space-1);
+    padding: var(--em-space-1) var(--em-space-2) var(--em-space-1) 0 !important;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-head > .race-endurance-date,
+  html[data-game] #app button.race-card.is-endurance .race-head > .event-name,
+  html[data-game] #app button.race-card.is-endurance .race-head > .race-meta {
+    flex: 0 0 100%;
+    margin: 0;
+    min-width: 0;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-head .race-date strong,
+  html[data-game] #app button.race-card.is-endurance .race-head .race-date small { font-size: 12px; }
+  html[data-game] #app button.race-card.is-endurance .race-endurance-types > .event-type-badge,
+  html[data-game] #app button.race-card.is-endurance .race-endurance-types > .official-badge {
+    max-width: 100%;
+    margin: 0;
+    padding: 0 4px !important;
+    font-size: 10px !important;
+    letter-spacing: normal;
+    line-height: 1.25;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-starts,
+  html[data-game] #app button.race-card.is-endurance .race-situation,
+  html[data-game] #app button.race-card.is-endurance .race-fill {
+    grid-column: 1/-1 !important;
+    margin-inline: var(--em-space-2);
+  }
+  html[data-game] #app button.race-card.is-endurance .race-starts {
+    width: auto;
+    gap: 3px;
+    padding: var(--em-space-1) 0 0;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-day { gap: var(--em-space-1); }
+  html[data-game] #app button.race-card.is-endurance .race-day em {
+    flex: 0 0 49px;
+    margin: 0;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-start {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    box-sizing: border-box;
+    min-width: 47px;
+    min-height: 0;
+    margin: 0;
+    padding: 2px var(--em-space-1);
+    font-size: var(--em-text-sm);
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  html[data-game] #app button.race-card.is-endurance .race-start .endurance-start-icon { margin-inline-end: 0; }
+  html[data-game] #app button.race-card.is-endurance .race-fill { padding-bottom: var(--em-space-1); }
+  html[data-game] #app button.race-card.is-endurance .race-fill .event-category-badges {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: var(--em-space-1);
+  }
+  html[data-game] #app button.race-card.is-endurance .event-category-badge {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: var(--em-space-1);
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    padding: 3px 5px;
+  }
+  html[data-game] #app button.race-card.is-endurance .event-category-badge .category-logo {
+    flex: 0 0 19px;
+    width: 19px;
+    height: 19px;
+    min-width: 0;
+    object-fit: contain;
+  }
+  html[data-game] #app button.race-card.is-endurance .event-category-badge .category-text-logo { display: none; }
+  html[data-game] #app button.race-card.is-endurance .event-category-copy {
+    min-width: 0;
+    gap: 0;
+    line-height: 1.15;
+  }
+  html[data-game] #app button.race-card.is-endurance .event-category-copy strong,
+  html[data-game] #app button.race-card.is-endurance .event-category-copy small {
+    font-size: 11px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* iRacing: independently licensed photographs of the real circuits. */
+.endurance-card-head.endurance-track-iracing-spa { --endurance-photo: url('/images/endurance/iracing/iracing-spa.webp'); --track-focus-compact: 39% 48%; --track-focus-wide: 43% 48%; --track-focus-detail: 42% 50%; }
+.endurance-pano.endurance-track-iracing-spa, .endurance-preview-track-iracing-spa { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-spa.webp'); --panorama-focus: 42% 46%; }
+.endurance-card-head.endurance-track-iracing-bathurst { --endurance-photo: url('/images/endurance/iracing/iracing-bathurst.webp'); --track-focus-compact: 62% 68%; --track-focus-wide: 59% 65%; --track-focus-detail: 60% 64%; }
+.endurance-pano.endurance-track-iracing-bathurst, .endurance-preview-track-iracing-bathurst { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-bathurst.webp'); --panorama-focus: 59% 64%; }
+.endurance-card-head.endurance-track-iracing-laguna-seca { --endurance-photo: url('/images/endurance/iracing/iracing-laguna-seca.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 51%; --track-focus-detail: 48% 49%; }
+.endurance-pano.endurance-track-iracing-laguna-seca, .endurance-preview-track-iracing-laguna-seca { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-laguna-seca.webp'); --panorama-focus: 49% 50%; }
+
+.endurance-card-head.endurance-track-iracing-adelaide { --endurance-photo: url('/images/endurance/iracing/iracing-adelaide.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-adelaide, .endurance-preview-track-iracing-adelaide { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-adelaide.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-portimao { --endurance-photo: url('/images/endurance/iracing/iracing-portimao.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-portimao, .endurance-preview-track-iracing-portimao { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-portimao.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-mexico { --endurance-photo: url('/images/endurance/iracing/iracing-mexico.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-mexico, .endurance-preview-track-iracing-mexico { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-mexico.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-interlagos { --endurance-photo: url('/images/endurance/iracing/iracing-interlagos.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-interlagos, .endurance-preview-track-iracing-interlagos { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-interlagos.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-imola { --endurance-photo: url('/images/endurance/iracing/iracing-imola.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-imola, .endurance-preview-track-iracing-imola { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-imola.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-monza { --endurance-photo: url('/images/endurance/iracing/iracing-monza.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-monza, .endurance-preview-track-iracing-monza { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-monza.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-mugello { --endurance-photo: url('/images/endurance/iracing/iracing-mugello.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-mugello, .endurance-preview-track-iracing-mugello { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-mugello.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-barcelona { --endurance-photo: url('/images/endurance/iracing/iracing-barcelona.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-barcelona, .endurance-preview-track-iracing-barcelona { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-barcelona.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-magny-cours { --endurance-photo: url('/images/endurance/iracing/iracing-magny-cours.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-magny-cours, .endurance-preview-track-iracing-magny-cours { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-magny-cours.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-misano { --endurance-photo: url('/images/endurance/iracing/iracing-misano.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-misano, .endurance-preview-track-iracing-misano { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-misano.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-le-mans { --endurance-photo: url('/images/endurance/iracing/iracing-le-mans.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-le-mans, .endurance-preview-track-iracing-le-mans { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-le-mans.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-cota { --endurance-photo: url('/images/endurance/iracing/iracing-cota.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-cota, .endurance-preview-track-iracing-cota { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-cota.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-daytona { --endurance-photo: url('/images/endurance/iracing/iracing-daytona.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-daytona, .endurance-preview-track-iracing-daytona { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-daytona.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-fuji { --endurance-photo: url('/images/endurance/iracing/iracing-fuji.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-fuji, .endurance-preview-track-iracing-fuji { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-fuji.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-hockenheim { --endurance-photo: url('/images/endurance/iracing/iracing-hockenheim.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-hockenheim, .endurance-preview-track-iracing-hockenheim { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-hockenheim.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-indianapolis { --endurance-photo: url('/images/endurance/iracing/iracing-indianapolis.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-indianapolis, .endurance-preview-track-iracing-indianapolis { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-indianapolis.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-road-atlanta { --endurance-photo: url('/images/endurance/iracing/iracing-road-atlanta.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-road-atlanta, .endurance-preview-track-iracing-road-atlanta { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-road-atlanta.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-nurburgring-gp { --endurance-photo: url('/images/endurance/iracing/iracing-nurburgring-gp.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-nurburgring-gp, .endurance-preview-track-iracing-nurburgring-gp { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-nurburgring-gp.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-nordschleife { --endurance-photo: url('/images/endurance/iracing/iracing-nordschleife.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-nordschleife, .endurance-preview-track-iracing-nordschleife { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-nordschleife.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-red-bull-ring { --endurance-photo: url('/images/endurance/iracing/iracing-red-bull-ring.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-red-bull-ring, .endurance-preview-track-iracing-red-bull-ring { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-red-bull-ring.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-road-america { --endurance-photo: url('/images/endurance/iracing/iracing-road-america.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-road-america, .endurance-preview-track-iracing-road-america { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-road-america.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-sebring { --endurance-photo: url('/images/endurance/iracing/iracing-sebring.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-sebring, .endurance-preview-track-iracing-sebring { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-sebring.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-silverstone { --endurance-photo: url('/images/endurance/iracing/iracing-silverstone.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-silverstone, .endurance-preview-track-iracing-silverstone { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-silverstone.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-sonoma { --endurance-photo: url('/images/endurance/iracing/iracing-sonoma.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-sonoma, .endurance-preview-track-iracing-sonoma { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-sonoma.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-suzuka { --endurance-photo: url('/images/endurance/iracing/iracing-suzuka.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-suzuka, .endurance-preview-track-iracing-suzuka { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-suzuka.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-thruxton { --endurance-photo: url('/images/endurance/iracing/iracing-thruxton.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-thruxton, .endurance-preview-track-iracing-thruxton { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-thruxton.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-vir { --endurance-photo: url('/images/endurance/iracing/iracing-vir.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-vir, .endurance-preview-track-iracing-vir { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-vir.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-watkins-glen { --endurance-photo: url('/images/endurance/iracing/iracing-watkins-glen.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-watkins-glen, .endurance-preview-track-iracing-watkins-glen { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-watkins-glen.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-zandvoort { --endurance-photo: url('/images/endurance/iracing/iracing-zandvoort.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-zandvoort, .endurance-preview-track-iracing-zandvoort { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-zandvoort.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-brands-hatch { --endurance-photo: url('/images/endurance/iracing/iracing-brands-hatch.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-brands-hatch, .endurance-preview-track-iracing-brands-hatch { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-brands-hatch.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-charlotte { --endurance-photo: url('/images/endurance/iracing/iracing-charlotte.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-charlotte, .endurance-preview-track-iracing-charlotte { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-charlotte.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-montreal { --endurance-photo: url('/images/endurance/iracing/iracing-montreal.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-montreal, .endurance-preview-track-iracing-montreal { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-montreal.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-navarra { --endurance-photo: url('/images/endurance/iracing/iracing-navarra.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-navarra, .endurance-preview-track-iracing-navarra { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-navarra.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-zolder { --endurance-photo: url('/images/endurance/iracing/iracing-zolder.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-zolder, .endurance-preview-track-iracing-zolder { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-zolder.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-long-beach { --endurance-photo: url('/images/endurance/iracing/iracing-long-beach.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-long-beach, .endurance-preview-track-iracing-long-beach { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-long-beach.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-motegi { --endurance-photo: url('/images/endurance/iracing/iracing-motegi.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-motegi, .endurance-preview-track-iracing-motegi { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-motegi.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-oschersleben { --endurance-photo: url('/images/endurance/iracing/iracing-oschersleben.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-oschersleben, .endurance-preview-track-iracing-oschersleben { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-oschersleben.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-oulton-park { --endurance-photo: url('/images/endurance/iracing/iracing-oulton-park.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-oulton-park, .endurance-preview-track-iracing-oulton-park { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-oulton-park.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-snetterton { --endurance-photo: url('/images/endurance/iracing/iracing-snetterton.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-snetterton, .endurance-preview-track-iracing-snetterton { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-snetterton.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-summit-point { --endurance-photo: url('/images/endurance/iracing/iracing-summit-point.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-summit-point, .endurance-preview-track-iracing-summit-point { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-summit-point.webp'); --panorama-focus: 50% 50%; }
+.endurance-card-head.endurance-track-iracing-the-bend { --endurance-photo: url('/images/endurance/iracing/iracing-the-bend.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 50%; --track-focus-detail: 50% 50%; }
+.endurance-pano.endurance-track-iracing-the-bend, .endurance-preview-track-iracing-the-bend { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-the-bend.webp'); --panorama-focus: 50% 50%; }

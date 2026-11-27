@@ -7,7 +7,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'
 
 // Audit of 2026-11-09 (Nathan OK'd its 14 points).
 test('the Discord setting says what the bot does: a poster, « S’inscrire », @everyone on stream days only', () => {
-  const page = read('front/members-page.mjs');
+  const page = read('front/admin/discord-settings.mjs');
   assert.doesNotMatch(page, /avec @everyone : les events/);
   assert.doesNotMatch(page, /Présent et Absent/);
   assert.doesNotMatch(page, /La soirée avec/);
@@ -78,7 +78,7 @@ test('a race over several days is a table: one row per start time, one button on
   assert.match(planning,/--rows:\$\{times\.length\}/);
   assert.match(planning,/table\?dayFree\(event,day\):''/);
   assert.match(read('front/app/event-view.mjs'),/absence:absenceButton\(event,'Absent pour cette course'\)/);
-  const css=read('styles/ux-mobile-navigation-controls.css');
+  const css=read('styles/pages/race-planning-extensions.css');
   assert.match(css,/\.departure-planning\.is-table \.planning-day \{[^}]*grid-template-rows: subgrid/);
   assert.match(css,/\.planning-quick > :not\(\.is-primary\) \{ display: none; \}/);
   assert.match(css,/\.is-table \.planning-day-free \{ grid-row: calc\(var\(--rows, 1\) \+ 2\)/);

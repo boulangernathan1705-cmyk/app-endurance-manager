@@ -58,3 +58,37 @@ test('the error dialog keeps focus, closes on Escape and restores focus',async({
   await expect(dialog).toHaveCount(0);
   await expect(help).toBeFocused();
 });
+
+test('a newer build reloads once the pilot finishes editing',async({page})=>{
+  await setup(page);
+  let releaseVersion;
+  const versionGate=new Promise(resolve=>{releaseVersion=resolve;});
+  let notices=0;
+  await page.route('**/front/version.json',async route=>{
+    if(++notices===1)await versionGate;
+    await route.fulfill({json:{build:'compat-next-build'}});
+  });
+  await page.goto('/lmu/#equipages');
+  await expect(page.getByRole('heading',{name:'ÉQUIPAGES',exact:true})).toBeVisible();
+
+  const checking=page.waitForRequest('**/front/version.json');
+  await page.clock.fastForward(65000);
+  await checking;
+  const draft=await page.evaluateHandle(()=>{
+    const input=document.createElement('input');
+    document.body.append(input);
+    input.focus();
+    input.value='Saisie en cours';
+    return input;
+  });
+  const versionReceived=page.waitForResponse('**/front/version.json');
+  releaseVersion();
+  await versionReceived;
+  await expect.poll(()=>draft.evaluate(input=>input.value)).toBe('Saisie en cours');
+  await draft.evaluate(input=>input.blur());
+
+  const reloaded=page.waitForEvent('framenavigated',frame=>frame===page.mainFrame());
+  await page.clock.fastForward(65000);
+  await reloaded;
+  await expect(page.getByRole('heading',{name:'ÉQUIPAGES',exact:true})).toBeVisible();
+});

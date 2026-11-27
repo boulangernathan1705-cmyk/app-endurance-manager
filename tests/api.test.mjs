@@ -47,7 +47,7 @@ function harness(withParticipants=true){
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
  DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));}
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0105_iracing_source_snapshot.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0106_iracing_supervision.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0090_event_list_revision.sql',import.meta.url),'utf8'));}
  const env={DB,...(withParticipants?{COMMUNITY:'tdz'}:{}),APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -363,7 +363,8 @@ test('a sign-in lasts 30 days and each visit (once a day) pushes it back',async(
  assert.ok(renewed.data.user);assert.match(renewed.response.headers.get('Set-Cookie'),/__Host-em_session=[a-f0-9]{64};.*Max-Age=2592000/);
  assert.ok(expires()>=at+30*86400-5);
 });
-test('validation, closed departures, guest link rejection and free-tier rate limiting',async()=>{
+test('validation, closed departures, guest link rejection and free-tier rate limiting',async t=>{
+ t.mock.method(Date,'now',()=>Date.UTC(2026,10,26,18,5));
  const h=harness();await h.login(ADMIN,'admin');
  for(const data of [{...eventInput,name:' '},{...eventInput,categories:['LMP2']},{...eventInput,departures:[{date:'2090-02-30',time:'14:00'}]},{...eventInput,departures:[eventInput.departures[0],eventInput.departures[0]]}])assert.equal((await h.req('/api/events','POST',data,'admin')).status,400);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'a'.repeat(64)})).status,410,'no entries without an account any more');
@@ -372,6 +373,18 @@ test('validation, closed departures, guest link rejection and free-tier rate lim
  assert.equal((await h.req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',{name:'Late',status:'whole',category:'GTE'},'admin')).status,409);
  for(let i=0;i<80;i++)assert.notEqual((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
+ const counters=()=>h.DB.db.prepare('SELECT key,count FROM rate_limits ORDER BY key').all();
+ const before=counters();
+ for(let i=0;i<20;i++) assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
+ assert.deepEqual(counters(),before,'denied requests no longer increment the counters');
+ let calls=0;
+ h.env.ABUSE_PREFILTER={limit:async()=>{calls++;return {success:false};}};
+ assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'prefilter')).status,429);
+ assert.equal(calls,1);
+ assert.deepEqual(counters(),before,'edge rejection avoids D1 counter access');
+ h.env.ABUSE_PREFILTER={limit:async()=>{throw Error('binding unavailable');}};
+ assert.notEqual((await h.req('/api/guest/recover','POST',{token:'bad'},'fallback')).status,429,'D1 fallback remains available');
+ delete h.env.ABUSE_PREFILTER;
  assert.equal((await h.req('/api/events','POST',eventInput,'admin',{headers:{'Cookie':'__Host-em_session=forged'}})).status,401);
 });
 test('Paris timezone is stable across seasons and rejects ambiguous/nonexistent clock changes',async()=>{
@@ -714,6 +727,7 @@ test('multi-round event: each round has its own places and waiting list',async()
 
 test('official iRacing endurances are imported once, by the daily task or by an admin', async t => {
  const {req,login,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ DB.db.exec(readFileSync(new URL('../migrations/0043_notifications.sql',import.meta.url),'utf8'));
  // The community shows the official iRacing calendar (module): the races are common to every community.
  DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true'))`);
  const realFetch=globalThis.fetch;t.after(()=>{globalThis.fetch=realFetch;});
@@ -759,6 +773,7 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  assert.deepEqual(indy.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2099-10-17 00:00 tbd','2099-10-17 00:00','2099-10-17 14:00'],'Friday 22:00 GMT is Saturday midnight in Paris');
  const [common,slotA,slotB]=indy.departures;
  assert.equal(common.id,pool.id);assert.equal(common.availability.length,2);
+ assert.ok(DB.db.prepare("SELECT count(*) n FROM notifications WHERE event_id=? AND kind='choose_departure'").get(indy.id).n>=1,'automatic publication notifies waiting pilots');
  // The crew picks its start and moves there with its pilots; a pilot without crew picks theirs.
  const team=common.crews[0];
  assert.equal((await req('/api/crews/'+team.id,'PATCH',{departureId:common.id,version:team.version},'admin')).status,400,'not the common start');

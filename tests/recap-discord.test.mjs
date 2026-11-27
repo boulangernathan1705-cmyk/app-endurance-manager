@@ -780,7 +780,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   assert.equal(settings.destination_id,bot.id);assert.equal(settings.iracing_destination_id,bot.id);
   await syncBotRecaps(env,NOW,community);
   const threads=channels.filter(item=>item.type===11);
-  assert.deepEqual(threads.map(item=>[item.name,item.parent_id,item.auto_archive_duration]).sort(),[['🏁 iRacing · 8h de Watkins Glen',week.id,10080],['🏎️ LMU · 6h de Spa',week.id,10080]]);
+  assert.deepEqual(threads.map(item=>[item.name,item.parent_id,item.auto_archive_duration]).sort(),[['LMU · 6h de Spa',week.id,10080],['iRacing · 8h de Watkins Glen',week.id,10080]].sort());
   assert.deepEqual(categoriesInOrder(channels),['Accueil','🏆 Endurance Manager','Endurances','Vocaux'],'no crew voice: no race category');
   assert.equal(channels.filter(item=>item.name==='infos-de-la-course').length,0);
   // In the thread, the race only: no week header.
@@ -796,7 +796,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const card=index.embeds.at(-1),spa=threads.find(thread=>thread.name.includes('Spa')).id;
   assert.equal(index.embeds.length,2);assert.match(index.embeds[0].title,/^📝 Semaine/);assert.ok(index.embeds[0].image.url.includes('banner'));
   assert.equal(card.title,'🏎️ LMU · 1 course à venir');assert.match(card.image.url,/\/images\/discord-spacer\.png$/);
-  assert.match(card.description,new RegExp(`^<#${spa}>\\n📍 .+ · ⏱️ .+\\n📅 \\*\\*\\S+ \\d+ \\S+\\*\\* · \\d+h`));
+  assert.match(card.description,new RegExp(`^<#${spa}>\\n📍 .+ · ⏱️ .+\\nCatégories : .+\\n📅 \\*\\*\\S+ \\d+ \\S+\\*\\* · \\d+h`));
   assert.match(card.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
   // LMU and iRacing share the channel: the iRacing message has its card only, as wide.
   const iracing=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('iRacing')));
@@ -810,8 +810,8 @@ test('LMU and iRacing apart: one category each, each race its thread in its sim\
   await syncBotRecaps(env,NOW,COMMUNITY);await syncBotRecaps(env,NOW,COMMUNITY);
   assert.deepEqual(categoriesInOrder(channels).slice(0,2),['🔴 LMU','🔵 iRacing']);
   const parent=name=>channels.find(item=>item.id===channels.find(thread=>thread.type===11&&thread.name===name).parent_id).parent_id;
-  assert.equal(parent('🏎️ LMU · 6h de Spa'),named(channels,'🔴 LMU').id);
-  assert.equal(parent('🏁 iRacing · 8h de Watkins Glen'),named(channels,'🔵 iRacing').id);
+  assert.equal(parent('LMU · 6h de Spa'),named(channels,'🔴 LMU').id);
+  assert.equal(parent('iRacing · 8h de Watkins Glen'),named(channels,'🔵 iRacing').id);
 });
 
 test('no race category any more, even with a crew; the old infos-de-la-course channel gives way to the thread, its empty category goes',async t=>{
@@ -829,7 +829,7 @@ test('no race category any more, even with a crew; the old infos-de-la-course ch
   await syncBotRecaps(env,NOW+1000,community);
   assert.equal(channels.find(item=>item.id===old.id),undefined,'old channel deleted');
   assert.equal(channels.find(item=>item.id==='777777777777777771'),undefined,'its empty category deleted');
-  const thread=channels.find(item=>item.type===11);assert.equal(thread.name,'🏎️ LMU · 6h de Spa');
+  const thread=channels.find(item=>item.type===11);assert.equal(thread.name,'LMU · 6h de Spa');
   assert.equal(DB.db.prepare("SELECT in_thread FROM discord_recap_publications WHERE event_id='race-a'").get().in_thread,1);
   // An archived thread is opened again to be edited.
   DB.db.prepare("UPDATE discord_recap_publications SET content_hash='changed' WHERE event_id='race-a'").run();
@@ -854,7 +854,7 @@ test('« récap de la semaine »: just below a channel, the events with the endu
   assert.equal(channels.filter(item=>item.type===4&&item.name.includes('6h de Spa')).length,0,'no race category');
   // The race has its thread in # endurances-de-la-semaine too; the week's message links to it.
   const thread=channels.find(item=>item.type===11);
-  assert.equal(thread.name,'🏎️ LMU · 6h de Spa');assert.equal(thread.parent_id,week.id);
+  assert.equal(thread.name,'LMU · 6h de Spa');assert.equal(thread.parent_id,week.id);
 });
 
 test('changing one\'s mind: the bot takes off what it made and puts the new setting in place; « Tout retirer » takes off everything',async t=>{
@@ -862,14 +862,14 @@ test('changing one\'s mind: the bot takes off what it made and puts the new sett
   await layout(env,COMMUNITY,{mode:'events',sims:'all',showWeek:true,under:ACCUEIL});
   await syncBotRecaps(env,NOW,COMMUNITY);
   assert.ok(named(channels,'🏆 Endurance Manager'));
-  const before=channels.find(item=>item.type===11&&item.name==='🏎️ LMU · 6h de Spa');assert.ok(before);
+  const before=channels.find(item=>item.type===11&&item.name==='LMU · 6h de Spa');assert.ok(before);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
   for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(channels.find(item=>item.id===before.id),undefined,'the old thread gone');
   assert.equal(named(channels,'🏆 Endurance Manager'),undefined,'the bot\'s category gone once empty');
   const week=channels.filter(item=>item.name==='📅・endurances-de-la-semaine');
   assert.equal(week.length,1);assert.equal(week[0].parent_id,CATEGORY);
-  assert.equal(channels.find(item=>item.type===11&&item.name==='🏎️ LMU · 6h de Spa')?.parent_id,week[0].id,'its thread in the new place');
+  assert.equal(channels.find(item=>item.type===11&&item.name==='LMU · 6h de Spa')?.parent_id,week[0].id,'its thread in the new place');
   assert.equal((await as(env,'/api/community/discord','DELETE')).status,200);
   for(let pass=0;pass<2;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(channels.filter(item=>item.name==='📅・endurances-de-la-semaine').length,0);
@@ -1065,6 +1065,8 @@ test('the pilots with access are added to the race\'s thread once each, those of
   pilot('100000000000000001',[ROLE]);pilot('100000000000000002',[ROLE]);pilot('100000000000000003',[]);pilot('100000000000000004',[ROLE],'left');
   DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES('pg','Invité',?,0,?)").run(OWNER,DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('rg','race-a','start-a','guest','Invité','invite','GT3','whole',0,'pg',?)").run(DEV_COMMUNITY);
   calls.length=0;
   assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
   const message=DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id;
@@ -1133,7 +1135,9 @@ test('a pass with nothing to change makes one request; a changed race only its e
   for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW+pass*1000,COMMUNITY);
   calls.length=0;await syncBotRecaps(env,NOW+5000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET'],'the server\'s channels, read once');
-  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='x' WHERE event_id='race-a'").run();
+  // Invalidate the payload only, keeping the already-checked name fingerprint.
+  const hash=DB.db.prepare("SELECT content_hash FROM discord_recap_publications WHERE event_id='race-a'").get().content_hash;
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash=? WHERE event_id='race-a'").run(hash.slice(0,hash.lastIndexOf(':')+1)+'x');
   calls.length=0;await syncBotRecaps(env,NOW+6000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
 });
@@ -1196,7 +1200,7 @@ test('the crews\' voices: LMU first, then iRacing, each by its start; other voic
   calls.length=0;await syncBotRecaps(env,NOW+1000,community);await syncBotRecaps(env,NOW+1500,community);
   const order=channels.filter(item=>item.type===2&&item.parent_id===bot.id).sort((a,b)=>a.position-b.position).map(item=>item.name);
   // Named with the race's logo in front (voices made before it renamed).
-  assert.deepEqual(order,['Général','🏎️ LMU · 4h de Monza · monza','🏎️ LMU · 6h de Spa · spa','🏁 iRacing · 8h de Watkins Glen · iracing']);
+  assert.deepEqual(order,['Général','#monza · Voiture à choisir · GT3','#spa · Voiture à choisir · GT3','#iracing · Voiture à choisir · GT3']);
   calls.length=0;await syncBotRecaps(env,NOW+2000,community);
   assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
 });
@@ -1244,7 +1248,7 @@ test('a community showing the official iRacing races on its site: each gets its 
   const community={...COMMUNITY,modules:{...COMMUNITY.modules,iracingImport:true}};
   await layout(env,community,{mode:'events',sims:'iracing',showEvents:false,under:'top'});
   await syncBotRecaps(env,NOW,community);
-  assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
+  assert.ok(channels.some(item=>item.type===11&&item.name==='iRacing · Officielle iRacing'));
   assert.ok([...messages.values()].some(item=>item.embeds.at(-1).title?.startsWith('🏁 iRacing')&&/<#/.test(item.embeds.at(-1).description||'')));
 });
 test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again by its first name',async()=>{
@@ -1514,4 +1518,22 @@ test('a refused expired recap does not starve other expired races',async t=>{
   assert.ok(channels.some(channel=>channel.id===first));
   setFailure(null);
   assert.equal(await cleanupEventRecaps(env,at+120_000,1),1);
+});
+
+
+test('a historical race thread is renamed in place, without deleting its messages or changing settings',async t=>{
+  const {DB,env,channels,calls}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'top'});
+  await syncBotRecaps(env,NOW,COMMUNITY);await syncBotRecaps(env,NOW,COMMUNITY);
+  const thread=channels.find(item=>item.type===11);
+  const row=DB.db.prepare("SELECT * FROM discord_recap_publications WHERE event_id='race-a'").get();
+  const settings=DB.db.prepare('SELECT layout,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').get(DEV_COMMUNITY);
+  thread.name='🏎️ LMU · 6h de Spa';
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='historical' WHERE event_id='race-a'").run();
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(thread.name,'LMU · 6h de Spa');
+  assert.equal(DB.db.prepare("SELECT channel_id,message_id FROM discord_recap_publications WHERE event_id='race-a'").get().channel_id,row.channel_id);
+  assert.equal(DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id,row.message_id);
+  assert.ok(!calls.some(call=>call.method==='DELETE'&&call.path.startsWith(`/channels/${thread.id}`)));
+  assert.deepEqual(DB.db.prepare('SELECT layout,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').get(DEV_COMMUNITY),settings);
 });

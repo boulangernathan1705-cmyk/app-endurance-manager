@@ -1,6 +1,6 @@
 // Helpers the API files share: finding a race or a start, the acting community, a permission (server/worker.mjs, server/api-crews.mjs).
 import {grindfestEnabled, isGrindfest} from '../shared/grindfest.mjs';
-import {fail} from './core.mjs';
+import {fail, owned} from './core.mjs';
 import {soloRacesEnabled, communityById} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess} from './access.mjs';
@@ -37,6 +37,7 @@ export function departureById(event, departureId) {
 }
 // An official slot for pilots leaving the common "Horaire à définir" start of the same race.
 export function slotFor(event, from, departureId) {
+  if (event.official_schedule_status) fail(409, 'Le choix d’un horaire est suspendu pour cette course iRacing.');
   if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
   const target = JSON.parse(event.departures).find(d => d.id === departureId);
   if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
@@ -45,3 +46,10 @@ export function slotFor(event, from, departureId) {
 }
 // Permissions of the actor in the current community (server/access.mjs).
 export const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
+
+export function isRegistrationManager(actor) {
+  return can(actor, 'manage_registrations');
+}
+export function canManageRegistration(reg, actor) {
+  return owned(reg, actor) || isRegistrationManager(actor);
+}

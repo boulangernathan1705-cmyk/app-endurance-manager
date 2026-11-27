@@ -14,11 +14,19 @@ jobs:
     steps:
       - name: Require dev as source branch
         shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
         run: |
+          if [[ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]]; then
+            echo 'Production releases must use a branch from this repository.'
+            exit 1
+          fi
           # A hotfix/* branch made from main ships one fix alone while dev holds work still in test (Nathan, 2026-10-21).
-          case "${{ github.head_ref }}" in
+          case "$HEAD_BRANCH" in
             dev) echo "Valid production release: dev -> main" ;;
-            hotfix/*) echo "Valid production hotfix: ${{ github.head_ref }} -> main" ;;
+            hotfix/*) echo 'Valid production hotfix.' ;;
             *) echo "Production releases must be merged from the dev branch (or a hotfix/* branch made from main)."
                echo "Open the pull request as: dev -> main."
                exit 1 ;;

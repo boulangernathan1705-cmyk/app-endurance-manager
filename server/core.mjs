@@ -155,21 +155,47 @@ async function registrationParticipant(env, actor, input, data, community) {
   await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
   return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
 }
-async function body(request, limit = 24000) {
-  if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
+// Read at most limit bytes even when Content-Length is absent or inaccurate.
+async function readLimitedText(request, limit) {
+  const declared = request.headers.get('Content-Length');
+  if (declared !== null && Number(declared) > limit) fail(413, 'Formulaire trop volumineux.');
   const reader = request.body?.getReader();
   if (!reader) fail(400, 'Formulaire vide.');
   let size = 0; const chunks = [];
-  while (true) { const {value, done} = await reader.read(); if (done) break; size += value.length; if (size > limit) { await reader.cancel(); fail(413, 'Formulaire trop volumineux.'); } chunks.push(value); }
+  try {
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > limit) {
+        void reader.cancel().catch(() => {});
+        fail(413, 'Formulaire trop volumineux.');
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
   const all = new Uint8Array(size); let offset = 0;
   for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
-  try { const value = JSON.parse(new TextDecoder().decode(all)); if (!value || Array.isArray(value) || typeof value !== 'object') throw Error(); return value; } catch { fail(400, 'Formulaire invalide.'); }
+  return new TextDecoder().decode(all);
+}
+async function body(request, limit = 24000) {
+  if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
+  const raw = await readLimitedText(request, limit);
+  try { const value = JSON.parse(raw); if (!value || Array.isArray(value) || typeof value !== 'object') throw Error(); return value; } catch { fail(400, 'Formulaire invalide.'); }
 }
 async function rateLimit(request, env, kind, limit) {
   const bucket = Math.floor(now() / 600);
-  const key = await hash(`${kind}:${request.headers.get('CF-Connecting-IP') || 'local'}:${bucket}`);
-  const row = await env.DB.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count').bind(key, (bucket + 1) * 600).first();
-  if (row.count > limit) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  // Optional edge prefilter for sustained excess. The exact D1 policy remains authoritative.
+  if (env.ABUSE_PREFILTER) {
+    let allowed = true;
+    try { allowed = (await env.ABUSE_PREFILTER.limit({key: `${kind}:${ip}`})).success !== false; }
+    catch { /* The existing D1 guard remains available if the binding is unavailable. */ }
+    if (!allowed) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
+  }
+  const key = await hash(`${kind}:${ip}:${bucket}`);
+  const row = await env.DB.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE rate_limits.count < ? RETURNING count').bind(key, (bucket + 1) * 600, limit).first();
+  if (!row || row.count > limit) fail(429, 'Trop de tentatives. Réessaie dans quelques minutes.');
 }
 async function cleanup(env) {
   const timestamp = now();
@@ -183,7 +209,16 @@ async function cleanup(env) {
 // Anything else (other hosts, protocol-relative URLs, query strings) falls back to the home page.
 function returnPath(value) {
   const path = typeof value === 'string' ? value : '';
-  return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+\/?)*(?:#event=[a-f0-9-]{36}|#inscriptions)?$/.test(path) ? path : '/';
+  // Allow only explicit memo parameters on these two local pages; never a host or redirect target.
+  if (path.length <= 600 && /^\/(?:simhub|fiches-combo)(?:\.html)?(?:[?#]|$)/.test(path)) {
+    const url = new URL(path, 'https://local.invalid');
+    const allowed = new Set(['circuit','track','car','event','version','setup','moment','tmin','tmax','from','to','tab','compare','crew','race','cond','scope','reserve','laps','tyres','rubber']);
+    if (url.origin === 'https://local.invalid' && [...url.searchParams].every(([key, value]) => allowed.has(key) && value.length <= 120 && !/[\u0000-\u001f]/.test(value)) && /^(?:#(?:memo|mur|board|chrono|car|tele|map|installer))?$/.test(url.hash)) {
+      return url.pathname + url.search + url.hash;
+    }
+    return '/';
+  }
+  return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*\/?)?(?:#event=[a-f0-9-]{36}|#inscriptions)?$/.test(path) ? path : '/';
 }
 function text(value, max, label) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) fail(400, `${label} : indique de 1 à ${max} caractères.`);
@@ -509,7 +544,7 @@ function validateRegistration(input, event) {
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal,
-  registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
+  registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, readLimitedText, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };
 
 

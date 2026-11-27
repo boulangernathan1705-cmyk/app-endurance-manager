@@ -1,0 +1,251 @@
+/* =====================================================================
+   « Accueil » (front/app/week-view.mjs): the week of the community, Monday to Sunday (7 columns on a computer, the
+   days one under the other on a phone), and the pilot's next race beside it. One colour per kind of race.
+   ===================================================================== */
+.home-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--em-space-3) var(--em-space-4); margin-bottom: var(--em-space-4); }
+.home-create { display: flex; flex-wrap: wrap; gap: var(--em-space-2); margin-left: auto; }
+.week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
+.week-nav .week-step { min-width: 38px; min-height: 36px; padding: 0 var(--em-space-3); font-size: var(--em-text-lg); }
+.week-label { display: grid; min-width: 170px; text-align: center; font-size: var(--em-text-md); font-weight: 800; color: var(--em-text); }
+.week-label small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: var(--em-space-3); align-items: start; }
+.home-layout.is-full { grid-template-columns: minmax(0, 1fr); }
+.week-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--em-space-3); }
+.week-filters .week-filter { border-radius: var(--em-radius-pill); }
+.week-filters .week-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--kind, var(--em-accent)); }
+.week-filters .is-lmu { --kind: var(--em-kind-lmu); }
+.week-filters .is-iracing { --kind: var(--em-kind-iracing); }
+.week-filters .is-event { --kind: var(--em-kind-event); }
+.week-filters .is-mine { --kind: var(--em-ok); }
+.week-grid { display: grid; grid-template-columns: var(--week-columns, repeat(7, minmax(0, 1fr))); gap: 6px; align-items: stretch; }
+/* The home takes the screen's width (Nathan 2026-11-01): the week needs it more than the other pages. */
+main:not(.charte):has(.home-layout) { max-width: 2400px; }
+/* A busy day scrolls on its own, its races one under the other; the page does not move (Nathan 2026-11-07). */
+@media (min-width: 761px) {
+  .week-day-list { max-height: 452px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--em-accent) 55%, transparent) transparent; }
+}
+.week-day-head .week-day-name, .week-day-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-done { justify-self: stretch; grid-column: 1 / -1; padding: 5px 9px; border: 1px dashed var(--em-border); border-radius: 8px; background: none; color: var(--em-muted); font: inherit; font-size: 12.5px; font-weight: 700; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.week-done:hover { color: var(--em-text); border-color: var(--em-muted); }
+.week-day { min-width: 0; min-height: 260px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); background: var(--em-panel); overflow: hidden; }
+.week-day.is-today { border-color: color-mix(in srgb, var(--em-accent) 70%, transparent); box-shadow: inset 0 3px 0 var(--em-accent); }
+.week-day.is-past { opacity: .6; }
+.week-day-head { display: flow-root; margin: 0; padding: 9px 10px 7px; border-bottom: 1px solid var(--em-border); font-size: var(--em-text-md); font-weight: 850; color: var(--em-text); }
+.week-day-name { display: block; text-transform: capitalize; }
+.week-day-head small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
+.week-today { float: right; margin-top: 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em-accent); }
+.week-day-list { display: grid; gap: 7px; padding: 7px; }
+.week-empty { margin: 4px 0; text-align: center; color: var(--em-faint); }
+.week-block {
+  --kind: var(--em-accent);
+  position: relative; width: 100%; text-align: left; overflow: hidden;
+  border: 1px solid var(--em-border); border-radius: 10px; color: var(--em-text); font: inherit; text-decoration: none; cursor: pointer;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 16%, var(--em-panel-2)), var(--em-panel-2) 70%);
+}
+.week-block::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--kind); }
+.week-block:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 26%, var(--em-panel-2)), var(--em-panel-2) 75%); }
+.week-block.is-endurance.is-lmu { --kind: var(--em-kind-lmu); }
+.week-block.is-endurance.is-iracing { --kind: var(--em-kind-iracing); }
+.week-block.is-event { --kind: var(--sim, var(--em-kind-event)); }
+.week-block.is-gridfest { --kind: var(--em-kind-gridfest); }
+.week-block.is-stream { --kind: var(--em-kind-stream); }
+.week-block.is-past { opacity: .6; }
+.week-block.is-mine { box-shadow: 0 0 0 1px color-mix(in srgb, var(--em-ok) 60%, transparent); }
+.week-block-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.week-block-time { font-size: 15px; font-weight: 850; color: var(--em-text-strong); }
+.week-block-time small { font-size: 12.5px; font-weight: 700; color: var(--em-muted); white-space: nowrap; }
+.week-block-sim { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 75%, var(--em-text-strong)); }
+.week-badge { padding: 2px 6px; border-radius: var(--em-radius-pill); background: color-mix(in srgb, var(--kind) 32%, transparent); font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--em-text-strong); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.week-block-logo { flex: none; }
+.week-block-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* The body's lines are the card's own lines on a computer; on a phone they make the middle of the agenda row. */
+.week-block-time > span { white-space: nowrap; }
+.week-block-length small { display: none; }
+.week-block-name { font-size: 13.5px; line-height: 1.25; overflow-wrap: anywhere; }
+.week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
+.week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
+/* The title, the schedule and the facts of a card are only grouped on a phone (option G, Nathan 2026-11-02). */
+.week-block-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.week-block-facts .week-block-meta { display: contents; }
+.week-block-kind, .week-soon, .week-block-plan { display: none; }
+/* On a computer (option P1, Nathan 2026-11-02): a band of the race's colour on top with its times (the start big,
+   « → end » small) and its logo inside the band; under it the kind, the name, the circuit, the stream in its own
+   purple line with its link, the facts and how full it is. */
+.week-block { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.week-block::before { display: none; }
+.week-block .week-block-time, .week-block .week-block-stream, .week-block-sim { display: none; }
+/* The logo shrinks with the card and the band keeps its place: the times never run under it (Nathan 2026-11-15). */
+.week-block { container-type: inline-size; --week-logo: clamp(38px, 26cqi, 50px); }
+.week-block-head { order: 0; position: absolute; top: 6px; right: 8px; z-index: 1; }
+.week-block-logo { width: var(--week-logo); height: var(--week-logo); margin: 0; }
+.week-block-logo img { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .55)); }
+.week-block-head .week-badge { display: grid; place-content: center; width: var(--week-logo); height: var(--week-logo); margin-top: 0; padding: 0; border-radius: 11px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .3); font-size: 9.5px; text-align: center; white-space: normal; }
+.week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; line-height: 1; }
+.week-block-head .week-block-length small { display: block; margin-top: 2px; font-size: 8.5px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+.week-block-band { display: grid; align-content: center; min-height: 62px; padding: 8px calc(var(--week-logo) + 14px) 8px 11px; color: #fff;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(105deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
+.week-block-band small { display: inline-block; margin-left: .25em; white-space: nowrap; }
+/* Several starts: the rows run beside the logo, then under it with the whole width. */
+.week-block-band.is-many { display: block; padding-right: 8px; }
+.week-block-band.is-many::before { content: ""; float: right; width: calc(var(--week-logo) + 6px); height: calc(var(--week-logo) - 2px); }
+.week-block-band.is-many > span { display: block; }
+.week-block-band b { font-size: 22px; font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+.week-block-band small { font-size: 12.5px; font-weight: 800; opacity: .82; }
+.week-block-band.is-many b { font-size: 14.5px; }
+.week-block-band.is-many small { font-size: 12px; }
+.week-block-body { display: grid; gap: 3px; padding: 8px 11px 10px; }
+.week-block-title { display: contents; }
+.week-block-kind { display: block; font-size: 9.5px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 55%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.week-block-name { font-weight: 900; color: var(--em-text-strong); }
+.week-block-live { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; padding: 4px 8px; border: 1px solid color-mix(in srgb, #a970ff 35%, transparent); border-radius: 8px; background: color-mix(in srgb, #a970ff 16%, transparent); font-size: 12px; color: #d9c4ff; }
+.week-block-live > i { width: 7px; height: 7px; border-radius: 50%; background: #ff4d6d; box-shadow: 0 0 0 3px rgba(255, 77, 109, .25); }
+.week-block-live b { font-weight: 900; white-space: nowrap; }
+.week-block-live .week-stream-link { margin-left: auto; white-space: nowrap; }
+.week-block-facts { margin-top: 3px; }
+.week-block-facts .week-chip.is-warn { display: none; }
+.week-block-gauge { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.week-block-gauge > span { flex: 1; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.week-block-gauge i { display: block; height: 100%; background: linear-gradient(90deg, var(--kind), color-mix(in srgb, var(--kind) 60%, #fff)); }
+.week-block-gauge em { font-style: normal; font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--em-warn) 85%, #fff); white-space: nowrap; }
+.week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .06); color: var(--em-text); font-weight: 700; }
+/* When the stream is live, in small, with its link (Nathan 2026-11-02). */
+.week-block-stream { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--em-text-xs); font-weight: 650; color: var(--em-muted); }
+.week-stream-link { color: #a970ff; font-weight: 750; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.week-stream-link:hover, .week-stream-link:focus-visible { color: #c9a6ff; }
+.week-chip { justify-self: start; padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 800; line-height: 1.3; }
+.week-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.week-chip.is-alert, .week-chip.is-live { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
+.week-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+
+.home-next-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--em-warn) 14%, transparent), var(--em-panel) 65%); }
+.home-next-label { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; color: var(--em-text-strong); }
+.home-next-when { margin: 0 0 6px; font-weight: 750; color: var(--em-warn); }
+.home-next-rows { margin: 0; }
+.home-next-rows div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
+.home-next-rows dt { color: var(--em-muted); }
+.home-next-rows dd { margin: 0; text-align: right; font-weight: 750; color: var(--em-text); }
+.home-next-go { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
+.home-next-go:hover { filter: brightness(1.08); }
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .home-layout { grid-template-columns: minmax(0, 1fr); }
+  .home-side { order: -1; }
+  .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .home-create { width: 100%; margin-left: 0; }
+  .home-create > * { flex: 1 1 0; font-size: var(--em-text-sm); padding-inline: var(--em-space-2); }
+  .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
+  .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
+  .home-side { order: -1; }
+  .week-filters { flex-wrap: wrap; overflow: visible; }
+  .week-filters .week-filter { flex: none; white-space: nowrap; }
+  .week-grid { grid-template-columns: minmax(0, 1fr); }
+  .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
+  .week-day { min-height: 0; }
+  .week-day.is-empty { display: none; }
+  .week-day-name { display: inline; margin-right: 8px; }
+  /* Option G (Nathan 2026-11-02): no box around the day; each card in three floors: what (logo, kind, name, circuit),
+     when (one line per moment, start → end, the stream first when it starts first), who (pilots, places, my status). */
+  .week-grid { gap: 12px; }
+  .week-day, .week-day.is-today { border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+  .week-day-head { padding: 0 2px 6px; border: 0; font-size: 16px; }
+  .week-day-head small { font-size: 13px; }
+  .week-day.is-today .week-day-name { color: var(--em-accent); }
+  .week-soon { display: inline; }
+  .week-day-list { gap: 8px; padding: 0; }
+  /* The computer's colour band, turned on its side: a striped band on the left holds the logo (Nathan 2026-11-02). */
+  .week-block { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 0; border-radius: 14px;
+    background: var(--em-panel-2); }
+  .week-block::before { display: block; width: 76px;
+    background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(180deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
+  .week-block-head { display: contents; }
+  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block .week-block-band, .week-block-live, .week-block-gauge { display: none; }
+  .week-block-facts .week-chip.is-warn { display: inline-block; }
+  .week-plan-row .week-stream-link { justify-self: end; font-size: 12.5px; white-space: nowrap; }
+  .week-plan-time { white-space: nowrap; }
+  .week-block-logo, .week-block-head .week-badge { position: relative; z-index: 1; grid-column: 1; grid-row: 1 / span 3; align-self: center; justify-self: center; }
+  .week-block-logo { width: 60px; height: 60px; margin: 0; }
+  .week-block-head .week-badge { display: grid; place-content: center; width: 58px; height: 58px; margin: 0; padding: 0; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .3); color: #fff; font-size: 10px; text-align: center; white-space: normal; }
+  .week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; }
+  .week-block-length small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+  .week-block-body { display: contents; }
+  .week-block-title { grid-column: 2; grid-row: 1; display: grid; gap: 1px; min-width: 0; }
+  .week-block-title .week-chip { margin-bottom: 3px; }
+  .week-block-kind { display: none; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .week-block-body { padding: 0; }
+  .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; color: var(--em-text-strong); }
+  .week-block-circuit { font-size: 12.5px; }
+  .week-block-plan { grid-column: 2; display: grid; gap: 1px; margin: 0; padding: 0; border: 0; background: none; }
+  .week-plan-row em { display: inline; }
+  .week-plan-row { display: grid; grid-template-columns: 6.4em auto minmax(0, 1fr); align-items: baseline; gap: 3px; font-size: 12.5px; line-height: 1.35; font-weight: 700; color: var(--em-muted); }
+  .week-plan-row > span:first-child { white-space: nowrap; }
+  .week-plan-row b { font-size: 14px; font-weight: 900; color: var(--em-text-strong); white-space: nowrap; }
+  .week-plan-row i { font-style: normal; text-align: center; opacity: .6; }
+  .week-plan-row.is-stream > span:first-child, .week-plan-row.is-stream b { color: #c9a6ff; }
+  .week-block-facts { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .week-block-facts .week-block-meta { display: contents; }
+  .week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 12px; font-weight: 700; color: var(--em-text); }
+  .week-block-facts .week-chip { font-size: 11.5px; padding: 1px 7px; }
+}
+
+/* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
+.solo-entry-block { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-3); padding: var(--em-space-3) var(--em-space-4);
+  border: 1px solid color-mix(in srgb, var(--em-accent) 45%, transparent); border-left: 4px solid var(--em-accent); border-radius: var(--em-radius-lg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-block.is-mine { border-color: color-mix(in srgb, var(--em-ok) 50%, transparent); border-left-color: var(--em-ok); background: linear-gradient(90deg, color-mix(in srgb, var(--em-ok) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-copy { display: grid; gap: 2px; min-width: 0; }
+.solo-entry-copy strong { font-size: var(--em-text-lg); color: var(--em-text-strong); }
+.solo-entry-copy small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-entry-block .planning-quick { position: static; margin-left: auto; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.solo-round-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--em-space-3); }
+.solo-round-card { display: grid; align-content: start; gap: var(--em-space-2); min-width: 0; padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.solo-round-card.is-mine { border-color: color-mix(in srgb, var(--em-ok) 45%, transparent); }
+.solo-round-card-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--em-space-2); margin: 0; }
+.solo-round-card-title small { flex-basis: 100%; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em-accent); }
+.solo-round-card-title strong { font-size: var(--em-text-lg); color: var(--em-text-strong); overflow-wrap: anywhere; }
+.solo-round-card-count { margin: 0; color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-round-pilots-all { padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+@media (max-width: 760px) {
+  .solo-entry-block .planning-quick { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* « Équipages à former » on the home page (organisers), under « Ta prochaine course ». */
+.home-side { display: grid; gap: var(--em-space-3); align-content: start; }
+.home-crews-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.home-crews-box ul { margin: 0; padding: 0; list-style: none; }
+.home-crews-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border: 0; border-top: 1px solid var(--em-border); background: none; color: var(--em-text); font: inherit; text-align: left; cursor: pointer; }
+.home-crews-row > span:first-child { display: grid; min-width: 0; font-size: var(--em-text-sm); }
+.home-crews-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-crews-row small { color: var(--em-muted); }
+.home-crews-row:hover strong { color: var(--em-accent); }
+.home-crews-row .week-chip { flex: none; }
+.home-crews-done, .home-crews-more { margin: 4px 0 0; font-size: var(--em-text-sm); color: var(--em-muted); }
+.home-crews-compact { display: none; }
+@media (max-width: 760px) {
+  .home-crews-box > :not(.home-crews-compact) { display: none; }
+  .home-crews-box { padding-block: var(--em-space-1); }
+  .home-crews-box .home-crews-compact { display: flex; min-height: 44px; border-top: 0; }
+}
+.home-crews-box .home-next-go { background: var(--em-accent); color: var(--em-bg); }
+
+/* Counter of the « Équipages » tab. */
+.nav-count { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 5px; border-radius: var(--em-radius-pill); background: var(--em-danger); color: var(--em-text-strong); font-size: 11px; font-weight: 800; line-height: 1.4; text-align: center; }
+
+/* TDZ Accueil — agenda de la semaine uniquement. */
+#app .tdz-agenda { display: grid; gap: var(--em-space-3); }
+#app .tdz-agenda-day { display: grid; grid-template-columns: minmax(116px,1fr) minmax(0,3fr); gap: var(--em-space-3); align-items: start; padding: var(--em-space-3) 0; border-bottom: 1px solid var(--em-border); min-width: 0; }
+#app .tdz-agenda-day:last-child { border-bottom: 0; }
+#app .tdz-agenda-date { display: grid; gap: 4px; margin: 0; padding: var(--em-space-2) 0; font-size: var(--em-text-lg); font-weight: 800; color: var(--em-text); text-transform: none; }
+#app .tdz-agenda-date > span { text-transform: capitalize; }
+#app .tdz-agenda-date small { color: var(--em-muted); font-size: var(--em-text-sm); font-weight: 600; }
+#app .tdz-agenda-date .tdz-agenda-today { color: var(--em-accent); }
+html[data-game] #app .tdz-agenda .tdz-agenda-cards { display: grid; grid-template-columns: minmax(0,1fr); gap: var(--em-space-2); min-width: 0; }
+html[data-game] #app .tdz-agenda .tdz-agenda-cards > .event-card { width: 100%; max-width: none; min-width: 0; margin: 0; }
+@media (max-width: 760px) {
+  #app .tdz-agenda-day { grid-template-columns: minmax(0,1fr); gap: var(--em-space-2); }
+  #app .tdz-agenda-date { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--em-space-2); padding: 0; }
+}

@@ -33,15 +33,15 @@ export function calendarType(event) {
   return event.access === 'safe' || type === 'SAFE' ? 'safe' : 'open';
 }
 const undated = event => event.schedulePending || !(event.departures || []).some(departure => !departure.tbd && /^\d{4}-\d{2}-\d{2}$/.test(departure.date || ''));
-// One entry per event and day (several starts the same day: the first one, « +1 »).
+// One entry per event and day, with the starts kept in chronological order.
 function entries(events) {
   const byDay = new Map();
   for (const event of events) {
     if (undated(event)) continue;
     const seen = new Map();
     for (const departure of (event.departures || []).filter(item => !item.tbd && item.date).sort((a, b) => a.startsAt - b.startsAt)) {
-      if (seen.has(departure.date)) { seen.get(departure.date).more++; continue; }
-      const entry = {event, departure, more:0};
+      if (seen.has(departure.date)) { seen.get(departure.date).departures.push(departure); continue; }
+      const entry = {event, departure, departures:[departure]};
       seen.set(departure.date, entry);
       if (!byDay.has(departure.date)) byDay.set(departure.date, []);
       byDay.get(departure.date).push(entry);
@@ -64,18 +64,22 @@ function streamCrew({event, departure}) {
 const opener = (event, departure, cls, inner) => event.otherGame
   ? `<a class="${cls}" href="/${esc(event.otherGame)}/#event=${esc(event.id)}">${inner}</a>`
   : `<button type="button" class="${cls}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${inner}</button>`;
-function entryHtml({event, departure, more}) {
-  if (event.streamedBy) return opener(event, departure, `cal-ev t-stream is-endurance endurance-sim-${enduranceSim(event)}`, `${enduranceHeader(event)}<b>📺 ${esc(event.name)}</b><small><strong>Stream ${esc(streamed(event))}</strong> · départ ${esc(timeOf(departure))} · ${esc(streamCrew({event, departure}))}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small><span class="cal-go" aria-hidden="true">›</span>`);
+function entryHtml({event, departure, departures = []}) {
+  const endurance = !isSolo(event);
+  const more = Math.max(0, departures.length - 1);
+  const starts = endurance && more
+    ? `<span class="cal-start-times">${departures.map(start => `<strong>${esc((!start.hideClock && timeOf(start)) || 'Horaire à définir')}</strong>`).join(' ')}</span>`
+    : '';
+  if (event.streamedBy) return opener(event, departure, `cal-ev t-stream is-endurance endurance-sim-${enduranceSim(event)}`, `${enduranceHeader(event)}<b>📺 ${esc(event.name)}</b><small><strong>Stream ${esc(streamed(event))}</strong> · départ ${esc(timeOf(departure))} · ${esc(streamCrew({event, departure}))}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}${starts}</small><span class="cal-go" aria-hidden="true">›</span>`);
   const type = calendarType(event), stream = streamDetails(event);
   const {confirmed} = isStream(event) ? {confirmed:0} : soloCounts(event, departure);
   const training = type === 'training';
   const end = training && departure.endsAt ? new Date(departure.endsAt).toLocaleTimeString('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit'}).replace(':00', 'h').replace(':', 'h') : '';
-  const endurance = !isSolo(event);
   const info = endurance ? '' : isStream(event) ? 'Stream' : training ? (end ? `–${end}` : '') : ` · ${confirmed} inscrit${confirmed > 1 ? 's' : ''}`;
   const time = undated(event) ? 'Date à confirmer' : isStream(event) ? hourLabel(stream.streamTime || stream.raceTime || departure.time) : timeOf(departure);
   const live = !isStream(event) && event.details?.streamTime ? `<span class="cal-live">● Stream ${esc(streamSpan(event.details.streamTime, event.details.streamEnd))}</span>` : '';
   const logo = endurance ? enduranceHeader(event) : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return `<button type="button" class="cal-ev t-${type}${endurance?` is-endurance endurance-sim-${enduranceSim(event)}`:''}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type"> · ${esc(typeLabel(type))}</em>` : ''}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
+  return `<button type="button" class="cal-ev t-${type}${endurance?` is-endurance endurance-sim-${enduranceSim(event)}`:''}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small>${starts || `<strong>${esc(time)}</strong>`}${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type">${starts ? '' : ' · '}${esc(typeLabel(type))}</em>` : ''}${!endurance && more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
 // In a day of the month on a computer: the logo on a band tinted with the type's colour, the race's name, then its time,
 // sim and length (Nathan 2026-11-07, mockup B: a bigger month, the colour visible, the event, the sim and the time).
@@ -163,7 +167,7 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   const selected = chosenDay(state.calendarMonth, byDay), day = byDay.get(selected) || [];
-  const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3 tabindex="-1">${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}` : ''}</aside>`;
+  const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3 tabindex="-1">${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}})).join('')}` : ''}</aside>`;
   // The months go up in the page's head, on the line of the other choices (Nathan 2026-11-07: more room for the month).
   const head = `<div class="cal-tabs" role="group" aria-label="Mois">${shift(-1, 'Mois précédent')}<div class="cal-months">${tabs}</div>${shift(1, 'Mois suivant')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>`;
   return {head, body:`<div class="cal">

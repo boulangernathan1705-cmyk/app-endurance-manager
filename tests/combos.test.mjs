@@ -136,8 +136,13 @@ test('the plugin sends sessions with the pilot’s key, once each, and stops whe
   assert.deepEqual((await plugin('/api/combos/plugin/status', key)).data, {pilot:'Nathan', community});
   const sent = await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000, pitAt:4}));
   assert.equal(sent.status, 201);
-  assert.deepEqual(sent.data, {track:TRACK, car:CAR, laps:8, stops:1, created:true});
-  assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000, pitAt:4}))).data.created, false);
+  const {id,receivedAt,...receipt} = sent.data;
+  assert.match(id,/^[a-f0-9-]{36}$/);
+  assert.ok(receivedAt>0);
+  assert.deepEqual(receipt, {track:TRACK, car:CAR, laps:8, stops:1, created:true});
+  const retry=await plugin('/api/combos/plugin/session',key,'POST',session({at:1_790_000_000_000,pitAt:4}));
+  assert.equal(retry.status,200);
+  assert.deepEqual(retry.data,{...sent.data,created:false});
   assert.equal(DB.db.prepare('SELECT COUNT(*) AS n FROM combo_laps').get().n, 8);
   assert.equal((await plugin('/api/combos/plugin/session', key, 'POST', {track:TRACK})).status, 400);
   assert.ok((await req('/api/combos/link', 'GET', null, NATHAN)).data.lastSeen);
@@ -263,15 +268,20 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
   const lucas = keyOf((await req('/api/combos/link', 'POST', {}, LUCAS)).data.code);
   await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_000_000_000, light:0.93}));
   await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_100_000_000, light:0.08, track:20}));
-  // An older plugin: no daylight.
-  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_200_000_000}));
+  // An older plugin: no daylight, compound or track temperature.
+  const older = session({at:1_790_200_000_000, compound:''});
+  for (const lap of older.laps) delete lap.track;
+  await plugin('/api/combos/plugin/session', nathan, 'POST', older);
 
   const base = `/api/combos/sheet?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
   const ids = sheet => sheet.conditions.dry.drivers.map(item => item.id).sort();
   const all = (await req(base, 'GET', null, NATHAN)).data;
   assert.deepEqual(all.conditions.dry.moments, {day:7, night:7}, 'laps without daylight are neither');
   assert.equal(all.conditions.dry.laps, 21);
+  assert.deepEqual(all.conditions.dry.trackTemp, [20.2, 30.8]);
   assert.deepEqual(all.conditions.dry.compounds.Medium.trackTemp, [20.2, 30.8]);
+  assert.equal(all.conditions.dry.compounds['?'].laps, 7);
+  assert.equal(all.conditions.rain.trackTemp, null);
   const night = (await req(`${base}&moment=night`, 'GET', null, NATHAN)).data;
   assert.equal(night.filters.moment, 'night');
   assert.deepEqual(ids(night), [LUCAS]);
@@ -279,7 +289,8 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
   assert.deepEqual(ids((await req(`${base}&moment=day`, 'GET', null, NATHAN)).data), [NATHAN]);
   assert.equal((await req(`${base}&moment=dusk`, 'GET', null, NATHAN)).data.filters.moment, null);
   const warm = (await req(`${base}&tmin=25`, 'GET', null, NATHAN)).data;
-  assert.deepEqual([warm.filters.trackMin, warm.filters.trackMax, warm.conditions.dry.laps], [25, null, 14]);
+  assert.deepEqual([warm.filters.trackMin, warm.filters.trackMax, warm.conditions.dry.laps], [25, null, 7]);
+  assert.deepEqual(warm.conditions.dry.trackTemp, [30.2, 30.8]);
   assert.deepEqual(ids(warm), [NATHAN]);
   assert.deepEqual(ids((await req(`${base}&tmin=15&tmax=25`, 'GET', null, NATHAN)).data), [LUCAS]);
   assert.equal((await req(`${base}&tmax=abc`, 'GET', null, NATHAN)).data.filters.trackMax, null);
@@ -304,6 +315,8 @@ test('a lap trace is kept only whole: every measure as long as the clock, within
   assert.equal(cleanTrace({...trace(5, 210), speed:[1, 2, 3]}), null);
   assert.equal(cleanTrace({...trace(5, 210), slip:[[0]]}), null);
   assert.equal(cleanTrace(trace(5, 210, 20)), null, 'too short to be a lap');
+  assert.equal(cleanTrace({...trace(5,210),time:trace(5,210).time.reverse()}),null);
+  assert.equal(cleanSession({...session({at:1_790_000_000_000}),trace:trace(19,210)}).trace,null);
   assert.equal(cleanTrace({...trace(5, 210), speed:Array(100).fill(900)}).speed[0], 0, 'an impossible speed is not kept');
 });
 
@@ -332,13 +345,15 @@ test('« Mon analyse »: each session wheel by wheel and its best lap on the map
   const query = `track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
   const list = (await req(`/api/combos/analysis?${query}`, 'GET', null, NATHAN)).data.sessions;
   assert.deepEqual(list.map(item => [item.name, item.mine, item.expert, item.trace]),
-    [['Lucas', false, false, null], ['Lucas', false, false, {lap:4, time:209.1}], ['Nathan', true, true, {lap:5, time:210.2}]]);
+    [['Lucas', false, false, null], ['Lucas', false, false, {lap:4, time:209.1, cond:'dry', temp:30.4, light:null}], ['Nathan', true, true, {lap:5, time:210.2, cond:'dry', temp:30.5, light:null}]]);
 
   const mine = (await req(`/api/combos/analysis/session?id=${list[2].id}`, 'GET', null, NATHAN)).data;
   assert.equal(mine.session.name, 'Nathan');
   assert.deepEqual(mine.expert.tyreTemp, [88, 91, 86, 87]);
   assert.equal(mine.expert.oilMax, 104);
   assert.equal(mine.laps.count, 7);
+  assert.equal(mine.byCondition.dry.count,7);
+  assert.equal(list[2].type,2);
   assert.equal(mine.trace.lap, 5);
   assert.equal(mine.trace.lapTime, 210.2);
   assert.equal(mine.trace.time.length, 100);
@@ -420,7 +435,7 @@ test('the plugin installer is handed out with the site written in and Windows li
 
 test('races being prepared and game versions sort the sessions by their dates', async () => {
   const {req, signIn, plugin} = harness();
-  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE, ORGA_ROLE]);
   const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_790_000_000_000}));
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:1_800_000_000_000, ve:8.1}));
@@ -455,7 +470,7 @@ test('races being prepared and game versions sort the sessions by their dates', 
 
 test('the plugin reads the sheet of the race and version going on now', async () => {
   const {req, signIn, plugin} = harness();
-  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE, ORGA_ROLE]);
   const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
   const day = 86_400_000, at = Date.now();
   await plugin('/api/combos/plugin/session', key, 'POST', session({at:at - 40 * day, ve:9}));
@@ -499,8 +514,8 @@ test('notes: the team writes, only the author or an admin changes them; the expo
 test('the Plugin SimHub page: one tab in the menu and the phone bar, the fiche and the wall as its two tabs, nothing run from the page text', () => {
   const home = readFileSync(new URL('../simhub.html', import.meta.url), 'utf8');
   assert.match(home, /src="\/front\/simhub-page\.mjs/);
-  assert.match(home, /class="nav-section-button nav-plugin-button" href="\/simhub\.html" data-module-link="combos" aria-current="page">Plugin SimHub</);
-  assert.match(home, /<main id="combos-app"[^>]*data-sh-panel="memo"/);
+  assert.match(home, /class="nav-section-button nav-plugin-button" href="\/simhub\.html" data-module-link="combos" hidden aria-current="page">Espace pilote</);
+  assert.match(home, /<main hidden id="combos-app"[^>]*data-sh-panel="memo"/);
   assert.match(home, /class="pw-body sh-wall" data-sh-panel="wall" hidden><main id="pw-app"/);
   assert.match(home, /data-panel="memo"[^>]*>Fiche mémo<\/a><a [^>]*data-panel="wall"[^>]*>Mur des stands<\/a>/);
   assert.doesNotMatch(home, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
@@ -516,8 +531,8 @@ test('the Plugin SimHub page: one tab in the menu and the phone bar, the fiche a
   // Hidden, the wall stops asking the room for the cars.
   assert.match(readFileSync(new URL('../front/pit-wall.mjs', import.meta.url), 'utf8'), /watch:shown\(\)/);
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button nav-plugin-button" href="\/simhub\.html">Plugin SimHub<\/a>'/);
-  assert.match(readFileSync(new URL('../front/tab-bar.mjs', import.meta.url), 'utf8'), /\['nav-plugin-button', 'Plugin'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button nav-plugin-button" href="\/simhub\.html">Espace pilote<\/a>'/);
+  assert.match(readFileSync(new URL('../front/tab-bar.mjs', import.meta.url), 'utf8'), /\['nav-plugin-button', 'Pilote'/);
 });
 
 test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {
@@ -576,4 +591,149 @@ test('the plugin\'s sheet stays in the cache until the combo changes: a new sess
     await read();
     assert.equal(counts.puts, 3, 'laps taken out: computed again');
   } finally { delete globalThis.caches; }
+});
+
+test('memo period changes require a crew organiser; pilots still read them', async () => {
+  const {req, signIn} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE, ORGA_ROLE]);
+  const period = {kind:'event', name:'Préparation', track:TRACK, startsAt:1_799_000_000_000, endsAt:1_801_000_000_000};
+  assert.equal((await req('/api/combos/periods','POST',period,NATHAN)).status,403);
+  const made = await req('/api/combos/periods','POST',period,LUCAS);
+  assert.equal(made.status,201);
+  assert.equal((await req('/api/combos/periods','GET',null,NATHAN)).status,200);
+  assert.equal((await req('/api/combos/periods/'+made.data.id,'DELETE',{},NATHAN)).status,403);
+});
+test('mixed weather analysis uses its condition reference and matches accepted tours',async()=>{
+ const {req, signIn, plugin}=harness(); signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+ const data=session({at:1_790_000_000_000,laps:8});
+ data.laps.forEach(l=>{if(l.n>=5){l.rain=.8;l.wet=.8;l.t+=40;}});
+ await plugin('/api/combos/plugin/session',key,'POST',data);
+ const q='track='+encodeURIComponent(TRACK)+'&car='+encodeURIComponent(CAR);
+ const sheet=(await req('/api/combos/sheet?'+q,'GET',null,NATHAN)).data;
+ const id=(await req('/api/combos/analysis?'+q,'GET',null,NATHAN)).data.sessions[0].id;
+ const result=(await req('/api/combos/analysis/session?id='+id,'GET',null,NATHAN)).data;
+ assert.equal(result.laps.count,sheet.conditions.dry.laps+sheet.conditions.rain.laps);
+ assert.equal(result.list.filter(l=>!l.out).length,7);
+});
+
+test('memo history is optional, protected and uses the same condition filters',async()=>{
+ const {req,signIn,plugin,DB}=harness(); signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+ await plugin('/api/combos/plugin/session',key,'POST',session({at:1_790_000_000_000,laps:12,pitAt:6}));
+ const q='/api/combos/history?track='+encodeURIComponent(TRACK)+'&car='+encodeURIComponent(CAR)+'&cond=dry';
+ const hist=await req(q,'GET',null,NATHAN); assert.equal(hist.status,200); assert.equal(hist.data.stints.length,2); assert.equal(hist.data.stops.length,1);
+ assert.ok(hist.data.stints.every(x=>x.pilot===NATHAN&&x.laps>0));
+ assert.equal((await req(q.replace('cond=dry','cond=rain'),'GET',null,NATHAN)).data.stints.length,0);
+ assert.equal((await req(q,'GET',null,null)).status,401);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
+ assert.equal((await req('/api/session','GET',null,NATHAN)).data.combos,false);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('true')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).data.stops.length,1);
+});
+
+test('memo crew context refuses unknown crew and is gated by the optional module',async()=>{
+ const {req,signIn,DB}=harness();signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+ const q='/api/combos/crew?id=00000000-0000-4000-8000-000000000001';
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
+ assert.equal((await req(q,'GET',null,null)).status,401);
+ DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json('false')) WHERE id=?").run(DEV_COMMUNITY);
+ assert.equal((await req(q,'GET',null,NATHAN)).status,404);
+});
+
+test('memo crew resolves actual members, not names, and refuses a non-member', async()=>{
+ const {req,signIn}=harness();
+ signIn(NATHAN,'Nathan',[TEAM_ROLE,ORGA_ROLE]); signIn(LUCAS,'Lucas',[TEAM_ROLE]); signIn(GUEST,'Guest',[TEAM_ROLE]);
+ const made=await req('/api/events','POST',{name:'Mémo test',categories:['Hypercar'],circuit:'spa',departures:[{date:'2090-10-15',time:'15:00'}]},NATHAN);
+ assert.equal(made.status,201);
+ const event=(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.name==='Mémo test');
+ const base='/api/events/'+event.id+'/departures/'+event.departures[0].id;
+ const first=await req(base+'/registrations','POST',{name:'Nathan',category:'Hypercar',status:'whole'},NATHAN);
+ assert.equal(first.status,201);
+ const created=await req(base+'/crews','POST',{name:'Équipage mémo',category:'Hypercar',car:'Ferrari 499P'},NATHAN);
+ assert.equal(created.status,201);
+ const teammate=await req(base+'/registrations','POST',{name:'Lucas',category:'Hypercar',status:'whole'},LUCAS);
+ assert.equal(teammate.status,201);
+ const current=async()=>(await req('/api/events','GET',null,NATHAN)).data.events.find(e=>e.id===event.id).departures[0].crews[0];
+ const members='/api/crews/'+created.data.id+'/members';
+ assert.equal((await req(members,'POST',{registrationId:first.data.id,version:(await current()).version},NATHAN)).status,200);
+ const joined=await req(members,'POST',{registrationId:teammate.data.id,version:(await current()).version,selfJoin:true},LUCAS);
+ assert.equal(joined.status,200);
+ const q='/api/combos/crew?id='+created.data.id;
+ const actual=await req(q,'GET',null,NATHAN);
+ assert.equal(actual.status,200); assert.deepEqual(actual.data.members.sort(),[NATHAN,LUCAS].sort());
+ assert.equal((await req(q,'GET',null,GUEST)).status,404);
+});
+
+test('notes keep their scope, preserve data when disabled and enforce moderation', async()=>{
+  const {req,signIn,DB}=harness();
+  signIn(NATHAN,'Nathan',[TEAM_ROLE,ORGA_ROLE]); signIn(LUCAS,'Lucas',[TEAM_ROLE]); signIn(GUEST,'Guest',[TEAM_ROLE]);
+  const event=await req('/api/events','POST',{name:'Le Mans mémo',categories:['Hypercar'],circuit:'le-mans',departures:[{date:'2090-10-15',time:'15:00'}]},NATHAN);
+  assert.equal(event.status,201);
+  const eventId=event.data.id, base={track:TRACK,car:CAR,body:'Pressions',theme:'tyres'};
+  const note=await req('/api/combos/notes','POST',{...base,eventId},LUCAS);
+  assert.equal(note.status,201);
+  assert.equal((await req('/api/combos/notes','POST',{...base,theme:'unknown'},LUCAS)).status,400);
+  assert.equal((await req('/api/combos/notes','POST',{...base,eventId:'00000000-0000-4000-8000-000000000001'},LUCAS)).status,404);
+  const endpoint='/api/combos/notes/'+note.data.id;
+  assert.equal((await req(endpoint,'PATCH',{body:'Autre'},GUEST)).status,403);
+  assert.equal((await req(endpoint,'PATCH',{pinned:true},LUCAS)).status,403);
+  assert.equal((await req(endpoint,'PATCH',{pinned:true},NATHAN)).status,200);
+  const q='/api/combos/sheet?'+new URLSearchParams({track:TRACK,car:CAR});
+  assert.deepEqual((await req(q,'GET',null,LUCAS)).data.notes,[]);
+  const scoped=q+'&race='+eventId;
+  const read=(await req(scoped,'GET',null,LUCAS)).data;
+  assert.deepEqual(read.race,{id:eventId,name:'Le Mans mémo'});
+  assert.deepEqual(read.notes.map(({eventId,theme,pinned,mine})=>({eventId,theme,pinned,mine})),[{eventId,theme:'tyres',pinned:true,mine:true}]);
+  const enabled=value=>DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.combos',json(?)) WHERE id=?").run(String(value),DEV_COMMUNITY);
+  enabled(false);
+  assert.equal((await req(scoped,'GET',null,LUCAS)).status,404);
+  assert.equal((await req(endpoint,'DELETE',{},NATHAN)).status,404);
+  enabled(true);
+  assert.equal((await req(scoped,'GET',null,LUCAS)).data.notes[0].id,note.data.id);
+});
+
+test('the same pilot cannot acknowledge a receipt from another community',async()=>{
+  const {req,signIn,DB,env,plugin}=harness();
+  signIn(MANAGER,'Nathan');
+  const first=keyOf((await req('/api/combos/link','POST',{},MANAGER)).data.code);
+  const input=session({at:1_790_000_000_000});
+  assert.equal((await plugin('/api/combos/plugin/session',first,'POST',input)).status,201);
+  const other='e0a1c0de-0000-4000-8000-000000000092';
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,modules,created_at) VALUES(?,'test-second','Autre','ATE',?,0)").run(other,JSON.stringify({combos:true}));
+  env.COMMUNITY='test-second';
+  assert.deepEqual((await req('/api/combos','GET',null,MANAGER)).data.combos,[]);
+  const second=keyOf((await req('/api/combos/link','POST',{},MANAGER)).data.code);
+  const refused=await plugin('/api/combos/plugin/session',second,'POST',input);
+  assert.equal(refused.status,409);
+  assert.equal(refused.data.id,undefined);
+  assert.equal((await req('/api/combos/link','GET',null,MANAGER)).data.lastSession,null);
+  const next={...input,at:input.at+10_000};
+  assert.equal((await plugin('/api/combos/plugin/session',second,'POST',next)).status,201);
+  assert.equal((await req('/api/combos/link','GET',null,MANAGER)).data.lastSession.startedAt,next.at);
+});
+
+test('website endurance reference excludes qualifying, warmup and short best laps without changing legacy statistics',async()=>{
+  const {signIn,req,plugin}=harness();
+  signIn(NATHAN,'Nathan',[TEAM_ROLE]);
+  const key=keyOf((await req('/api/combos/link','POST',{},NATHAN)).data.code);
+  const at=1790000000000;
+  for(const data of [
+    {...session({at,laps:8,t:210,ve:8}),session:2},
+    {...session({at:at+100000,laps:8,t:180,ve:10}),session:5},
+    {...session({at:at+200000,laps:8,t:190,ve:9}),session:9},
+    {...session({at:at+300000,laps:2,t:175,ve:10}),session:2}
+  ]) assert.equal((await plugin('/api/combos/plugin/session',key,'POST',data)).status,201);
+  const query=new URLSearchParams({track:TRACK,car:CAR});
+  const response=await req('/api/combos/sheet?'+query,'GET',null,NATHAN);
+  assert.equal(response.status,200);
+  const prep=response.data.conditions.dry.endurance;
+  assert.equal(prep.drivers[0].laps,7);
+  assert.equal(prep.drivers[0].avg,210.25);
+  assert.equal(prep.drivers[0].q25,210.15);
+  assert.equal(prep.drivers[0].q75,210.35);
+  assert.equal(prep.drivers[0].ve,8);
+  assert.equal(prep.compounds.Medium.laps,7);
 });

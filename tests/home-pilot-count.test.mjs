@@ -6,6 +6,6 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8')
 
 test('la carte événement compte les pilotes par catégorie, sans répéter un total',()=>{
   const home=read('front/app/home-view.mjs');
-  assert.match(home,/eventBadge\(category,eventCategoryCount\(event,category\)\)/);
+  assert.match(home,/eventBadge\(category,eventCategoryCount\(event,category\),game\)/);
   assert.doesNotMatch(home,/class="event-pilot-count"/);
 });

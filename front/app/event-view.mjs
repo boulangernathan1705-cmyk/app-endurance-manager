@@ -1,10 +1,11 @@
+import {memoHref} from '../../shared/memo-links.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {calendarType} from './season-calendar.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {streamerColumns, gridfestPasswordPanel} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
-import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
+import {enduranceHeader,enduranceSim,endurancePanoramaClass} from '../endurance-card.mjs';
 import {app,state,activeGame,esc,button,canManage,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,circuitVisual,pilotCount,notifyRender,pickableSlots} from './core.mjs';
 import {filterStorageKey,filterSelection,readFilterState,writeFilterState} from '../filter-state.mjs';
 import {eventCommunities,filterEventCommunities} from '../community-filters.mjs';
@@ -165,7 +166,7 @@ function multiRounds(event,departure,rounds,editor){
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
-  if(departure.startsAt<=Date.now())return '';
+  if(departure.startsAt<=Date.now()||event.officialScheduleStatus)return '';
   const own=ownRegistration(departure),crewAction=crewButton(event,departure),canCreateCrew=Boolean(crewAction);
   const crewTips={organiser:'Ouvre la page « Équipages » sur ce départ.',builder:'Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.',request:'Propose ton équipage : les organisateurs le vérifient et le créent.'};
   const createCrewAction=crewAction?`<button type="button" class="link-button ux-summary-create-crew" ${crewAction.attrs} data-tip="${esc(crewTips[crewAction.kind])}">${esc(crewAction.label)}${crewAction.kind==='organiser'?' →':''}</button>`:'';
@@ -258,6 +259,9 @@ export function renderEvent(message=''){
   const trash='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
   const manageActions=`${canEditRace(event)?button('edit-event','Modifier l’événement',`data-id="${event.id}"`,'secondary-button'):''}${state.manager&&!event.official&&!isSolo(event)?button('make-official','Rendre officielle',`data-id="${event.id}"`,'link-button'):''}${canEditRace(event)?button('delete-event',`${trash}<span>Supprimer l’événement</span>`,`data-id="${event.id}"`,'danger-link'):''}`;
   const shareAction=button('share-event','Copier le lien',`data-id="${event.id}"`,'link-button');
+  const myCrews=(event.departures||[]).flatMap(d=>(d.crews||[]).filter(c=>(c.registrationIds||[]).some(id=>(d.availability||[]).some(reg=>reg.mine&&String(reg.id)===String(id)))));
+  const myCars=[...new Set(myCrews.map(c=>c.car).filter(Boolean))];
+  const memo=state.combos ? memoHref(event,myCars.length===1?myCars[0]:'',myCrews.length===1?myCrews[0].id:'') : '';
   const eventActions=`<span class="race-header-actions">${manageActions?`<details class="race-actions-menu"><summary aria-label="Actions de la course">⋯</summary><div class="race-actions-popover">${manageActions}</div></details>`:''}</span>`;
   const visible=[...future,...undated];
   const upcoming=visible.map(({departure,index})=>renderDeparturePanel(event,departure,index,departure.id===state.selectedDepartureId||state.registrationOpen.has(departure.id))).join('');
@@ -269,10 +273,16 @@ export function renderEvent(message=''){
   const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure),absence:absenceButton(event,'Absent pour cette course')})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
-  const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
+  const game=enduranceSim(event,event.otherGame||activeGame);
+  const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType,game)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)&&!isStream(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${isStream(event)?'':absencesSection(event,!!(next||undated.length))}`}`;
+  const solo=isSolo(event),sim=game;
+  const raceDate=raceDateBlock(event,!next&&!undated.length);
+  const panorama=solo?'':endurancePanoramaClass(event,sim);
+  const detailContent=`<div class="race-card-top endurance-detail-content"><div class="race-head"><div class="endurance-detail-meta">${raceDate}${badges}</div><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${esc(circuitLabel(event.circuit,game))}</span>${raceInfoChips(event)}</div></div>`;
+  const header=solo?`<div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${(event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`}${!isStream(event)?soloHeaderTime(event,next):''}</span>${soloHeaderChips(event)}</div>${eventTypePanel(event)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}`:`<div class="endurance-detail-hero">${enduranceHeader(event,sim)}${circuitVisual(event.circuit)}${panorama?detailContent:''}</div>${panorama?'':detailContent}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${solo?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance-detail endurance-sim-${sim}${panorama}`}${isGrindfest(event)?' is-gridfest':''}"${solo?` data-race-kind="${calendarType(event)}"`:''} data-event-id="${event.id}">${header}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${memo?`<a class="secondary-button" href="${esc(memo)}">Fiche mémo</a>`:''}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${isStream(event)?'':absencesSection(event,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
