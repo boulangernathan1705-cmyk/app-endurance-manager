@@ -32,3 +32,11 @@ Resized to max 640 × 480, WebP quality 78. No image generation or runtime remot
 ## Panoramic trial on LMU cards
 
 18 previously downloaded LMU Assister `tracks/backgrounds/` WebP photos, stored separately in `images/endurance/lmu-pano/`. The previous covers are retained for other views and fallback. These are the real source photos, not the illustrative AI mockup. Source rights must be checked before production.
+
+## iRacing — trial of independently licensed real-world circuit photos
+
+The local cover (640 × 640) and panorama (1280 × 720) are cropped, resized and converted to WebP. Both versions retain the source licence; credits are also displayed on `/circuit-credits.html#photos-iracing`.
+
+- iracing-spa: [original](https://commons.wikimedia.org/wiki/File:Eau_Rouge_at_Spa_Francorchamps.jpg) — ContextCreator, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+- iracing-bathurst: [original](https://commons.wikimedia.org/wiki/File:Citigate_Mount_Panorama_Bathurst_(down_the_mountain)_-_panoramio.jpg) — Mountain Ash, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
+- iracing-laguna-seca: [original](https://commons.wikimedia.org/wiki/File:Laguna_Seca%27s_Corkscrew_-_2014_(2).jpg) — 菅野崇, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).

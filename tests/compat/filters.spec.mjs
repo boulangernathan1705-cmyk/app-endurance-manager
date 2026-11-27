@@ -201,7 +201,7 @@ for (const game of ['lmu','iracing']) test(`${game}: preview preserves card size
   await touch(card);
   await expect(card).toHaveClass(/is-panorama-preview/);
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
-  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing.webp');
+  expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing-pano/iracing-spa.webp');
   if(game==='iracing')expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).not.toContain('lmu-pano/');
   const after=await card.boundingBox();
   expect(after.width).toBeCloseTo(before.width,0);expect(after.height).toBeCloseTo(before.height,0);
@@ -215,4 +215,44 @@ for (const game of ['lmu','iracing']) test(`${game}: preview preserves card size
   const detail=page.locator('.race-header.is-endurance-detail');
   await expect(detail).toBeVisible();
   await expect(detail.locator('.circuit-visual img')).toHaveCount(1);
+});
+
+test('iRacing trial photos load independently in compact cards, previews and details',async({page},testInfo)=>{
+  test.setTimeout(90000);
+  const circuits=['iracing-spa','iracing-bathurst','iracing-laguna-seca','iracing-sebring'];
+  const events=circuits.map((circuit,index)=>race('iracing',{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa'+index,circuit,name:'Trial '+circuit}));
+  await boot(page,'iracing',events);
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:900});
+    await page.mouse.move(0,0);
+    for(const [index,circuit] of circuits.entries()){
+      const card=page.locator('button.race-card.is-endurance[data-id="'+events[index].id+'"]');
+      const art=card.locator('.endurance-card-head'),body=card.locator('.race-card-body');
+      const cover=index===3?'/images/endurance/iracing.webp':'/images/endurance/iracing/'+circuit+'.webp';
+      const pano=index===3?cover:'/images/endurance/iracing-pano/'+circuit+'.webp';
+      await expect(card).toBeVisible();
+      expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(cover);
+      const before=await card.boundingBox();
+      await card.evaluate(el=>el.classList.add('is-panorama-preview'));
+      expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(pano);
+      expect(await body.evaluate(el=>getComputedStyle(el).backgroundImage)).not.toContain('/lmu-pano/');
+      expect(await page.evaluate(async urls=>{
+        for(const url of urls){const img=new Image();img.src=url;await img.decode();if(!img.naturalWidth)return false;}
+        return true;
+      },[cover,pano])).toBe(true);
+      const after=await card.boundingBox();
+      expect(after.width).toBeCloseTo(before.width,0);
+      expect(after.height).toBeCloseTo(before.height,0);
+      await testInfo.attach(circuit+'-'+width,{body:await card.screenshot(),contentType:'image/png'});
+      await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
+    }
+  }
+  for(const [index,circuit] of circuits.slice(0,3).entries()){
+    await page.goto('/iracing/#event='+events[index].id);
+    const detail=page.locator('.race-header.is-endurance-detail');
+    await expect(detail).toHaveClass(new RegExp('endurance-track-'+circuit));
+    const hero=detail.locator('.endurance-detail-hero');
+    expect(await hero.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/iracing-pano/'+circuit+'.webp');
+    await expect(hero.locator('.circuit-visual img')).toBeVisible();
+  }
 });

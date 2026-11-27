@@ -20,7 +20,11 @@ export const enduranceSim = (event, game = event?.otherGame || gameForEvent(even
 const LMU_ARTWORK = new Set(['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']);
 // Only add local iRacing assets with documented permission (see docs/IRACING_ARTWORK.md).
 // The keys are complete iRacing circuit IDs; values identify the permission record.
-export const IRACING_ARTWORK = Object.freeze({});
+export const IRACING_ARTWORK = Object.freeze({
+  'iracing-spa':'Wikimedia Commons — ContextCreator, CC0 1.0',
+  'iracing-bathurst':'Wikimedia Commons — Mountain Ash, CC BY-SA 3.0',
+  'iracing-laguna-seca':'Wikimedia Commons — 菅野崇, CC BY-SA 3.0'
+});
 function artworkTrack(event, game) {
   const id = event?.circuit;
   if (enduranceSim(event, game) === 'iracing') {

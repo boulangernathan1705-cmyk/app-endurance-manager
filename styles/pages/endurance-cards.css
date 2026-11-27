@@ -739,3 +739,11 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
     overflow-wrap: anywhere;
   }
 }
+
+/* iRacing trial: independently licensed photographs of the real circuits. */
+.endurance-card-head.endurance-track-iracing-spa { --endurance-photo: url('/images/endurance/iracing/iracing-spa.webp'); --track-focus-compact: 39% 48%; --track-focus-wide: 43% 48%; --track-focus-detail: 42% 50%; }
+.endurance-pano.endurance-track-iracing-spa, .endurance-preview-track-iracing-spa { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-spa.webp'); --panorama-focus: 42% 46%; }
+.endurance-card-head.endurance-track-iracing-bathurst { --endurance-photo: url('/images/endurance/iracing/iracing-bathurst.webp'); --track-focus-compact: 62% 68%; --track-focus-wide: 59% 65%; --track-focus-detail: 60% 64%; }
+.endurance-pano.endurance-track-iracing-bathurst, .endurance-preview-track-iracing-bathurst { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-bathurst.webp'); --panorama-focus: 59% 64%; }
+.endurance-card-head.endurance-track-iracing-laguna-seca { --endurance-photo: url('/images/endurance/iracing/iracing-laguna-seca.webp'); --track-focus-compact: 50% 50%; --track-focus-wide: 50% 51%; --track-focus-detail: 48% 49%; }
+.endurance-pano.endurance-track-iracing-laguna-seca, .endurance-preview-track-iracing-laguna-seca { --endurance-panorama: url('/images/endurance/iracing-pano/iracing-laguna-seca.webp'); --panorama-focus: 49% 50%; }

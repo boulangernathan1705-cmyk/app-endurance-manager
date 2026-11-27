@@ -53,3 +53,7 @@ test('iRacing candidate inventory covers exactly the named circuit catalogue',()
  assert.equal(new Set(rows.map(m=>m[2])).size,expected.length);
  for(const id of Object.keys(IRACING_ARTWORK))assert.ok(expected.includes(id));
 });
+
+test('the trial activates exactly three independently licensed iRacing photos',()=>{
+ assert.deepEqual(Object.keys(IRACING_ARTWORK).sort(),['iracing-bathurst','iracing-laguna-seca','iracing-spa']);
+});
