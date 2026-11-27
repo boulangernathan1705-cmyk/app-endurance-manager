@@ -123,6 +123,25 @@ test('memo circuit picker loads parent artwork and selects the exact layout',asy
   await expect(page.locator('[data-picker=track] .cb-tile-art img')).toHaveAttribute('src','/images/endurance/lmu-pano/monza.webp');
 });
 
+test('memo car picker loads LMU liveries and keeps category fallbacks',async({page})=>{
+  const cars=[['Ferrari 499P','Hypercar','ferrari-499p'],['Oreca 07 Gibson ELMS','LMP2','oreca-elms'],['Ferrari 296 LMGT3','LMGT3','ferrari-296'],['Ferrari 488 GTE','GTE','ferrari-488'],['Unknown prototype','Hypercar',null],['Unknown GT','LMGT3',null]];
+  const items=cars.map(([car,carClass])=>({...combo,car,carClass}));
+  await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:here}));
+  await page.route(url=>url.pathname==='/api/combos/link',route=>route.fulfill({json:{linked:true}}));
+  await page.route(url=>url.pathname==='/api/combos',route=>route.fulfill({json:{combos:items,preferenceScope:'car-artwork-test'}}));
+  await page.route(url=>url.pathname==='/api/combos/sheet',route=>route.fulfill({json:sheet}));
+  await page.goto('/simhub.html#memo');
+  await expect(page.locator('[data-picker=car] .cb-tile-art img')).toHaveAttribute('src','/images/memo-cars/ferrari-499p.webp');
+  await page.locator('[data-picker=car]').click();
+  const box=page.getByRole('dialog');
+  for(const [car,carClass,id] of cars){
+    const img=box.getByRole('button',{name:new RegExp(car)}).locator('.cb-tile-art img');
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toHaveAttribute('src',id?`/images/memo-cars/${id}.webp`:carClass==='Hypercar'?'/images/memo-prototype.svg':'/images/memo-gt.svg');
+    await expect.poll(()=>img.evaluate(node=>node.complete && node.naturalWidth>0)).toBe(true);
+  }
+});
+
 test('disabled memo hides pilot navigation and never fetches downloads, sheet or wall data',async({page})=>{
   const paths=[];
   await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:{...here,combos:false}}));

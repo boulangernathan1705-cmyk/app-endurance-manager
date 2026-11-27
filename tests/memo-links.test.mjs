@@ -1,9 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {memoHref,memoCandidates,memoTrackImage} from '../shared/memo-links.mjs';
+import {memoHref,memoCandidates,memoTrackImage,memoCarImage} from '../shared/memo-links.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
-import {existsSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 const combos=[{track:'Circuit de la Sarthe',car:'Ferrari 499P'},{track:'Spa-Francorchamps',car:'Toyota GR010 Hybrid'},{track:'Spa-Francorchamps',car:'Ferrari 499P'}];
+
+test('LMU car images cover the catalogue and verified telemetry names with local WebP assets',()=>{
+ const sources=JSON.parse(readFileSync(new URL('../images/memo-cars/sources.json',import.meta.url),'utf8'));
+ for(const name of Object.values(catalogForGame('lmu').cars).flat())assert.ok(memoCarImage(name),name);
+ const seen=new Set();
+ for(const {id,names,source} of sources){
+  assert.match(source,/^start\/images\/cars\/FrontThumbnail\/.+_frontAngle\.webp$/);
+  const asset=readFileSync(new URL(`../images/memo-cars/${id}.webp`,import.meta.url));
+  assert.equal(asset.toString('ascii',0,4),'RIFF');
+  assert.equal(asset.toString('ascii',8,12),'WEBP');
+  assert.ok(asset.length<100_000);
+  for(const name of names){
+   assert.ok(!seen.has(name),name);seen.add(name);
+   assert.equal(memoCarImage(name),`/images/memo-cars/${id}.webp`);
+  }
+ }
+ assert.equal(memoCarImage('Lamborghini Huracán LMGT3'),memoCarImage('Lamborghini Huracan LMGT3'));
+ assert.notEqual(memoCarImage('Peugeot 9X8'),memoCarImage('Peugeot 9X8 Evo'));
+ assert.notEqual(memoCarImage('Oreca 07 Gibson'),memoCarImage('Oreca 07 Gibson ELMS'));
+ for(const name of [null,undefined,'Unknown GT3','Ferrari 296 LMGT3 Evo','Toyota TR010','Ferrari 499P custom'])assert.equal(memoCarImage(name),'');
+ for(const name of Object.values(catalogForGame('iracing').cars).flat())assert.equal(memoCarImage(name,'iracing'),'');
+});
 
 const artworkCases = [
  ['monza','Monza','Monza Curva Grande Circuit'],
