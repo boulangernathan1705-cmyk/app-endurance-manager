@@ -225,6 +225,17 @@ test('endurance-lmu-artwork-catalog',async({page},testInfo)=>{
       for(const sibling of node.parentElement.children)if(sibling!==node)sibling.style.setProperty('display','none','important');
     }
     for(const node of document.querySelectorAll('body *'))if(!sheet.contains(node)&&!sheet.contains(node.parentElement)&&!node.contains(sheet)&&getComputedStyle(node).position==='fixed')node.style.setProperty('display','none','important');
+    // The audit sheet deliberately covers more than one viewport. Exercise real
+    // lazy loading by scrolling each compact card into view before checking it.
+    for(const {art,context} of checks){
+      if(context==='detail'||!art.classList.contains('endurance-photo-pending'))continue;
+      art.scrollIntoView({block:'center',inline:'nearest'});
+      const deadline=performance.now()+3000;
+      while(art.classList.contains('endurance-photo-pending')&&performance.now()<deadline)
+        await new Promise(resolve=>setTimeout(resolve,25));
+      if(art.classList.contains('endurance-photo-pending'))throw new Error('Circuit photo did not load in viewport');
+    }
+    sheet.scrollIntoView({block:'start',inline:'nearest'});
     const audit=await Promise.all(checks.map(async({art,id,context})=>{
       const style=getComputedStyle(art,'::before'),mobile=innerWidth<=760;
       const prop=(context==='list'||context==='home')?'--track-focus-compact':context==='detail'&&mobile?'--track-focus-detail':'--track-focus-wide';

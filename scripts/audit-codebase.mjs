@@ -171,7 +171,9 @@ if (residualImports.length) warnings.push(`public/app.css contient encore de vra
 if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
 if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
 if (await exists(resolve(publicDir, 'shared/relay-pass.mjs'))) warnings.push('Le module de signature du relais doit rester côté serveur.');
-if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
+// Only content-versioned circuit artwork may override the native static cache.
+const circuitCacheBlock = /^\/images\/endurance\/\*\r?\n  ! Cache-Control\r?\n  Cache-Control: public, max-age=2592000\r?\n(?=\r?\n|$)/m;
+if (/^\s*!?\s*Cache-Control:/mi.test(publicHeaders.replace(circuitCacheBlock, ''))) warnings.push('Le cache statique hors photos de circuits doit rester géré par Workers Static Assets et ses ETag natifs.');
 const requiredHeaderFragments = [
   "Content-Security-Policy: default-src 'self'",
   "script-src 'self'",
