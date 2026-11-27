@@ -10,7 +10,7 @@ import {botInvite} from './api-community.mjs';
 import {syncIracingEvents} from './iracing-import.mjs';
 import {iracingSupervision, resolveIracingConflict} from './iracing-supervision.mjs';
 import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
-import {discordPreviewAvailable,sendDiscordPreview} from './discord-test-preview.mjs';
+import {discordPreviewAvailable,diagnoseDiscordPreview,sendDiscordPreview} from './discord-test-preview.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
   if (path === '/api/platform/iracing' && ['GET','POST','PATCH'].includes(method)) {
@@ -34,16 +34,19 @@ export async function platformApi({path, method, request, env, actor, community,
     if (!actor.user || !actor.manager) fail(403,'Réservé aux gestionnaires de la plateforme.');
     if (method !== 'POST') fail(405,'Méthode non autorisée.');
     if (request.headers.get('Origin') !== 'https://dev.endurance-manager.app') fail(403,'Origine refusée.');
-    if (!discordPreviewAvailable(env)) fail(503,'Webhook de test indisponible.');
     const input = await body(request,256);
-    if (input.confirm !== 'APERÇU' || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
-    await rateLimit(request,env,'discord-test-preview',2);
-    const result=await sendDiscordPreview(env);
+    if (!['APERÇU','DIAGNOSTIC'].includes(input.confirm) || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
+    const diagnose=input.confirm==='DIAGNOSTIC';
+    await rateLimit(request,env,diagnose?'discord-test-diagnostic':'discord-test-preview',diagnose?8:4);
+    const connection=await diagnoseDiscordPreview(env);
+    const result=diagnose||!connection.ok?{...connection,sent:0}:await sendDiscordPreview(env);
+    // Deliberately log only safe status fields: never the webhook URL, token, raw Discord response or user data.
+    console.log('discord-test-preview',{action:diagnose?'diagnostic':'send',ok:result.ok,stage:result.stage||'finished',httpStatus:result.httpStatus||0,discordCode:result.discordCode||0,sent:result.sent||0});
     return json(result);
   }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    return json({...await discordSupervision(env),testPreviewAvailable:discordPreviewAvailable(env)&&Boolean(request?.url)&&new URL(request.url).origin==='https://dev.endurance-manager.app'});
+    return json({...await discordSupervision(env),testPreviewAvailable:isDevelopment(env)&&Boolean(request?.url)&&new URL(request.url).origin==='https://dev.endurance-manager.app',testPreviewConfigured:discordPreviewAvailable(env)});
   }
   if (path === '/api/platform/discord/supervision/thread' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
