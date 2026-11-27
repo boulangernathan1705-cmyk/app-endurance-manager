@@ -196,6 +196,38 @@ test('TDZ agenda groups Paris days, uses one filter bar and ignores obsolete adv
   await expect(page.locator('[data-group="kinds"]')).toHaveCount(0);
 });
 
+test('TDZ weekly list fits seven days on desktop and scrolls only crowded days',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.clock.setFixedTime(Date.parse('2090-10-09T08:00:00Z'));
+  const date=i=>'2090-10-'+String(9+i).padStart(2,'0');
+  const make=(i,j)=>race('lmu',{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa'+String(i*10+j).padStart(3,'0'),name:'Event '+i+'-'+j,format:'solo',sim:'lmu',access:'open',official:false,details:{type:'OPEN'},rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],categories:[],departures:[{...start('d-'+i+'-'+j),date:date(i),startsAt:Date.parse(date(i)+'T12:00:00Z')+j*3600000,time:String(14+j).padStart(2,'0')+':00'}]});
+  const events=Array.from({length:7},(_,i)=>make(i,0));
+  events.push(...Array.from({length:5},(_,j)=>make(3,j+1)));
+  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
+  await boot(page,'lmu',events);
+  await page.goto('/lmu/#accueil');
+  await page.getByRole('button',{name:'Liste',exact:true}).click();
+  const agenda=page.locator('.tdz-agenda'),days=agenda.locator('.tdz-agenda-day[data-day]'),busy=days.nth(3).locator('.tdz-agenda-cards');
+  await expect(days).toHaveCount(7);
+  await expect(busy.locator('.event-card')).toHaveCount(6);
+  for(const [width,height] of [[1440,900],[1280,768]]){
+    await page.setViewportSize({width,height});
+    await expect.poll(async()=>{const box=await agenda.boundingBox();return box.y+box.height;}).toBeLessThanOrEqual(height+1);
+    const first=await days.first().boundingBox(),last=await days.last().boundingBox();
+    expect(first.y).toBeGreaterThan(0);expect(last.y+last.height).toBeLessThanOrEqual(height+1);
+    expect(await busy.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
+    await expect(busy).toHaveCSS('overflow-y','auto');
+    await busy.evaluate(el=>el.scrollTop=el.scrollHeight);
+    expect(await busy.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+    await expect(page.getByRole('button',{name:'Semaine suivante'})).toBeInViewport();
+  }
+  await page.setViewportSize({width:390,height:844});
+  await expect(busy).not.toHaveCSS('overflow-y','auto');
+  expect((await days.last().boundingBox()).y).toBeGreaterThan(844);
+  await expect(busy.locator('.event-card').last()).toBeVisible();
+  expect(await agenda.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+});
+
 test('community choices update the whole race view and never hide a private event',async({page})=>{
   const event=race('lmu',{absences:[{name:'Absent Alpha'},{name:'Absent Beta',communityId:'beta'}],departures:[start(),{...start('next'),date:'2090-10-16',startsAt:Date.parse('2090-10-16T12:00:00Z')}]});
   for(const departure of event.departures)departure.availability=[{id:`a-${departure.id}`,participantId:'a',name:'Pilot Alpha',mine:true,status:'whole',category:'GT3',carAny:true,community:alpha},{id:`b-${departure.id}`,participantId:'b',name:'Pilot Beta',status:'whole',category:'GT3',carAny:true,community:beta}];
