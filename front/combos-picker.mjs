@@ -34,11 +34,11 @@ export function memoPicker({view,esc,comboKey,openCombo,dialog}) {
     return `<button type="button" class="cb-tile is-${kind}" ${attrs}>
       <span class="cb-tile-art">${image?`<img src="${image}" alt="" loading="lazy">`:''}</span>
       <span class="cb-tile-text"><small>${logo}${esc(detail)}</small><strong>${esc(name)}</strong></span>
-      <span class="cb-tile-arrow" aria-hidden="true">›</span></button>`;
+      <span class="cb-tile-arrow" aria-hidden="true">⌄</span></button>`;
   }
   function header() {
     const c=view.combo;
-    return `<div class="cb-selection">${tile('track',c.track,'Circuit','data-picker="track" aria-haspopup="dialog"')}${tile('car',c.car,category(c),'data-picker="car" aria-haspopup="dialog"',c)}</div>`;
+    return `<div class="cb-selection">${tile('track',c.track,'Circuit','data-picker="track" aria-haspopup="dialog"')}${tile('car',c.car,'Voiture','data-picker="car" aria-haspopup="dialog"',c)}</div>`;
   }
   function show(kind,track=view.combo.track) {
     const quick=kind==='quick';
