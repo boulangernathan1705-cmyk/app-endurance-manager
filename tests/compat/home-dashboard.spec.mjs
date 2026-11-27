@@ -50,7 +50,9 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
    }
   }
   const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing/iracing-sebring.webp';
-  expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
+  // Compact photos are intentionally deferred: bring the card into view and wait for the observer.
+  await art.scrollIntoViewIfNeeded();
+  await expect.poll(()=>art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
   await card.evaluate(el=>el.classList.add('is-panorama-preview'));
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
   expect(await card.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing-pano/iracing-sebring.webp');
