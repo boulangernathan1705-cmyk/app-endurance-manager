@@ -151,11 +151,13 @@ test('TDZ agenda groups Paris days, uses one filter bar and ignores obsolete adv
   const tomorrow={...base,id:'tomorrow',date:'2090-10-14',startsAt:Date.parse('2090-10-14T12:00:00Z')};
   const second={...base,id:'second',time:'18:00',startsAt:Date.parse('2090-10-13T16:00:00Z')};
   const solo=race('lmu',{format:'solo',sim:'lmu',name:'Solo OPEN',access:'open',official:false,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],details:{type:'OPEN'},categories:[],departures:[base,second,tomorrow]});
-  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('em_filters_v3:tdz-home:all:alpha:111111111111111111',JSON.stringify({view:'list',advanced:{sims:['iracing'],kinds:['SAFE'],from:'2091-01-01'}}));});
+  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');if(!localStorage.getItem('em_filters_v3:tdz-home:all:alpha:111111111111111111'))localStorage.setItem('em_filters_v3:tdz-home:all:alpha:111111111111111111',JSON.stringify({view:'list',advanced:{sims:['iracing'],kinds:['SAFE'],from:'2091-01-01'}}));});
   await boot(page,'lmu',[solo]);
   await page.goto('/lmu/#accueil');
   const list=page.locator('.tdz-agenda'),days=list.locator('.tdz-agenda-day[data-day]');
   await expect(days).toHaveCount(2);
+  await expect(page.getByRole('button',{name:'Events TDZ',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:'Tout',exact:true})).toHaveAttribute('aria-pressed','false');
   await expect(days.first()).toHaveAttribute('data-day','2090-10-13');
   await expect(days.last()).toHaveAttribute('data-day','2090-10-14');
   await expect(days.first().locator('.event-card')).toHaveCount(1);
@@ -172,6 +174,10 @@ test('TDZ agenda groups Paris days, uses one filter bar and ignores obsolete adv
   await page.getByRole('button',{name:'Endurance LMU',exact:true}).click();
   await expect(list.locator('.event-card')).toHaveCount(0);
   await page.getByRole('button',{name:'Tout',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Tout',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(list.locator('.event-card')).toHaveCount(2);
+  await page.reload();
+  await expect(page.getByRole('button',{name:'Tout',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(list.locator('.event-card')).toHaveCount(2);
   await page.getByRole('button',{name:'Semaine suivante'}).click();
   await expect(list.locator('.event-card')).toHaveCount(0);
