@@ -1,0 +1,46 @@
+name: Import iRacing licensed circuit photo candidates
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [dev]
+    paths:
+      - '.github/workflows/import-iracing-catalogue.yml'
+      - 'docs/iracing-photo-candidates.json'
+      - 'scripts/import-iracing-circuit-photos.py'
+permissions:
+  contents: write
+concurrency:
+  group: iracing-photo-candidate-import
+  cancel-in-progress: true
+jobs:
+  import:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/iracing-all-circuit-photos'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/iracing-all-circuit-photos
+      - name: Install Pillow
+        run: python -m pip install Pillow==12.0.0
+      - name: Download and verify licences; generate WebPs and review sheets
+        run: python scripts/import-iracing-circuit-photos.py
+      - name: Commit imported candidates and their provenance without activating them
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/iracing-photo-import.json images/endurance/iracing images/endurance/iracing-pano
+          if [ -d docs/iracing-photo-review ] && find docs/iracing-photo-review -name '*.jpg' -print -quit | grep -q .; then git add docs/iracing-photo-review; fi
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Import licensed candidate images and visual review sheets"
+          git push origin HEAD:feat/iracing-all-circuit-photos
+      - name: Attach review sheets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iracing-photo-review
+          path: |
+            docs/iracing-photo-import.json
+            docs/iracing-photo-review/*.jpg
+          if-no-files-found: ignore
