@@ -621,7 +621,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
     if (previews.length === 10) break;
     const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId, null, null, Boolean(layout));
     // An official race without any entry of this community gets no category.
-    if (snapshot.futureDepartures.length) previews.push({eventId,name:raceCategoryName(events.find(item => item.id === eventId)),payload});
+    if (snapshot.futureDepartures.length) previews.push({eventId,name:(layout ? raceThreadName : raceCategoryName)(events.find(item => item.id === eventId)),payload});
   }
   return previews;
 }

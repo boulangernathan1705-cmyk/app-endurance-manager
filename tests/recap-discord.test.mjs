@@ -1135,7 +1135,9 @@ test('a pass with nothing to change makes one request; a changed race only its e
   for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW+pass*1000,COMMUNITY);
   calls.length=0;await syncBotRecaps(env,NOW+5000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET'],'the server\'s channels, read once');
-  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='x' WHERE event_id='race-a'").run();
+  // Invalidate the payload only, keeping the already-checked name fingerprint.
+  const hash=DB.db.prepare("SELECT content_hash FROM discord_recap_publications WHERE event_id='race-a'").get().content_hash;
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash=? WHERE event_id='race-a'").run(hash.slice(0,hash.lastIndexOf(':')+1)+'x');
   calls.length=0;await syncBotRecaps(env,NOW+6000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
 });
