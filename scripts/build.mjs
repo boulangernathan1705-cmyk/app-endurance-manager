@@ -4,11 +4,13 @@ import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {changelogHtml} from './changelog.mjs';
+import {createCircuitPhotoVersioner,staticAssetInventory,checkStaticAssetBudget} from './static-asset-budget.mjs';
 import {relaySocketOrigin} from '../shared/relay-pass.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
 const workers = process.argv.includes('--workers');
+const versionCircuitPhoto = createCircuitPhotoVersioner(root);
 const stylesheetTagPattern = /<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi;
 const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*\)\s*;/gi;
 const cssUrlPattern = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
@@ -30,7 +32,7 @@ function rewriteCssUrls(source, fromPath) {
     if (!localAssetPath(href, fromPath)) return full;
     const match = href.match(/^([^?#]*)(.*)$/);
     const assetPath = localAssetPath(match[1], fromPath);
-    return `url(${quote}/${assetPath}${match[2]}${quote})`;
+    return `url(${quote}/${assetPath}${versionCircuitPhoto(assetPath,match[2])}${quote})`;
   });
 }
 
@@ -233,6 +235,10 @@ await writeFile(new URL('_headers', out), `/*
   Cross-Origin-Resource-Policy: same-site
   X-DNS-Prefetch-Control: off
 
+/images/endurance/*
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000
+
 /members.html
   X-Robots-Tag: noindex, nofollow
 
@@ -304,5 +310,10 @@ Preferred-Languages: fr, en
 Canonical: https://endurance-manager.app/.well-known/security.txt
 Policy: https://endurance-manager.app/about.html#security
 `);
+
+const assetBudget = checkStaticAssetBudget(await staticAssetInventory(fileURLToPath(out)));
+console.log(`Static assets: ${assetBudget.count}/20000 files; images ${(assetBudget.imageBytes/1024/1024).toFixed(2)} MiB`);
+for (const warning of assetBudget.warnings) console.warn(warning);
+if (assetBudget.errors.length) throw new Error(assetBudget.errors.join('\n'));
 
 console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + diagnostics + aide + confiance, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);

@@ -89,9 +89,45 @@ export function endurancePreviewClass(event, game) {
   const track = artworkTrack(event,sim);
   return ' endurance-preview' + (track ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
+// Background images do not support loading="lazy". Defer only compact cards;
+// full-size race detail heroes and unsupported browsers keep eager loading.
+const lazyPhotoSelector = '.endurance-card-head.endurance-photo-pending';
+const compactPhotoSelector = '.week-block.is-endurance, button.race-card.is-endurance, .cal-side .cal-ev.is-endurance';
+let lazyPhotosEnabled = false;
+export function watchEndurancePhotos(doc, Intersection, Mutation) {
+  if (!doc?.body || typeof Intersection !== 'function' || typeof Mutation !== 'function') return false;
+  const observer = new Intersection(entries=>{
+    for(const entry of entries) if(entry.isIntersecting){
+      entry.target.classList.remove('endurance-photo-pending');
+      observer.unobserve(entry.target);
+    }
+  },{rootMargin:'600px 0px'});
+  const forPhotos = (root,visit)=>{
+    if(root.matches?.(lazyPhotoSelector)) visit(root);
+    root.querySelectorAll?.(lazyPhotoSelector).forEach(visit);
+  };
+  const register = photo=>{
+    if(photo.closest(compactPhotoSelector)) observer.observe(photo);
+    else photo.classList.remove('endurance-photo-pending');
+  };
+  const mutations = new Mutation(records=>{
+    // Remove stale observations before registering replacements in rerendered lists.
+    for(const record of records) for(const node of record.removedNodes) forPhotos(node,photo=>observer.unobserve(photo));
+    for(const record of records) for(const node of record.addedNodes) forPhotos(node,register);
+  });
+  mutations.observe(doc.body,{childList:true,subtree:true});
+  forPhotos(doc.body,register);
+  return true;
+}
+if(typeof document !== 'undefined' && typeof IntersectionObserver === 'function' && typeof MutationObserver === 'function'){
+  const start = ()=>{lazyPhotosEnabled = watchEndurancePhotos(document,IntersectionObserver,MutationObserver);};
+  if(document.body) start();
+  else document.addEventListener('DOMContentLoaded',start,{once:true});
+}
+
 export function enduranceArtwork(event, game, caption = '') {
   const sim = enduranceSim(event, game);
-  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}">${caption}</span>`;
+  return `<span class="endurance-card-head endurance-sim-${sim}${enduranceArtworkClass(event, game)}${lazyPhotosEnabled ? ' endurance-photo-pending' : ''}">${caption}</span>`;
 }
 
 export function enduranceCardIdentity(event, game) {
