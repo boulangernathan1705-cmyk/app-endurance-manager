@@ -294,7 +294,6 @@ export function renderWeek(message=''){
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
   const days=weekStarts(fusedTdzHome()?filterHomeEvents(all):all,monday).map(day=>({...day,items:day.items.filter(item=>fusedTdzHome()||keep(item,chosen))}));
-  const advanced=fusedTdzHome()&&tdzViews?tdzViews.advancedControls(all):{button:'',panel:''};
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
@@ -320,7 +319,7 @@ export function renderWeek(message=''){
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
     ${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
-        ${fusedTdzHome()?homeFilterBar()+advanced.button+advanced.panel:`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
+        ${fusedTdzHome()?homeFilterBar():`<div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>`}
         <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
       </section>
       ${box}
