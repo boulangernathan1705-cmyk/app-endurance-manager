@@ -13,7 +13,7 @@ export function homePrefs(){
   if(state.tdzHomeScope!==scope){
     const saved=readFilterState(scope);
     state.tdzHomeScope=scope;
-    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.filter(k=>kinds.includes(k)):[]};
+    state.tdzHomePrefs={view:views.includes(saved.view)?saved.view:'week',filters:Array.isArray(saved.filters)?saved.filters.includes('all')?['all']:saved.filters.filter(k=>kinds.includes(k)):[]};
     state.weekOffset=0;
   }
   return state.tdzHomePrefs;
@@ -39,13 +39,14 @@ export function setHomeView(view){
 export function homeViewSwitch(){return '<div class="cal-view" role="group" aria-label="Affichage">'+[['week','Semaine'],['month','Mois'],['list','Liste']].map(([k,label])=>button('tdz-home-view',label,'data-view="'+k+'" aria-pressed="'+(homeView()===k)+'"','event-filter-button')).join('')+'</div>';}
 export function selectHomeFilter(k){
   const p=homePrefs(),chosen=new Set(p.filters);
-  if(k==='all')chosen.clear();else if(kinds.includes(k)){if(chosen.has(k))chosen.delete(k);else chosen.add(k);}
+  if(k==='all'){chosen.clear();chosen.add('all');}else if(kinds.includes(k)){chosen.delete('all');if(chosen.has(k))chosen.delete(k);else chosen.add(k);}
   p.filters=[...chosen];save();
 }
-export function homeFilters(){return new Set(homePrefs().filters);}
+// No selection: the TDZ programme. Explicit 'Tout': all types. A selected simulator replaces the implicit default.
+export function homeFilters(){const filters=homePrefs().filters;return new Set(filters.includes('all')?[]:filters.length?filters:['event']);}
 export function homeFilterBar(){
   const chosen=homeFilters();
-  return '<div class="event-filter week-filters" role="group" aria-label="Filtrer les événements">'+[['all','Tout'],['lmu','Endurance LMU'],['iracing','Endurance iRacing'],['event','Events'],['stream','📺 Streams'],['mine','Mes courses']].map(([k,label])=>button('week-filter',(k==='all'?'':'<i aria-hidden="true"></i>')+label,'data-filter="'+k+'" aria-pressed="'+(k==='all'?!chosen.size:chosen.has(k))+'"','event-filter-button week-filter is-'+k)).join('')+'</div>';
+  return '<div class="event-filter week-filters" role="group" aria-label="Filtrer les événements">'+[['all','Tout'],['lmu','Endurance LMU'],['iracing','Endurance iRacing'],['event','Events TDZ'],['stream','📺 Streams'],['mine','Mes courses']].map(([k,label])=>button('week-filter',(k==='all'?'':'<i aria-hidden="true"></i>')+label,'data-filter="'+k+'" aria-pressed="'+(k==='all'?!chosen.size:chosen.has(k))+'"','event-filter-button week-filter is-'+k)).join('')+'</div>';
 }
 const monthDay=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 export function homeWeekNav(){
