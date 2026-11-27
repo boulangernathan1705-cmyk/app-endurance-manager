@@ -1,6 +1,6 @@
 {
   "candidates": 41,
-  "downloaded": 40,
+  "downloaded": 41,
   "records": [
     {
       "id": "iracing-adelaide",
@@ -678,6 +678,31 @@
       "description": "A picture of the pit road for w:Virginia International Raceway. Shot by \"The Daredevil\" at the 2008 Grand Am event at Virginia International Raceway"
     },
     {
+      "id": "iracing-watkins-glen",
+      "requestedTitle": "File:Watkins Glen - 2021 6 Hours of Watkins Glen.jpg",
+      "fileTitle": "File:Watkins Glen - 2021 6 Hours of Watkins Glen.jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Watkins_Glen_-_2021_6_Hours_of_Watkins_Glen.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c0/Watkins_Glen_-_2021_6_Hours_of_Watkins_Glen.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "sha256": "9e12ba9dca764cc721273e27acd42ebe768d6d8bff8c5d93fb45064da1675877",
+      "originalDimensions": [
+        5783,
+        3848
+      ],
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "coverBytes": 54174,
+      "panoramaBytes": 119468,
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "artist": "United Autosports",
+      "attribution": "",
+      "credit": "https://www.flickr.com/photos/unitedautosports/51283701885/",
+      "restrictions": "",
+      "description": "La piste de Watkins Glen lors des 6 Heures de Watkins Glen 2021"
+    },
+    {
       "id": "iracing-zandvoort",
       "requestedTitle": "File:Circuit Zandvoort motorsport race track in the Netherlands (46940292845).jpg",
       "fileTitle": "File:Circuit Zandvoort motorsport race track in the Netherlands (46940292845).jpg",
@@ -1003,7 +1028,5 @@
       "description": "Aerial Photograph of the Bend Motorsport Park, Captured by passing aircraft."
     }
   ],
-  "errors": {
-    "iracing-watkins-glen": "Not a suitable raster image"
-  }
+  "errors": {}
 }
