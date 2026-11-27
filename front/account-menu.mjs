@@ -176,8 +176,8 @@ function unifyNav(session) {
   // Équipages, like on the race pages, for those who may place pilots in crews.
   const crews = Array.isArray(session.permissions) && session.permissions.includes('crews') ? link(`/${sim}/#equipages`, 'Équipages', ' nav-crews-button') : '';
   const own = [...nav.querySelectorAll('.nav-sections .nav-section-button')].map(item => item.outerHTML).join('');
-  // Plugin SimHub (LMU only), for the pilots who see the module, unless the page already has its own tab.
-  const plugin = session.combos === true && sim === 'lmu' && !own.includes('nav-plugin-button') ? link('/simhub.html', 'Espace pilote', ' nav-plugin-button') : '';
+  // Pilot space is community-wide, regardless of the currently selected simulator.
+  const plugin = session.combos === true && !own.includes('nav-plugin-button') ? link('/simhub.html', 'Espace pilote', ' nav-plugin-button') : '';
   nav.querySelector('.nav-game-switcher')?.remove();
   for (const group of nav.querySelectorAll('.nav-sections')) group.remove();
   const sections = document.createElement('div');

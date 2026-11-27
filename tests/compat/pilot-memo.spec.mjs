@@ -3,8 +3,8 @@ import {test,expect} from '@playwright/test';
 const crewId='00000000-0000-4000-8000-000000000012', raceId='00000000-0000-4000-8000-000000000013';
 const combo={track:'Spa-Francorchamps',car:'Ferrari 499P',laps:20,drivers:2};
 const here={access:'member',user:{id:'1',name:'Nathan'},permissions:['access','combos'],combos:true,community:{id:'memo-ci',slug:'fmt',name:'FMT'}};
-const empty={laps:0,drivers:[],moments:{day:0,night:0},compounds:{}};
-const measured={laps:10,avg:125,best:123,slope:0.1,ve:7,fuel:6,wear:[1,1,1,1],temp:[],kpa:[],brake:[]};
+const empty={laps:0,drivers:[],moments:{day:0,night:0},compounds:{},endurance:{drivers:[],compounds:{}}};
+const measured={laps:10,avg:125,q25:124.5,q75:125.5,best:123,slope:0.1,ve:7,fuel:6,wear:[1,1,1,1],temp:[],kpa:[],brake:[]};
 const sheet={
   combo:{...combo,capacity:90},race:{id:raceId,name:'6 h de Spa'},notes:[],canManageNotes:true,canManagePeriods:false,
   periods:{events:[],versions:[]},setups:[],sample:{laps:20,drivers:2,sessions:2,from:1790000000000,to:1790000000000},
@@ -12,7 +12,7 @@ const sheet={
   drivers:[{id:'1',name:'Nathan',me:true},{id:'2',name:'Lucas'}],
   conditions:{dry:{laps:20,trackTemp:[25,30],moments:{day:20,night:0},
     drivers:[{...measured,id:'1'},{...measured,id:'2',ve:8}],
-    compounds:{Medium:{laps:20,drivers:[{...measured,id:'1'},{...measured,id:'2'}]}}},damp:empty,rain:empty}
+    compounds:{Medium:{laps:20,drivers:[{...measured,id:'1'},{...measured,id:'2'}]}},endurance:{drivers:[{...measured,id:'1'},{...measured,id:'2',ve:8}],compounds:{Medium:{laps:20,drivers:[{...measured,id:'1'},{...measured,id:'2'}]}}}},damp:empty,rain:empty}
 };
 
 test('pilot memo opens on the race and crew, saves preparation filters, and loads heavy data on demand',async({page})=>{
@@ -37,7 +37,12 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   const prep=page.locator('.cb-prep');
   await expect(prep).toContainText('6 h de Spa');
   await expect(page.getByRole('button',{name:'Mon équipage'})).toHaveAttribute('aria-pressed','true');
-  await expect(page.getByRole('button',{name:'Préparation',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:'Statistiques',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Analyse',exact:true})).toHaveCount(0);
+  await expect(prep).toContainText('2:05,000');
+  await expect(prep).toContainText('2:04,500 – 2:05,500');
+  await expect(prep.locator('.cb-wheel-diagram')).toHaveCount(0);
+  await expect(prep.locator('.cb-relay-bars .cb-meter')).toHaveCount(3);
   await expect(page.locator('.cb-overview')).toBeVisible();
   await expect(page.locator('.cb-context > .cb-drivers')).toHaveCount(0);
   await expect(prep).toContainText('Nathan');
@@ -61,18 +66,9 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   await page.getByRole('button',{name:'Ajouter la note'}).click();
   await expect(page.getByText('Pressions à froid')).toBeVisible();
   expect(notes[0]).toMatchObject({eventId:raceId,theme:'tyres'});
-  await page.getByRole('button',{name:'Statistiques',exact:true}).click();
-  await expect(prep).toHaveCount(0);
-  await expect(page.getByText('Rythme moyen · écart au plus rapide')).toBeVisible();
-  await page.getByRole('button',{name:'Historique',exact:true}).click();
-  await page.getByRole('button',{name:'Charger l’historique'}).click();
-  await expect(page.getByText('Arrêts enregistrés',{exact:true})).toBeVisible();
-  expect(history).toBe(1);
-  await page.getByRole('button',{name:'Préparation',exact:true}).click();
-  await page.getByText('Simulateur d’arrêt au stand',{exact:true}).click();
-  await page.getByLabel('Mode de ravitaillement').selectOption('fuel');
-  await page.getByLabel('Changement de pilote').uncheck();
-  await expect(page.getByText(/comparaison est disponible|aucun arrêt mesuré|temps immobilisé ·/i)).toBeVisible();
+  await expect(prep.getByText('Temps aux stands',{exact:true})).toBeVisible();
+  await expect(prep.getByText('Plein + 4 pneus',{exact:true})).toBeVisible();
+  expect(history).toBe(0);
   expect(installs).toBeGreaterThan(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await page.setViewportSize({width:390,height:844});
