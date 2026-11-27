@@ -1041,9 +1041,12 @@ test('a refused deletion of a historical archived text channel retains its id', 
 });
 
 
-test('compact names retain simulator categories and a visible vehicle even for long crew names',()=>{
+test('compact names omit the single LMU LMP2 model and retain other vehicles and categories',()=>{
   assert.equal(crewVoiceName({crew_name:'TDZ 01',car:'Toyota GR010 Hybrid',category:'Hypercar'}),'#TDZ 01 · Toyota GR010 · HY');
-  assert.equal(crewVoiceName({crew_name:'TDZ 02',car:'Oreca 07 Gibson ELMS',category:'LMP2 ELMS'}),'#TDZ 02 · Oreca 07 ELMS · LMP2 ELMS');
+  assert.equal(crewVoiceName({crew_name:'TDZ 02',car:'Oreca 07 Gibson ELMS',category:'LMP2 ELMS'}),'#TDZ 02 · LMP2 ELMS');
+  assert.equal(crewVoiceName({crew_name:'TDZ 04',car:'Oreca 07 Gibson',category:'LMP2 WEC',circuit:'spa'}),'#TDZ 04 · LMP2 WEC');
+  assert.equal(crewVoiceName({crew_name:'TDZ 05',car:'Dallara P217 LMP2',category:'LMP2 P217',circuit:'iracing-spa'}),'#TDZ 05 · Dallara P217 · LMP2 P217');
+  assert.ok(crewVoiceName({crew_name:'X'.repeat(180),car:'Oreca 07 Gibson',category:'LMP2 WEC'}).endsWith(' · LMP2 WEC'));
   assert.equal(crewVoiceName({crew_name:'TDZ 03',car:'Porsche 963 GTP',category:'GTP',circuit:'iracing-spa'}),'#TDZ 03 · Porsche 963 · GTP');
   const long=crewVoiceName({crew_name:'X'.repeat(180),car:'Ferrari 296 LMGT3',category:'GT3'});
   assert.ok(long.length<=100);assert.ok(long.endsWith(' · Ferrari 296 · GT3'));

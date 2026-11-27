@@ -153,7 +153,7 @@ async function hash(text) {
 }
 async function voiceRecap(env,community,row,start,pilots,emojis){
   const fallback=recapPayload(env,community,row,start,pilots);
-  const prefix=VOICE_POLICY_VERSION+VOICE_DISPLAY_VERSION+await hash(JSON.stringify(fallback))+':';
+  const prefix=VOICE_POLICY_VERSION+(omitLmp2Car(row)?'display-v3:':VOICE_DISPLAY_VERSION)+await hash(JSON.stringify(fallback))+':';
   const payload=emojis?recapPayload(env,community,row,start,pilots,emojis):fallback;
   const contentHash=prefix+await hash(JSON.stringify(payload));
   // A temporary registry failure must not replace already published logos with text on an otherwise unchanged card.
@@ -440,7 +440,10 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     const categoryLabel=parts[1]||'';
     const customCategory=categoryLabel.match(/^<:([a-z0-9_]+):(\d+)>(?: (ELMS|WEC))?$/);
     const possible=customCategory?['lmu','iracing'].flatMap(sim=>Object.keys(catalogForGame(sim).categories).filter(category=>categoryDisplay(category,sim,{[customCategory[1]]:customCategory[2]})===categoryLabel)): [categoryLabel];
-    const currentNames=name&&parts.length?possible.map(category=>crewVoiceName({crew_name:name,car:parts[0]==='Voiture à choisir'?'':parts[0],category})):[];
+    const currentNames=name&&parts.length?possible.flatMap(category=>{
+      const row={crew_name:name,car:parts[0]==='Voiture à choisir'?'':parts[0],category};
+      return [crewVoiceName(row),legacyCompactVoiceName(row)];
+    }):[];
     if (!name || (!currentNames.includes(channel.name) && channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
@@ -583,14 +586,18 @@ export async function serverCategories(env, guildId) {
 const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - Number(row.created_at) < WAIT_CATEGORY
   && (row.race_scope === 'all' || row.race_scope === game(row.circuit));
 
-// One compact voice name, regardless of the category selected by the administrator.
-export const crewVoiceName = row => {
+// Both LMU LMP2 classes have a single car; keep the category and omit the redundant model in voice names only.
+const omitLmp2Car = row => !String(row.circuit||'').startsWith('iracing-') && ['LMP2 ELMS','LMP2 WEC'].includes(row.category);
+function compactVoiceName(row, omitCar=false) {
   const car = safe(carShortName(row.car)) || 'Voiture à choisir';
   const category = safe(row.category === 'Hypercar' ? 'HY' : row.category);
-  const suffix = ` · ${car}${category ? ` · ${category}` : ''}`;
+  const suffix = omitCar ? ` · ${category}` : ` · ${car}${category ? ` · ${category}` : ''}`;
   const name = safe(row.crew_name) || 'Équipage';
   return clip(`#${clip(name, Math.max(1, 99 - suffix.length))}${suffix}`, 100);
-};
+}
+// Recognize the previous exact name during orphan recovery; do not broaden deletion rules.
+const legacyCompactVoiceName = row => compactVoiceName(row);
+export const crewVoiceName = row => compactVoiceName(row,omitLmp2Car(row));
 const voiceName = (row, crewName) => crewVoiceName({...row, crew_name:crewName});
 // In the admins' category the voice channels follow the races: LMU first, then iRacing, each by start (one request).
 async function sortVoices(env, budget, row, parent) {

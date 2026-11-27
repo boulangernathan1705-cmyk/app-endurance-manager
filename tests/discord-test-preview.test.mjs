@@ -11,7 +11,9 @@ test('the real formatters create the actual week, thread and voice payloads',()=
   assert.equal(payloads.week.length,3);assert.equal(payloads.threads.length,2);assert.equal(payloads.voices.length,7);
   assert.match(payloads.threads[0].name,/^LMU · /);
   assert.match(payloads.voices[0].name,/#EM TEST 01 · Toyota GR010 · HY/);
-  assert.match(payloads.voices[1].name,/LMP2 ELMS/);assert.match(payloads.voices[2].name,/LMP2 WEC/);
+  assert.equal(payloads.voices[1].name,'#EM TEST 02 · LMP2 ELMS');assert.equal(payloads.voices[2].name,'#EM TEST 03 · LMP2 WEC');
+  assert.match(payloads.voices[1].payload.embeds[0].description,/Oreca 07 Gibson ELMS/);
+  assert.match(payloads.voices[2].payload.embeds[0].description,/Oreca 07 Gibson/);
   assert.match(JSON.stringify(payloads.threads[0].payload),/em_brand_toyota/);
   assert.match(payloads.voices[0].payload.embeds[0].description,/em_brand_toyota/);
   for(const payload of [...payloads.week,...payloads.threads.map(x=>x.payload),...payloads.voices.map(x=>x.payload)]){
