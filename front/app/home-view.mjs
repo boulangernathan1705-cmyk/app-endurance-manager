@@ -1,5 +1,5 @@
-import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,homeWeekNav,weekContains,homeAdvanced,saveHomeAdvanced,filterHomeEvents} from './tdz-home-state.mjs';
-import {weekStart} from '../week-days.mjs';
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilterBar,homeWeekNav,agendaDays,filterHomeEvents} from './tdz-home-state.mjs';
+import {weekStart,parisDay} from '../week-days.mjs';
 import {eventSchedule} from '../schedule.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 import {raceFilterKey,mySituation,emptyRaceFilters,normalizeRaceFilters,filteredCalendarEvents} from '../race-filters.mjs';
@@ -31,9 +31,9 @@ export function raceDateBlock(event,archived){
   return dateBlock(shown?.startsAt);
 }
 // Start times grouped by day ("sam. 26 · 05h 12h 16h"), all shown alike.
-export function raceStarts(event,archived){
+export function raceStarts(event,archived,allStarts=false){
   const dated=datedDepartures(event),now=Date.now();
-  const shown=archived?dated:dated.filter(d=>Number(d.startsAt)>now);
+  const shown=archived||allStarts?dated:dated.filter(d=>Number(d.startsAt)>now);
   if(!shown.length)return '';
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
@@ -72,7 +72,7 @@ function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-secti
   // The simulator is chosen in Endurance only: the events calendar shows every simulator.
   const games=nav.querySelector('.nav-game-switcher');if(games)games.hidden=page==='week'||page==='crews'||(page!=='my-entries'&&activeList(page)==='solo');}
 // Events of the community first (every simulator), then Endurance with its simulator (LMU or iRacing).
-export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.access==='member'?button('week','Accueil','','nav-section-button nav-week-button'):''}${state.soloRaces&&!fusedTdzHome()?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCE','data-list="endurance"','nav-section-button nav-endurance-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button nav-entries-button')}${crewsTab()}${state.combos?'<a class="nav-section-button nav-plugin-button" href="/simhub.html">Espace pilote</a>':''}</div>`;syncNavSection(state.page);notifyNav();}
+export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.access==='member'?button('week','Accueil','','nav-section-button nav-week-button'):''}${state.soloRaces&&!fusedTdzHome()?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCES','data-list="endurance"','nav-section-button nav-endurance-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button nav-entries-button')}${crewsTab()}${state.combos?'<a class="nav-section-button nav-plugin-button" href="/simhub.html">Espace pilote</a>':''}</div>`;syncNavSection(state.page);notifyNav();}
 document.addEventListener('endurance:render',event=>syncNavSection(event.detail?.page));
 // « Équipages » for the organisers, with the number of pilots waiting for a crew and of requests.
 function crewsTab(){
@@ -82,12 +82,12 @@ function crewsTab(){
 }
 document.addEventListener('endurance:crews-count',()=>{const tab=nav.querySelector('.nav-crews-button');if(tab)tab.outerHTML=crewsTab();syncNavSection(state.page);});
 // Solo event card: one bottom line with the start (« 21h »), the places and where the pilot stands.
-function soloCardFoot(event,archived,situation){
+function soloCardFoot(event,archived,situation,agenda=false){
   const dated=datedDepartures(event),shown=archived?dated.at(-1):dated.find(d=>Number(d.startsAt)>Date.now())||dated.at(-1);
   const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}</span>`:'';
   // A stream: its times are above, nobody enters.
   if(isStream(event))return situation?`<span class="solo-card-foot"><span class="race-situation">${situation}</span></span>`:'';
-  return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
+  return `<span class="solo-card-foot">${agenda&&dated.length>1?raceStarts(event,archived,true):start+(event.official&&(event.departures||[]).length>1?raceStarts(event,archived):'')}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
 // EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, BOULOULES…),
 // using the simulator-specific OPEN/SAFE artwork.
@@ -104,7 +104,7 @@ export function streamEventCard(event,{preview=false,archived=false}={}) {
   const watch=details.streamUrl ? `<a class="primary-button stream-button" href="${esc(details.streamUrl)}" target="_blank" rel="noopener noreferrer">Regarder sur ${esc(streamPlatform(details.streamUrl))} →</a>` : '';
   return `<article class="event-card event-card-harmonized race-card event-type-private is-solo is-solo-open sim-stream stream-event-card${archived?' archived':''}" data-race-kind="stream"><div class="event-card-body race-card-body"><div class="race-card-content"><div class="race-card-top">${raceDateBlock(event,archived)}<div class="race-head">${open}${details.streamerName?`<span class="race-meta">Avec ${esc(details.streamerName)}</span>`:''}${accessBadge(event)}</div></div>${details.description?`<p class="stream-description">${esc(details.description)}</p>`:''}<div class="stream-card-times">${esc(streamTimes(event))}</div>${soloCardInfo(event)}<div class="stream-card-actions"><small>${archived?'Stream passé':'Horaires de Paris'}</small>${watch}</div></div><div class="race-card-circuit race-card-type-logo is-stream">${streamPanel(event)}</div></div></article>`;
 }
-function eventCard({event,next,archived,end}){
+function eventCard({event,next,archived,end},{agenda=false}={}){
   if(isStream(event))return streamEventCard(event,{archived});
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
@@ -114,7 +114,7 @@ function eventCard({event,next,archived,end}){
   const calendarDate=raceDateBlock(event,archived);
   const enduranceDate=solo?'':`<span class="race-endurance-date">${calendarDate}${enduranceCardIdentity(event)}</span>`;
   const classification=solo?officialBadge(event)+accessBadge(event):`<span class="race-endurance-meta"><span class="race-endurance-types">${officialBadge(event)}${eventTypeBadge(event.eventType)}</span>${enduranceCardDuration(event)}</span>`;
-  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance endurance-sim-${enduranceSim(event)}${endurancePreviewClass(event)}`}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${solo?calendarDate:enduranceArtwork(event)}<span class="race-head">${enduranceDate}<span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>${classification}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance endurance-sim-${enduranceSim(event)}${endurancePreviewClass(event)}`}${isGrindfest(event)?' is-gridfest':''} ${archived?'archived':''}"${isSolo(event)?` data-race-kind="${calendarType(event)}"`:''} data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${solo?calendarDate:enduranceArtwork(event)}<span class="race-head">${enduranceDate}<span class="event-name">${event.streamedBy?`📺 Stream ${esc(String(event.streamedBy.streamTime||'').replace(':','h'))} · `:''}${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):esc(circuitLabel(event.circuit))}</span>${classification}</span></span>${isGrindfest(event)?`<span class="gridfest-avatars" aria-hidden="true">${streamersOf(event).map(streamer=>streamerLogo(streamer)).join('')}</span>`:''}${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation,agenda)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived,agenda)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 // Filters of the race list (communities, type, category, dates, situation), kept in the browser.
 const emptyFilters=emptyRaceFilters;
@@ -122,15 +122,14 @@ const emptyFilters=emptyRaceFilters;
 const filterKey=()=>raceFilterKey(activeGame,state.listFormat,{communityId:state.community?.id,userId:state.user?.id});
 const inTdzHome=()=>fusedTdzHome()&&state.page==='week';
 export function raceFilters(){
-  if(inTdzHome())return homeAdvanced();
   state.raceFiltersBy??={};const key=filterKey();
   state.raceFiltersBy[key]=normalizeRaceFilters(state.raceFiltersBy[key]??readFilterState(key),{game:activeGame,format:state.listFormat,
     communityIds:(state.communities||[]).map(item=>item.id).filter(Boolean),
     kindIds:[...new Set([...(state.eventTypes||[]),...state.events.filter(event=>event.format==='solo').map(event=>event.details?.type).filter(Boolean)])]});
   return state.raceFiltersBy[key];
 }
-export function saveRaceFilters(){if(inTdzHome()){saveHomeAdvanced();return;}writeFilterState(filterKey(),raceFilters());}
-export function resetRaceFilters(){if(inTdzHome()){Object.assign(homeAdvanced(),emptyFilters());saveHomeAdvanced();return;}state.raceFiltersBy??={};state.raceFiltersBy[filterKey()]=emptyFilters();saveRaceFilters();}
+export function saveRaceFilters(){writeFilterState(filterKey(),raceFilters());}
+export function resetRaceFilters(){state.raceFiltersBy??={};state.raceFiltersBy[filterKey()]=emptyFilters();saveRaceFilters();}
 // A filter group toggles its values (several may be chosen); the situation is a single choice.
 export function toggleRaceFilter(group,value){
   const filters=raceFilters();
@@ -152,7 +151,7 @@ function filterPanel(events,filters){
   const mark=item=>item.logoUrl?`<img src="${esc(item.logoUrl)}" alt="">`:'';
   const parts=[];
   const dates=group('Dates',`<label class="race-filter-date"><span>Du</span><input type="date" data-race-filter-date="from" value="${esc(filters.from)}"></label><label class="race-filter-date"><span>Au</span><input type="date" data-race-filter-date="to" value="${esc(filters.to)}"></label>`);
-  if(state.listFormat==='solo'||inTdzHome()){
+  if(state.listFormat==='solo'){
     // Events calendar: simulator, event type of the community, dates, entered or not.
     const kinds=[...new Set([...state.eventTypes,...events.map(event=>event.details?.type).filter(Boolean)])];
     parts.push(group('Simu',SIMS.map(sim=>filterChip('sims',sim.id,`<span class="event-sim-badge sim-${sim.id}">${esc(sim.short)}</span>`,filters.sims.includes(sim.id))).join('')));
@@ -170,8 +169,8 @@ function filterPanel(events,filters){
 }
 if(typeof document!=='undefined')document.addEventListener('change',event=>{
   const field=event.target;
-  if(!field?.dataset?.raceFilterDate)return;
-  setFilterDate(raceFilters(),field.dataset.raceFilterDate,field.value);saveRaceFilters();if(inTdzHome())renderWeek();else renderHome();
+  if(!field?.dataset?.raceFilterDate||inTdzHome())return;
+  setFilterDate(raceFilters(),field.dataset.raceFilterDate,field.value);saveRaceFilters();renderHome();
 });
 
 // Not a member of the community (or not signed in): no data, only how to get in.
@@ -285,9 +284,7 @@ export function renderTdzCalendar(message=''){
   const head='<h1 class="page-title">ACCUEIL</h1>'+homeViewSwitch();
   const notice=message?'<p class="creation-success" role="status">'+esc(message)+'</p>':'';
   const menu=createMenu(true);
-  const controls=tdzAdvancedControls(races);
-  const bar=homeFilterBar()+controls.button;
-  const panel=controls.panel;
+  const bar=homeFilterBar();
   const decorate=event=>{
     if(isSolo(event))return [event];
     const streamed=event.departures.filter(d=>(d.availability||[]).some(reg=>reg.streamTime&&reg.status!=='unavailable'));
@@ -296,19 +293,22 @@ export function renderTdzCalendar(message=''){
   };
   if(homeView()==='month'){
     const calendar=seasonCalendar(visible.flatMap(decorate),{setting:state.tdzSeason,canEdit:Boolean(state.tdzSeason)&&can('create_race')});
-    app.innerHTML='<div class="page-head cal-head">'+head+bar+calendar.head+menu+helpContext('events-calendar')+'</div>'+panel+notice+calendar.body;
+    app.innerHTML='<div class="page-head cal-head">'+head+bar+calendar.head+menu+helpContext('events-calendar')+'</div>'+notice+calendar.body;
   }else{
     const monday=weekStart(Date.now(),Number(state.weekOffset)||0);
-    const scoped=visible.filter(event=>!event.schedulePending).map(event=>({...event,departures:event.departures.filter(d=>weekContains(d,monday))})).filter(event=>event.departures.length);
-    const items=scoped.flatMap(decorate).map(event=>eventSchedule(event,Date.now())).sort((a,b)=>(a.event.departures[0]?.startsAt||0)-(b.event.departures[0]?.startsAt||0));
+    const days=agendaDays(visible,monday),now=Date.now(),today=parisDay(now);
+    const weekday=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',weekday:'long'});
+    const date=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
+    const list=days.map(({day,events})=>{
+      const label=new Date(day*86400000),items=events.flatMap(decorate).map(event=>eventSchedule(event,now))
+        .sort((a,b)=>Number(a.event.departures[0].startsAt)-Number(b.event.departures[0].startsAt));
+      return '<section class="tdz-agenda-day'+(day===today?' is-today':'')+'" aria-labelledby="tdz-day-'+day+'" data-day="'+label.toISOString().slice(0,10)+'"><h2 class="tdz-agenda-date" id="tdz-day-'+day+'"><span>'+esc(weekday.format(label))+'</span><small>'+esc(date.format(label))+'</small>'+(day===today?'<small class="tdz-agenda-today">Aujourd’hui</small>':'')+'</h2><div class="event-list tdz-agenda-cards">'+items.map(item=>eventCard(item,{agenda:true})).join('')+'</div></section>';
+    }).join('');
     const pending=visible.filter(event=>event.schedulePending||!event.departures.some(d=>!d.tbd&&d.date));
-    const list=items.map(item=>eventCard(item)).join('');
-    const pendingList=pending.filter(event=>!scoped.some(e=>e.id===event.id)).map(event=>eventCard(eventSchedule(event,Date.now()))).join('');
-    app.innerHTML='<div class="page-head home-head">'+head+homeWeekNav()+menu+'</div>'+bar+panel+notice+'<div class="event-agenda">'+(list?'<div class="event-list">'+list+'</div>':'<div class="empty">Aucun événement cette semaine.</div>')+(pendingList?'<section class="event-period"><h2 class="event-period-heading">Dates à confirmer</h2><div class="event-list">'+pendingList+'</div></section>':'')+'</div>';
+    const pendingList=pending.map(event=>eventCard(eventSchedule(event,now),{agenda:true})).join('');
+    app.innerHTML='<div class="page-head home-head">'+head+homeWeekNav()+menu+'</div>'+bar+notice+'<div class="event-agenda tdz-agenda">'+(list||'<div class="empty">Aucun événement cette semaine.</div>')+(pendingList?'<section class="tdz-agenda-day tdz-agenda-pending"><h2 class="tdz-agenda-date">Dates à confirmer</h2><div class="event-list tdz-agenda-cards">'+pendingList+'</div></section>':'')+'</div>';
   }
   notifyRender();
 }
 
-export function tdzAdvancedControls(events){const filters=homeAdvanced();return {button:filterButton(activeFilterCount(filters)),panel:state.raceFilterOpen?filterPanel(events,filters):''};}
-
-configureTdzViews({renderCalendar:renderTdzCalendar,advancedControls:tdzAdvancedControls});
+configureTdzViews({renderCalendar:renderTdzCalendar});
