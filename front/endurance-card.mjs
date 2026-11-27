@@ -18,10 +18,25 @@ export function enduranceDuration(event, always = false) {
 
 export const enduranceSim = (event, game = event?.otherGame || gameForEvent(event)) => game === 'iracing' ? 'iracing' : 'lmu';
 const LMU_ARTWORK = new Set(['bahrain','barcelona','cota','daytona','fuji','imola','interlagos','laguna-seca','le-mans','long-beach','lusail','monza','paul-ricard','portimao','road-atlanta','sebring','silverstone','spa']);
-export function enduranceArtworkClass(event, game) {
-  return enduranceSim(event, game) === 'lmu' && LMU_ARTWORK.has(event?.circuit) ? ' endurance-track-'+event.circuit : '';
+// Only add local iRacing assets with documented permission (see docs/IRACING_ARTWORK.md).
+// The keys are complete iRacing circuit IDs; values identify the permission record.
+export const IRACING_ARTWORK = Object.freeze({
+  'iracing-spa':'Wikimedia Commons — ContextCreator, CC0 1.0',
+  'iracing-bathurst':'Wikimedia Commons — Mountain Ash, CC BY-SA 3.0',
+  'iracing-laguna-seca':'Wikimedia Commons — 菅野崇, CC BY-SA 3.0'
+});
+function artworkTrack(event, game) {
+  const id = event?.circuit;
+  if (enduranceSim(event, game) === 'iracing') {
+    return typeof id === 'string' && /^iracing-[a-z0-9-]+$/.test(id) && Object.hasOwn(IRACING_ARTWORK,id) ? id : '';
+  }
+  return LMU_ARTWORK.has(id) ? id : '';
 }
-// Known LMU circuits only; no arbitrary class names from event input.
+export function enduranceArtworkClass(event, game) {
+  const track = artworkTrack(event, game);
+  return track ? ' endurance-track-'+track : '';
+}
+// Known artwork only; no arbitrary class names from event input.
 export function endurancePanoramaClass(event, game) {
   const track = enduranceArtworkClass(event, game);
   return track ? ' endurance-pano'+track : '';
@@ -29,8 +44,9 @@ export function endurancePanoramaClass(event, game) {
 // The compact cards share one interaction; the detail page retains its own hero.
 export function endurancePreviewClass(event, game) {
   const sim = enduranceSim(event, game);
-  const track = String(event?.circuit || '').replace(/^iracing-/, '');
-  return ' endurance-preview' + (LMU_ARTWORK.has(track) ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
+  // Keep simulator artwork isolated, even when the real-world track is shared.
+  const track = artworkTrack(event,sim);
+  return ' endurance-preview' + (track ? ' endurance-preview-track-'+track : '') + ' endurance-preview-'+sim;
 }
 export function enduranceArtwork(event, game, caption = '') {
   const sim = enduranceSim(event, game);
