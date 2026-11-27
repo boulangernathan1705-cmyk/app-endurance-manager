@@ -24,7 +24,7 @@ test('fixed fictitious messages: no active buttons, no mentions, categories incl
     calls.push({url,init});return Response.json({id:'123456789012345678',channel_id:'234567890123456789',guild_id:'345678901234567890'});
   });
   assert.equal(result.sent,3);assert.equal(result.ok,true);
-  assert.equal(calls.length,3);assert.ok(calls.every(x=>x.url.endsWith('?wait=true')&&x.init.redirect==='error'&&x.init.method==='POST'));
+  assert.equal(calls.length,3);assert.ok(calls.every(x=>x.url.endsWith('?wait=true')&&x.init.redirect==='manual'&&x.init.method==='POST'));
   assert.doesNotMatch(JSON.stringify(result),/fake_test_webhook/);
 });
 test('a failed second send stops, reports the confirmed count and never exposes the secret',async()=>{
@@ -46,7 +46,7 @@ test('platform test route rejects non-managers, non-dev and cross-origin request
 test('diagnostic verifies the incoming webhook without publishing and returns the channel, not the token',async()=>{
   const result=await diagnoseDiscordPreview({...env,DISCORD_TEST_WEBHOOK:env.DISCORD_TEST_WEBHOOK.replace('discord.com/api/','discordapp.com/api/v9/')},async(url,init)=>{
     assert.equal(init.method,'GET');assert.match(url,/^https:\/\/discord\.com\/api\/v10\/webhooks\//);
-    assert.equal(init.redirect,'error');
+    assert.equal(init.redirect,'manual');
     return Response.json({type:1,guild_id:'123456789012345678',channel_id:'234567890123456789',token:'fake_test_webhook_not_a_secret'});
   });
   assert.equal(result.ok,true);assert.equal(result.channelUrl,'https://discord.com/channels/123456789012345678/234567890123456789');
@@ -59,4 +59,17 @@ test('diagnostic and send expose safe numeric Discord errors, never raw error me
   const result=await sendDiscordPreview(env,reject);
   assert.equal(result.discordCode,50027);assert.equal(result.sent,0);assert.equal(result.stage,'message 1/3');
   assert.doesNotMatch(JSON.stringify([diag,result]),/fake_test_webhook/);
+});
+
+test('Workers-compatible fetch never follows redirects carrying a webhook credential',async()=>{
+  let calls=0;
+  const redirect=async(url,init)=>{
+    calls++;
+    assert.equal(init.redirect,'manual');
+    return new Response(null,{status:302,headers:{Location:'https://example.test/'}});
+  };
+  const diag=await diagnoseDiscordPreview(env,redirect);
+  assert.equal(diag.ok,false);assert.equal(diag.httpStatus,302);assert.match(diag.error,/Redirection/);
+  const send=await sendDiscordPreview(env,redirect);
+  assert.equal(send.sent,0);assert.equal(send.httpStatus,302);assert.equal(calls,2);
 });
