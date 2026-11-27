@@ -20,19 +20,34 @@ export function homePrefs(){
 }
 function save(){writeFilterState(key(),homePrefs());}
 export function homeView(){return homePrefs().view;}
+// Opening the home is different from browsing it: keep preferences, reset the calendar position.
+export function resetHomeDate(){
+  if(fusedTdzHome())homePrefs();
+  state.weekOffset=0;
+  if(!fusedTdzHome())return;
+  state.calendarShift=0;state.calendarMonth=parisMonth();state.calendarDay=null;state.calendarStep=0;
+}
+const weekMonth=()=>parisMonth(Date.now()+(Number(state.weekOffset)||0)*7*86400000);
 export function setHomeView(view){
   if(!views.includes(view))return;
   const prior=homeView();
   if(view==='month'&&prior!=='month'){
-    const month=new Date(weekStart(Date.now(),state.weekOffset||0)*86400000).toISOString().slice(0,7);
+    const month=weekMonth();
     let shift=0;
     for(let i=0;i<120&&!seasonMonths(state.tdzSeason,parisMonth(),shift).includes(month);i++)shift+=month<seasonMonths(state.tdzSeason,parisMonth(),shift)[0]?-1:1;
     state.calendarShift=shift;state.calendarMonth=month;state.calendarDay=null;
   }
   if(prior==='month'&&view!=='month'){
-    const day=state.calendarDay|| (state.calendarMonth?state.calendarMonth+'-01':'');
-    const date=Date.parse(day+'T12:00:00Z');
-    if(Number.isFinite(date))state.weekOffset=(weekStart(date)-weekStart())/7;
+    // Only an explicitly selected day or a different month changes the week. Returning from
+    // the same month without picking a day must not jump back to the month's first week.
+    const month=state.calendarMonth;
+    if(state.calendarDay?.startsWith(month)){
+      const date=Date.parse(state.calendarDay+'T12:00:00Z');
+      if(Number.isFinite(date))state.weekOffset=(weekStart(date)-weekStart())/7;
+    }else if(month&&month!==weekMonth()){
+      const date=month===parisMonth()?Date.now():Date.parse(month+'-01T12:00:00Z');
+      if(Number.isFinite(date))state.weekOffset=(weekStart(date)-weekStart())/7;
+    }
   }
   homePrefs().view=view;save();
 }

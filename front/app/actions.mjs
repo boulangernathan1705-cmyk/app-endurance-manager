@@ -1,4 +1,4 @@
-import {fusedTdzHome,setHomeView} from './tdz-home-state.mjs';
+import {fusedTdzHome,setHomeView,resetHomeDate} from './tdz-home-state.mjs';
 import {renderTdzCalendar} from './home-view.mjs';
 import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
@@ -150,7 +150,7 @@ async function perform(action,target){
       if (overlay?.returnFocus?.isConnected) overlay.returnFocus.focus();
       break;
     }
-    case 'home': if(target.dataset.list==='solo'&&fusedTdzHome()){renderWeek();break;} if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'home': if(target.dataset.list==='solo'&&fusedTdzHome()){resetHomeDate();renderWeek();break;} if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.
     case 'tdz-home-view': if(fusedTdzHome()){setHomeView(target.dataset.view);renderWeek();}break;
@@ -290,7 +290,7 @@ async function perform(action,target){
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.${inCommunity()}`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     // « Semaine »: from the bar, this week; its arrows move a week back or forward.
-    case 'week': if(fusedTdzHome()&&target.dataset.offset===undefined){renderWeek();break;} state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
+    case 'week': if(target.dataset.offset===undefined){resetHomeDate();renderWeek();break;} state.weekOffset=target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
     case 'week-done': {const day=Number(target.dataset.day),open=state.weekOpenDays||(state.weekOpenDays=new Set());if(open.has(day))open.delete(day);else open.add(day);renderWeek();break;}
     case 'week-filter': toggleWeekFilter(target.dataset.filter||'all');renderWeek();break;
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
