@@ -139,6 +139,17 @@ test('memo car picker loads LMU liveries and keeps category fallbacks',async({pa
     await img.scrollIntoViewIfNeeded();
     await expect(img).toHaveAttribute('src',id?`/images/memo-cars/${id}.webp`:carClass==='Hypercar'?'/images/memo-prototype.svg':'/images/memo-gt.svg');
     await expect.poll(()=>img.evaluate(node=>node.complete && node.naturalWidth>0)).toBe(true);
+    if(id){
+      await expect(img).toHaveCSS('object-fit','contain');
+      await expect(img).toHaveCSS('filter','none');
+      await expect(img).toHaveCSS('transform','none');
+      const artwork=await img.evaluate(node=>{
+        const art=node.parentElement;
+        const label=art.parentElement.querySelector('.cb-tile-text');
+        return {overlay:getComputedStyle(art,'::after').display, width:node.naturalWidth,height:node.naturalHeight, separate:label.getBoundingClientRect().right<=art.getBoundingClientRect().left+1};
+      });
+      expect(artwork).toEqual({overlay:'none',width:500,height:200,separate:true});
+    }
   }
 });
 
