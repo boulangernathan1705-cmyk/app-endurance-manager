@@ -7,6 +7,13 @@ Endurances LMU et iRacing. Répondre à Nathan en français.
 - Préserver le fonctionnement du relais du muret. Lire la section Relais de [DEPLOYMENT.md](DEPLOYMENT.md) avant toute modification du relais, de son protocole ou de ses dépendances partagées.
 - Avant de pousser, lancer `npm run check`. Pour le navigateur, utiliser la CI et les commandes de [DEPLOYMENT.md](DEPLOYMENT.md). Pour une refactorisation CSS à rendu constant, comparer les captures sans régénérer les références de la CI.
 
+## Travailler avec Nathan et les autres IA
+
+- Nathan pilote le produit sans coder : échanger en français clair, proposer les changements importants et les maquettes avant de les réaliser ; prendre en charge le code, les commandes et les tests. Ne lui demander que les choix et les validations concrètes qui nécessitent son intervention.
+- Lire [l'index documentaire](docs/README.md), la [méthode commune](docs/AI_WORKFLOW.md) et les documents utiles au chantier. Les [décisions validées](docs/DECISIONS.md) et la [charte](docs/DESIGN_SYSTEM.md) ne doivent pas être contournées.
+- Pour reprendre un chantier, consulter les PR ouvertes, leur diff et la CI ; ne pas recommencer ni écraser le travail existant. Documenter les changements durables dans la même PR et les limites de validation dans sa description.
+- Ne pas automatiser de dialogue, d'attribution ou de relance entre IA. Aucun secret ni accès de production supplémentaire pour un agent.
+
 ## Point de départ par domaine
 
 Les dépendances, contrats et tests ciblés sont dans la [cartographie de l’architecture](docs/ARCHITECTURE.md).
