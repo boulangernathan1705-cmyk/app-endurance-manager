@@ -69,8 +69,8 @@ export function notifyRender() {
 }
 export function notifyNav() { queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:nav'))); }
 
-export function logo(category) {
-  const config = categories[category];
+export function logo(category, game=activeGame) {
+  const config = catalogForGame(game).categories[category];
   return config?.image ? `<img class="category-logo" src="/images/${esc(config.image)}" alt="">` : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
 }
 // Small brand logo (or initials) before a car name; nothing when the car is not chosen.
@@ -87,17 +87,17 @@ export function carLabel(car, fallback) {
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
-const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', lmu:`Manche du championnat officiel de ${activeGame==='iracing'?'iRacing':'Le Mans Ultimate'}.`, private:'Course organisée par ta communauté.'};
-export function eventTypeBadge(type) { const key = EVENT_TYPES[type] ? type : 'private', item = EVENT_TYPES[key]; return `<span class="event-type-badge ${item.css}" data-tip="${esc(EVENT_TYPE_TIPS[key] || '')}">${esc(item.label)}</span>`; }
+const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', private:'Course organisée par ta communauté.'};
+export function eventTypeBadge(type,game=activeGame) { const catalog=catalogForGame(game),types=catalog.eventTypes,key=types[type]?type:'private',item=types[key]; const tip=key==='lmu'?`Manche du championnat officiel de ${catalog.name}.`:EVENT_TYPE_TIPS[key]||''; return `<span class="event-type-badge ${item.css}" data-tip="${esc(tip)}">${esc(item.label)}</span>`; }
 export function schedulePendingBadge(event) {
   if (event?.officialScheduleStatus) return `<span class="event-schedule-badge">${event.officialScheduleStatus === 'cancelled' ? 'Annulée par iRacing' : 'Reportée par iRacing'}</span>`;
   return event?.schedulePending ? '<span class="event-schedule-badge" data-tip="Les horaires officiels ne sont pas encore connus : inscris-toi et forme ton équipage, chacun choisira son départ quand ils seront publiés.">Horaires à confirmer</span>' : ''; }
 // Pilots of a category on the whole race: a pilot entered on several starts counts once.
 export function eventCategoryCount(event, category) { return pilotCount(event.departures.flatMap(departure => departure.availability.filter(reg => reg.category === category))); }
-export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}" data-tip="${count} pilote${count > 1 ? 's' : ''} inscrit${count > 1 ? 's' : ''} en ${esc(category)}, tous départs confondus.">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
+export function eventBadge(category,count,game=activeGame) { const config=catalogForGame(game).categories[category]; return `<span class="event-category-badge ${config?.css || ''}" data-tip="${count} pilote${count > 1 ? 's' : ''} inscrit${count > 1 ? 's' : ''} en ${esc(category)}, tous départs confondus.">${config?.image?logo(category,game):''}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
 export function pilotCount(registrations) { return new Set(registrations.filter(reg => reg.status !== 'unavailable').map(reg => reg.participantId || reg.id)).size; }
-export function circuitInfo(id) { return CIRCUITS.find(circuit => circuit.id === id) || null; }
-export function circuitLabel(id) { return circuitInfo(id)?.name || 'Circuit à préciser'; }
+export function circuitInfo(id,game=activeGame) { return catalogForGame(game).circuits.find(circuit => circuit.id === id) || null; }
+export function circuitLabel(id,game=activeGame) { return circuitInfo(id,game)?.name || 'Circuit à préciser'; }
 export function circuitVisual(id, compact = false) {
   // The weekly dashboard includes races from both simulators, regardless of the active game.
   const circuit = circuitInfo(id) || catalogForGame(gameForEvent({circuit:id})).circuits.find(item=>item.id===id);

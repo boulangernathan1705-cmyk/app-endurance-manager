@@ -394,3 +394,29 @@ test('all named iRacing circuit images decode and stay separate from LMU',async(
   });
   expect(failures).toEqual([]);
 });
+
+for(const game of ['lmu','iracing'])test(`${game}: mixed home agenda uses each endurance's own catalog`,async({page})=>{
+  await page.clock.setFixedTime(Date.parse('2090-10-13T08:00:00Z'));
+  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('em_filters_v3:tdz-home:all:alpha:111111111111111111',JSON.stringify({view:'list'}));});
+  const events=[
+    race('lmu',{id:'mixed-lmu',name:'LMU series',eventType:'lmu',categories:['Hypercar','GT3','Unknown class']}),
+    race('iracing',{id:'mixed-iracing',name:'iRacing series',eventType:'lmu',categories:['GTP','LMP2 P217','GT3','Porsche Cup','Production']})
+  ];
+  await boot(page,game,events);
+  await page.goto(`/${game}/#accueil`);
+  await page.getByRole('button',{name:'Tout',exact:true}).click();
+  const lmu=page.locator('.tdz-agenda .race-card[data-id="mixed-lmu"]');
+  const iracing=page.locator('.tdz-agenda .race-card[data-id="mixed-iracing"]');
+  await expect(lmu).toHaveCount(1);
+  await expect(iracing).toHaveCount(1);
+  await expect(lmu.locator('.event-type-badge')).toHaveText('Championnat LMU');
+  await expect(iracing.locator('.event-type-badge')).toHaveText('Championnat iRacing');
+  await expect(lmu.locator('.race-meta')).not.toHaveText('Circuit à préciser');
+  await expect(iracing.locator('.race-meta')).not.toHaveText('Circuit à préciser');
+  for(const [card,files] of [[lmu,['HC.png','GT3.webp']],[iracing,['iracing-gtp.svg','iracing-lmp2.svg','iracing-gt3.svg','iracing-cup.svg','iracing-production.svg']]]){
+    await expect(card.locator('.category-logo')).toHaveCount(files.length);
+    for(const file of files)await expect(card.locator(`img.category-logo[src="/images/${file}"]`)).toHaveCount(1);
+    await expect(card.locator('.category-text-logo')).toHaveCount(0);
+  }
+  await expect(lmu.locator('.event-category-badge').filter({hasText:'Unknown class'})).toHaveCount(1);
+});
