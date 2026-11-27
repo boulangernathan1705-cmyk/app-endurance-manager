@@ -617,3 +617,23 @@ th.an-who { color: var(--dc) !important; }
   .cb-dialog .cb-swatch {width:32px;height:44px;min-height:44px;background:radial-gradient(circle,var(--dc) 0 9px,transparent 10px);border:0;box-shadow:none;}
   .cb-dialog .cb-swatch[aria-pressed=true] {background:radial-gradient(circle,var(--dc) 0 8px,var(--em-text-strong) 9px 10px,transparent 11px);}
 }
+
+/* The memo is a single, calm reference sheet. */
+.cb-memo-summary {display:grid;gap:var(--em-space-3);}
+.cb-memo-pace {display:grid;gap:var(--em-space-2);padding:var(--em-space-4);background:var(--em-panel-2);border:1px solid var(--em-border);border-radius:var(--em-radius-md);}
+.cb-memo-pace small {color:var(--em-muted);}
+.cb-memo-pace strong {font-size:clamp(28px,4vw,40px);font-variant-numeric:tabular-nums;line-height:1.1;}
+.cb-memo-pace b {font-size:clamp(17px,2.5vw,24px);font-variant-numeric:tabular-nums;}
+.cb-memo-pace p {margin:0;}
+#combos-app .cb-prep .cb-overview {grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));margin:0 0 var(--em-space-3);}
+#combos-app .cb-prep .cb-overview > div strong {color:var(--em-text-strong);}
+.cb-prep-tyres .cb-relay-bars {margin:var(--em-space-3) 0;}
+.cb-prep-tyres .cb-meter {height:12px;}
+.cb-prep-tyres .cb-meter i {background:var(--em-accent);}
+.cb-memo-stops {margin:var(--em-space-4) 0;}
+.cb-memo-stops table {min-width:0;}
+#combos-app .cb-prep-bottom {grid-template-columns:minmax(0,1fr);}
+@media(max-width:620px) {
+  #combos-app .cb-prep .cb-overview {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .cb-memo-stops th,.cb-memo-stops td {white-space:normal;overflow-wrap:anywhere;}
+}
