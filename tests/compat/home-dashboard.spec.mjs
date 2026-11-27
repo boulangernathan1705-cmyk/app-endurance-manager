@@ -49,11 +49,11 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
     expect(statusBox.x+statusBox.width).toBeLessThanOrEqual(badgeBox.x);
    }
   }
-  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing.webp';
+  const artwork=sim==='lmu'?'/images/endurance/lmu/spa.webp':'/images/endurance/iracing/iracing-sebring.webp';
   expect(await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(artwork);
   await card.evaluate(el=>el.classList.add('is-panorama-preview'));
   await expect(card.locator('.circuit-visual')).toHaveCount(0);
-  expect(await card.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing.webp');
+  expect(await card.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(sim==='lmu'?'/images/endurance/lmu-pano/spa.webp':'/images/endurance/iracing-pano/iracing-sebring.webp');
   await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
   expect(await page.evaluate(async artwork=>{
    const image=new Image();image.src=artwork;

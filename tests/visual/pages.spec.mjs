@@ -97,25 +97,14 @@ for(const game of ['lmu','iracing'])test('endurance-detail-'+game,async({page})=
   await expect(header.locator('.endurance-card-duration')).toHaveText(game==='lmu'?'6H':'2H');
   const hero=header.locator('.endurance-detail-hero'),art=hero.locator('.endurance-card-head'),map=hero.locator('.circuit-visual'),caption=hero.locator('.endurance-card-caption');
   await expect(map).toBeVisible();
-  expect(game==='lmu'?await hero.evaluate(el=>getComputedStyle(el).backgroundImage):await art.evaluate(el=>getComputedStyle(el,'::before').backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/cota.webp':'/images/endurance/iracing.webp');
+  expect(await hero.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain(game==='lmu'?'/images/endurance/lmu-pano/cota.webp':'/images/endurance/iracing-pano/iracing-sebring.webp');
   const [a,m,c]=await Promise.all([art.boundingBox(),map.boundingBox(),caption.boundingBox()]);
-  if(game==='iracing')expect(m.x).toBeGreaterThanOrEqual(a.x+a.width-1);
   expect(m.width).toBeGreaterThan(70);
-  if(game==='iracing')expect(c.x+c.width).toBeLessThanOrEqual(m.x+1);
-  if(game==='iracing')expect(Math.abs(c.y+c.height-a.y-a.height)).toBeLessThanOrEqual(2);
-  else {
-    expect(c.y).toBeGreaterThanOrEqual(a.y);
-    expect(c.y+c.height).toBeLessThanOrEqual(a.y+a.height+1);
-    expect(m.y).toBeGreaterThanOrEqual(a.y+a.height-1);
-  }
-  if(game==='iracing'){
-    expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
-    expect(await caption.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(9, 14, 20, 0.78)');
-    expect(await art.evaluate(el=>getComputedStyle(el,'::after').clipPath)).toContain('polygon');
-  }else{
-    await expect(hero.locator('.endurance-detail-content')).toBeVisible();
-    expect(await art.evaluate(el=>getComputedStyle(el,'::before').display)).toBe('none');
-  }
+  expect(c.y).toBeGreaterThanOrEqual(a.y);
+  expect(c.y+c.height).toBeLessThanOrEqual(a.y+a.height+1);
+  expect(m.y).toBeGreaterThanOrEqual(a.y+a.height-1);
+  await expect(hero.locator('.endurance-detail-content')).toBeVisible();
+  expect(await art.evaluate(el=>getComputedStyle(el,'::before').display)).toBe('none');
   const mapImage=map.locator('img'),picture=await mapImage.boundingBox();
   expect(picture.x).toBeGreaterThan(m.x+3);
   expect(picture.x+picture.width).toBeLessThan(m.x+m.width-3);

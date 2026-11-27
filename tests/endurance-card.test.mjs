@@ -54,6 +54,6 @@ test('iRacing candidate inventory covers exactly the named circuit catalogue',()
  for(const id of Object.keys(IRACING_ARTWORK))assert.ok(expected.includes(id));
 });
 
-test('the trial activates exactly three independently licensed iRacing photos',()=>{
- assert.deepEqual(Object.keys(IRACING_ARTWORK).sort(),['iracing-bathurst','iracing-laguna-seca','iracing-spa']);
+test('all named iRacing circuits have independently licensed photos',()=>{
+ assert.deepEqual(Object.keys(IRACING_ARTWORK).sort(),GAME_CATALOGS.iracing.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd')).map(c=>c.id).sort());
 });
