@@ -251,10 +251,10 @@ for(const enabled of [true,false])test('pilot space on iRacing and shared home, 
   if(enabled)await expect(mobile).toBeVisible();
 });
 
-test('iRacing trial photos load independently in compact cards, previews and details',async({page},testInfo)=>{
+test('iRacing circuit photos load independently in compact cards, previews and details',async({page},testInfo)=>{
   test.setTimeout(90000);
-  const circuits=['iracing-spa','iracing-bathurst','iracing-laguna-seca','iracing-sebring'];
-  const events=circuits.map((circuit,index)=>race('iracing',{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa'+index,circuit,name:'Trial '+circuit}));
+  const circuits=['iracing-spa','iracing-bathurst','iracing-laguna-seca','iracing-tbd'];
+  const events=circuits.map((circuit,index)=>race('iracing',{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa'+index,circuit,name:'Artwork '+circuit}));
   await boot(page,'iracing',events);
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:900});
@@ -289,4 +289,23 @@ test('iRacing trial photos load independently in compact cards, previews and det
     expect(await hero.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('/images/endurance/iracing-pano/'+circuit+'.webp');
     await expect(hero.locator('.circuit-visual img')).toBeVisible();
   }
+});
+
+test('all named iRacing circuit images decode and stay separate from LMU',async({page})=>{
+  test.setTimeout(90000);
+  await boot(page,'iracing',[race('iracing')]);
+  const failures=await page.evaluate(async()=>{
+    const {GAME_CATALOGS}=await import('/shared/catalog.mjs');
+    const {IRACING_ARTWORK,enduranceArtworkClass,endurancePreviewClass}=await import('/front/endurance-card.mjs');
+    const bad=[];
+    for(const {id} of GAME_CATALOGS.iracing.circuits.filter(c=>!c.random&&!c.id.endsWith('-tbd'))){
+      if(!Object.hasOwn(IRACING_ARTWORK,id)||!enduranceArtworkClass({circuit:id},'iracing').includes(id)||!endurancePreviewClass({circuit:id},'iracing').includes(id)||enduranceArtworkClass({circuit:id},'lmu'))bad.push(id+' registry');
+      for(const dir of ['iracing','iracing-pano']){
+        const img=new Image();img.src='/images/endurance/'+dir+'/'+id+'.webp';
+        try{await img.decode();if(!img.naturalWidth||!img.naturalHeight)bad.push(img.src);}catch{bad.push(img.src);}
+      }
+    }
+    return bad;
+  });
+  expect(failures).toEqual([]);
 });
