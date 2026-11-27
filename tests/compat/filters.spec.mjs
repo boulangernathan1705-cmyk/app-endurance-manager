@@ -226,6 +226,7 @@ test('opening TDZ home resets dates, while browsing and switching views preserve
   await next.click();
   await expect(label).toContainText('La semaine prochaine');
   await page.locator('#navigation [data-action="my-entries"]').click();
+  await expect(page).toHaveURL(/#inscriptions$/);
   await page.locator('#navigation .nav-week-button').click();
   await expect(view('Liste')).toHaveAttribute('aria-pressed','true');
   await expect(label).toContainText('Cette semaine');
@@ -238,7 +239,9 @@ test('opening TDZ home resets dates, while browsing and switching views preserve
   await view('Semaine').click();
   await expect(label).toContainText('du 11 novembre');
   await page.locator('#navigation [data-action="my-entries"]').click();
+  await expect(page).toHaveURL(/#inscriptions$/);
   await page.goBack();
+  await expect(page).toHaveURL(/#accueil$/);
   await expect(label).toContainText('Cette semaine');
   await expect(view('Tout')).toHaveAttribute('aria-pressed','true');
 });
