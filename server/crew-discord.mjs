@@ -97,7 +97,7 @@ const raceLink = (env, community, row) => { try { return `${communityUrl(env, co
 const relative = timestamp => `<t:${Math.floor(timestamp / 1000)}:R>`;
 const pageButton = link => link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : [];
 const weatherOf = row => conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'))?.value.replace(/\n/g, ' · ') || '';
-function recapPayload(env, community, row, start, pilots, emojis = {}) {
+export function recapPayload(env, community, row, start, pilots, emojis = {}) {
   const sim = game(row.circuit), link = raceLink(env, community, row);
   const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
   // The one who made the crew first, then the others in their order of entry.

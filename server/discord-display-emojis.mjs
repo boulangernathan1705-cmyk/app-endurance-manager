@@ -53,6 +53,17 @@ function validAsset(bytes,mime){
     ? String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'
     : mime==='image/png'&&bytes.slice(0,8).every((value,index)=>value===[137,80,78,71,13,10,26,10][index]);
 }
+// Same image upload for automatic publication and explicit DEV preview.
+export async function uploadDisplayEmoji(env,asset,request){
+  if(!env.ASSETS||!asset)return null;
+  const file=await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN||'https://endurance-manager.app'}${asset.path}`));
+  if(!file.ok)return null;
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  if(!validAsset(bytes,asset.mime))return null;
+  let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
+  const created=await request('POST',`/applications/${env.DISCORD_CLIENT_ID}/emojis`,{name:asset.name,image:`data:${asset.mime};base64,${btoa(binary)}`});
+  return validId(created?.id)?created.id:null;
+}
 // At most one optional upload per application per half-hour per warm Worker, after a registry read.
 // Failure never blocks an ordinary message or causes a guild-level emoji upload.
 export async function registerOneDisplayEmoji(env,assets,request,now=Date.now()){
@@ -65,13 +76,8 @@ export async function registerOneDisplayEmoji(env,assets,request,now=Date.now())
   state.assetRetry.set(asset.name,now+6*HOUR);
   state.uploading=(async()=>{
     try{
-      const file=await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN||'https://endurance-manager.app'}${asset.path}`));
-      if(!file.ok)return;
-      const bytes=new Uint8Array(await file.arrayBuffer());
-      if(!validAsset(bytes,asset.mime))return;
-      let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);
-      const created=await request('POST',`/applications/${env.DISCORD_CLIENT_ID}/emojis`,{name:asset.name,image:`data:${asset.mime};base64,${btoa(binary)}`});
-      if(validId(created?.id))state.ids={...state.ids,[asset.name]:created.id};
+      const id=await uploadDisplayEmoji(env,asset,request);
+      if(id)state.ids={...state.ids,[asset.name]:id};
     }catch{/* A missing logo is purely cosmetic. */}
   })();
   try{await state.uploading;}finally{state.uploading=null;}

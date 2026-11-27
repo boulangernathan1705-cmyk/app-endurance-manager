@@ -337,7 +337,7 @@ export async function expectedRaceThreads(env, community, settings, timestamp = 
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
-const raceThreadName = event => raceCategoryName(event).replace(/^(?:🏎️|🏁) /u, '');
+export const raceThreadName = event => raceCategoryName(event).replace(/^(?:🏎️|🏁) /u, '');
 // The race categories follow the category chosen for their sim: LMU first, then iRacing, each by date of its first start
 // (one request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, settings, budget) {
