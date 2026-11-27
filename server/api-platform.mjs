@@ -1,5 +1,5 @@
 // The platform managers' actions: showcase, official community, communities (called by server/worker.mjs).
-import {fail, now, baseDomain, json, body, text} from './core.mjs';
+import {fail, now, baseDomain, json, body, text, rateLimit} from './core.mjs';
 import {closeCommunityRequest} from './community-requests.mjs';
 import {allCommunities, communityUrl, communitySlug} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
@@ -10,6 +10,7 @@ import {botInvite} from './api-community.mjs';
 import {syncIracingEvents} from './iracing-import.mjs';
 import {iracingSupervision, resolveIracingConflict} from './iracing-supervision.mjs';
 import {checkClosedDiscordThread, discordSupervision} from './discord-supervision.mjs';
+import {discordPreviewAvailable,sendDiscordPreview} from './discord-test-preview.mjs';
 // Answers the request when it is one of the platform's actions, else null.
 export async function platformApi({path, method, request, env, actor, community, mainAddress, openSite}) {
   if (path === '/api/platform/iracing' && ['GET','POST','PATCH'].includes(method)) {
@@ -28,9 +29,21 @@ export async function platformApi({path, method, request, env, actor, community,
       fail(502, 'Le calendrier iRacing est momentanément indisponible. Consulte le suivi des sources.');
     }
   }
+  if (path === '/api/platform/discord/test-preview') {
+    if (!isDevelopment(env) || new URL(request.url).origin !== 'https://dev.endurance-manager.app') fail(404,'Fonction indisponible.');
+    if (!actor.user || !actor.manager) fail(403,'Réservé aux gestionnaires de la plateforme.');
+    if (method !== 'POST') fail(405,'Méthode non autorisée.');
+    if (request.headers.get('Origin') !== 'https://dev.endurance-manager.app') fail(403,'Origine refusée.');
+    if (!discordPreviewAvailable(env)) fail(503,'Webhook de test indisponible.');
+    const input = await body(request,256);
+    if (input.confirm !== 'APERÇU' || Object.keys(input).length !== 1) fail(400,'Confirme l’envoi du test.');
+    await rateLimit(request,env,'discord-test-preview',2);
+    const result=await sendDiscordPreview(env);
+    return json(result);
+  }
   if (path === '/api/platform/discord/supervision' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    return json(await discordSupervision(env));
+    return json({...await discordSupervision(env),testPreviewAvailable:new URL(request.url).origin==='https://dev.endurance-manager.app'&&discordPreviewAvailable(env)});
   }
   if (path === '/api/platform/discord/supervision/thread' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
