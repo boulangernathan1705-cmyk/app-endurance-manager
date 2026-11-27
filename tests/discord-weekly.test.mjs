@@ -356,3 +356,14 @@ test('le calendrier du salon : une ligne par jour comme dans le fil, puis le nom
   assert.equal(monza,['<#11>','📍 Autodromo Nazionale Monza · ⏱️ 6 h · 🏷️ Événement spécial','📅 **ven. 20 nov.** · 3h, 10h','📅 **sam. 21 nov.** · 13h','📅 **dim. 22 nov.** · 18h','👤 3 pilotes inscrits'].join('\n'));
   assert.equal(ricard.split('\n').length,3,'personne d’inscrit : pas de ligne de pilotes');
 });
+
+
+test('race categories are shown even without crews, with separate ELMS and WEC labels',()=>{
+  const departure={eventId:'race',eventName:'Test',circuit:'spa',startsAt:Date.parse('2090-10-15T12:00Z'),categories:['Hypercar','LMP2 ELMS','LMP2 WEC','GT3'],crews:[],unassignedPilots:[]};
+  const snapshot={futureDepartures:[departure],currentDepartures:[],periodLabel:'semaine'};
+  const emojis={em_hypercar:'111',em_lmp2:'222'};
+  const thread=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',emojis,{alone:true});
+  assert.match(thread.embeds[0].description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
+  const recap=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',emojis,{threads:{race:'123'},head:false});
+  assert.match(recap.embeds.at(-1).description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
+});

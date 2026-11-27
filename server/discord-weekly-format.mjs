@@ -82,6 +82,18 @@ function categoryMark(category,sim,emojis={}){
   const name=categoryEmojiName(sim,category),id=emojis[name];
   return id?`<:${name}:${id}>`:markers.get(category)||'⬜';
 }
+export function categoryDisplay(category,sim,emojis={}) {
+  const name=categoryEmojiName(sim,category);
+  const label=category==='Hypercar'?'HY':category;
+  if (!emojis[name]) return clean(label);
+  const suffix=category==='LMP2 ELMS'?' ELMS':category==='LMP2 WEC'?' WEC':'';
+  return `${categoryMark(category,sim,emojis)}${suffix}`;
+}
+function raceCategories(departure,emojis={}) {
+  const categories=Array.isArray(departure.categories)?departure.categories:[];
+  const labels=orderedCategories([...new Set(categories.filter(Boolean))]).map(category=>categoryDisplay(category,simOf(departure),emojis));
+  return labels.length?`Catégories : ${labels.join(' · ')}`:'';
+}
 // One way to write a start everywhere (Nathan, 2026-11-01): « Dim. 1 nov. · 13h00 », Paris time. Discord's <t:…> dates
 // show in each reader's own language (« Sunday, November 1, 2026 1:00 PM »), so they are kept for « dans 2 heures » only.
 export function clockLabel(startsAt){return recapTime.format(startsAt).replace(':','h');}
@@ -90,7 +102,8 @@ function departureTitle(departure){return startTimeLabel(departure.startsAt,depa
 // One crew per block, separated by a blank line: name, then its car, then one pilot per line.
 function crewBlock(crew,sim,emojis){
   const marker=categoryMark(crew.category,sim,emojis),status=crew.locked?'🔒':'🔓';
-  return [`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
+  const category=emojis[categoryEmojiName(sim,crew.category)] ? `${categoryDisplay(crew.category,sim,emojis)} **${clean(crew.name)}**` : `${marker} **${clean(crew.name)}** · ${clean(crew.category)}`;
+  return [`${category} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
     ...(crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`):['*Aucun pilote*'])].filter(Boolean).join('\n');
 }
 const asPilot=pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot;
@@ -189,7 +202,7 @@ function raceEmbed(departures,siteUrl,compact=false,current=false,emojis={}){
   const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
   const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
   const details=[`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · ');
-  const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut([details,note,startsRecap(departures)].filter(Boolean).join('\n'),4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
+  const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut([details,raceCategories(first,emojis),note,startsRecap(departures)].filter(Boolean).join('\n'),4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
     fields:raceFields(departures,compact,emojis)};
   const url=raceUrl(siteUrl,first);if(url)embed.url=url;
   return embed;
@@ -272,7 +285,7 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
       const pilots=new Set(group.flatMap(departure=>[...(departure.crews||[]).flatMap(crew=>crew.pilots||[]),...(departure.unassignedPilots||[]).map(pilot=>asPilot(pilot).name)])).size;
       return [`${live?'🔴 **En cours** · ':''}${thread?`<#${thread}>`:url?`[${name}](${url})`:`**${name}**`}`,
         [`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · '),
-        startsRecap(group),pilots&&`👤 ${pilots} pilote${pilots>1?'s':''} inscrit${pilots>1?'s':''}`].filter(Boolean).join('\n');};
+        raceCategories(first,emojis),startsRecap(group),pilots&&`👤 ${pilots} pilote${pilots>1?'s':''} inscrit${pilots>1?'s':''}`].filter(Boolean).join('\n');};
     let shown=races.length,description='';
     // 4096 characters at most: the last races go to the site.
     do{description=[...races.slice(0,shown).map(box),shown<races.length&&`… et ${races.length-shown} autre${races.length-shown>1?'s':''} sur le site.`].filter(Boolean).join('\n\n');}while(description.length>4000&&--shown>0);

@@ -17,6 +17,7 @@ import {bellReminders, BELL_REMINDER_WINDOW} from './race-bell-reminders.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {memoHref} from '../shared/memo-links.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
+import {carShortName} from '../shared/car-brands.mjs';
 import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
 
 const HOUR = 3600_000;
@@ -37,6 +38,7 @@ const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 17n) | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
 // Changing this version also repairs existing channels on their next sync.
 const VOICE_POLICY_VERSION = 'public-voice-v3:';
+const VOICE_DISPLAY_VERSION = 'display-v1:';
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
@@ -99,7 +101,7 @@ function recapPayload(env, community, row, start, pilots) {
   const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
-  const names = ordered.map(pilot => safeText(pilot.name) && `${safeText(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
+  const names = ordered.map(pilot => safeText(pilot.name) && safeText(pilot.name)).filter(Boolean);
   const weather = weatherOf(row);
   const lines = [
     `Équipage **${safeText(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Il reste de la place'}`,
@@ -315,7 +317,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length || endDue(row, start, timestamp)) return true;
-  return row.recap_hash !== VOICE_POLICY_VERSION + await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
+  return row.recap_hash !== VOICE_POLICY_VERSION + VOICE_DISPLAY_VERSION + await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
 }
 
 // Deletes a channel (already gone: fine).
@@ -406,13 +408,16 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
         || links.includes(message.embeds?.[0]?.url)));
     const name = (card?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || card?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
     // In a race's category the voice is named after its crew; elsewhere after its sim, race and crew.
-    if (!name || (channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
+    const carLine = card?.embeds?.[0]?.description?.split('\n').find(line => line.startsWith('🚗 '))?.slice(3);
+    const parts = carLine?.split(' · ') || [];
+    const currentName = name && parts.length > 0 ? crewVoiceName({crew_name:name, car:parts[0] === 'Voiture à choisir' ? '' : parts[0], category:parts[1] || ''}) : null;
+    if (!name || (channel.name !== currentName && channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
       .bind(community.discordGuildId,channel.id).first()) return 0;
     const crews = (await env.DB.prepare('SELECT name FROM crews WHERE community_id=? AND event_id=?')
       .bind(community.id,eventId).all()).results || [];
-    if (crews.some(crew => safe(crew.name) === name)) return 0;
+    if (crews.some(crew => safe(crew.name) === safe(name))) return 0;
     await remove(env,budget,channel.id);
     return 1;
   } finally {
@@ -550,8 +555,14 @@ const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - N
 
 // In its race's category the crew's name is enough; elsewhere the sim and the race come first (« LMU · 6h de Spa · Équipage A »).
 // « 🏎️ LMU · 6h de Spa · Équipage A »: the race's logo in front, as its thread.
-export const crewVoiceName = row => clip(`${game(row.circuit) === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'} · ${safe(row.event_name) || 'Endurance'} · ${safe(row.crew_name) || 'Équipage'}`, 100);
-const voiceName = (row, crewName) => clip(row.race_category ? crewName : crewVoiceName({...row, crew_name:crewName}), 100);
+export const crewVoiceName = row => {
+  const car = safe(carShortName(row.car)) || 'Voiture à choisir';
+  const category = safe(row.category === 'Hypercar' ? 'HY' : row.category);
+  const suffix = ` · ${car}${category ? ` · ${category}` : ''}`;
+  const name = safe(row.crew_name) || 'Équipage';
+  return clip(`#${clip(name, Math.max(1, 99 - suffix.length))}${suffix}`, 100);
+};
+const voiceName = (row, crewName) => crewVoiceName({...row, crew_name:crewName});
 // In the admins' category the voice channels follow the races: LMU first, then iRacing, each by start (one request).
 async function sortVoices(env, budget, row, parent) {
   const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
@@ -636,7 +647,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     }
   }
   const payload = recapPayload(env, community, row, start, pilots);
-  const contentHash = VOICE_POLICY_VERSION + await hash(JSON.stringify(payload));
+  const contentHash = VOICE_POLICY_VERSION + VOICE_DISPLAY_VERSION + await hash(JSON.stringify(payload));
   if (!row.message_id) {
     // Plain names only: even the first message must not notify or ping the pilots.
     const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...payload, allowed_mentions:{parse:[]}, flags:4096});

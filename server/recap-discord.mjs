@@ -16,7 +16,7 @@ import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wanted
 
 const DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
-const RECAP_FORMAT = 14;
+const RECAP_FORMAT = 15;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n, EVERYONE = 131072n;
@@ -336,6 +336,7 @@ export async function expectedRaceThreads(env, community, settings, timestamp = 
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
+const raceThreadName = event => raceCategoryName(event).replace(/^(?:🏎️|🏁) /u, '');
 // The race categories follow the category chosen for their sim: LMU first, then iRacing, each by date of its first start
 // (one request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, settings, budget) {
@@ -394,7 +395,7 @@ async function placeCategories(env, community, guildId, channels, category, sett
 // The crews' voices in each category: LMU first, then iRacing, each by its start (server/crew-discord.mjs sorts them when one
 // is made, a pass that can stop on the way). Other voices stay first, as they are. One request, only when out of order.
 async function placeVoices(env, community, guildId, channels, budget) {
-  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, c.name AS crew_name, e.name AS event_name, e.circuit, e.departures FROM crew_discord d
+  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, c.name AS crew_name, c.car, c.category, e.name AS event_name, e.circuit, e.departures FROM crew_discord d
     JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL`).bind(community.id).all()).results || [];
   // Named as now wanted (the race's logo in front since it came; a crew renamed on the site).
   for (const item of rows) {
@@ -716,6 +717,19 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
   if (!repair && row.message_id && row.content_hash === hash) return;
+  // Rename an existing thread only when its recap is already due for an update. Never recreate it for its name.
+  if (threaded && row.message_id) {
+    const existing = await discord(env,'GET',`/channels/${channel}`,null,budget).catch(error => { if (error.status !== 404 || error.code !== 10003) throw error; return null; });
+    const wanted = raceThreadName(event);
+    if (existing?.name && existing.name !== wanted) {
+      const rename = () => discord(env,'PATCH',`/channels/${channel}`,{name:wanted},budget);
+      await rename().catch(async error => {
+        if (error.code !== 50083) throw error;
+        await discord(env,'PATCH',`/channels/${channel}`,{archived:false},budget);
+        await rename();
+      });
+    }
+  }
   // A race's thread quiet for 6 days (addThreadMembers): its card sent again at the bottom, then the old one deleted. The
   // thread gets a message, so Discord does not archive it, and keeps one clean card.
   if (threaded && row.message_id && row.content_hash === REPOST) {
@@ -805,7 +819,7 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
   }
   if (!row.channel_id || !row.in_thread) {
     // Open a week (Discord's longest): a quiet thread is archived, opened again on its next change.
-    const thread = await discord(env,'POST',`/channels/${week.channel_id}/threads`,{name:raceCategoryName(event),type:11,auto_archive_duration:10080},budget).catch(error => {
+    const thread = await discord(env,'POST',`/channels/${week.channel_id}/threads`,{name:raceThreadName(event),type:11,auto_archive_duration:10080},budget).catch(error => {
       if (error.status === 403) throw Object.assign(new Error('Pour ouvrir le fil de chaque course, le bot doit pouvoir « Créer des fils publics » et « Envoyer des messages dans les fils » dans # endurances-de-la-semaine : invite-le à nouveau avec ses droits.'), {rights:true});
       throw error;
     });
@@ -822,7 +836,7 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     const later = error => { if (error.budget || error.status === 429) throw error; return null; };
     const recent = await discord(env,'GET',`/channels/${week.channel_id}/messages?limit=100`,null,budget).catch(later);
     for (const item of (recent || []).filter(item => Number(item.type) === 18 && item.author?.id === env.DISCORD_CLIENT_ID
-      && (item.message_reference?.channel_id === row.channel_id || item.content === raceCategoryName(event))))
+      && (item.message_reference?.channel_id === row.channel_id || [raceCategoryName(event),raceThreadName(event)].includes(item.content))))
       await discord(env,'DELETE',`/channels/${week.channel_id}/messages/${item.id}`,null,budget).catch(later);
     row.thread_notice_gone = 1;
     await env.DB.prepare('UPDATE discord_recap_publications SET thread_notice_gone=1 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
