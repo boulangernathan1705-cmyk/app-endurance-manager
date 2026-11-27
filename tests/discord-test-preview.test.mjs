@@ -10,7 +10,7 @@ test('the real formatters create the actual week, thread and voice payloads',()=
   const payloads=realPreviewPayloads(env,{name:'Test',slug:'test',modules:{}},fixture,{em_hypercar:'123',em_lmp2:'456',em_brand_toyota:'789'},Object.fromEntries(fixture.races.map(r=>[r.id,'123456789012345678'])),Date.now());
   assert.equal(payloads.week.length,3);assert.equal(payloads.threads.length,2);assert.equal(payloads.voices.length,7);
   assert.match(payloads.threads[0].name,/^LMU · /);
-  assert.match(payloads.voices[0].name,/#EM TEST 01 · GR010 · HY/);
+  assert.match(payloads.voices[0].name,/#EM TEST 01 · Toyota GR010 · HY/);
   assert.match(payloads.voices[1].name,/LMP2 ELMS/);assert.match(payloads.voices[2].name,/LMP2 WEC/);
   assert.match(JSON.stringify(payloads.threads[0].payload),/em_brand_toyota/);
   assert.match(payloads.voices[0].payload.embeds[0].description,/em_brand_toyota/);
