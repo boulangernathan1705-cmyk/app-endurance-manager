@@ -36,6 +36,7 @@ function supervisionMarkup(result, esc, diagWhen) {
   const problems=result.communities.filter(item=>['error','attention'].includes(item.state)).length;
   return `<p class="members-help">Relevé : ${esc(when(result.generatedAt))} · ${result.communities.length} communauté(s) · ${problems} à surveiller.</p>
     ${result.development?'<p class="members-help">DEV : les tâches planifiées sont désactivées. Les dates ne prouvent pas une panne.</p>':''}
+    ${result.development&&result.testPreviewAvailable?'<div class="setup-actions"><button type="button" class="secondary-button" data-discord-test-preview>Envoyer un aperçu Discord</button><span role="status" class="settings-status"></span></div><p class="members-help">Trois messages fictifs dans le salon du webhook de test. Aucun vocal créé, aucune inscription, aucun ping.</p>':''}
     ${!result.botConfigured?'<p class="settings-status" role="alert">Le token du bot n’est pas configuré.</p>':''}
     ${rows||'<p class="members-help">Aucun serveur lié.</p>'}`;
 }
@@ -66,7 +67,19 @@ export function installDiscordSupervision(app, {api, esc, diagWhen}) {
     } catch(error) {status.textContent=error.message;}
     finally {button.disabled=false;}
   }
+  async function sendPreview(button){
+    if(!confirm('Envoyer les trois aperçus fictifs dans le salon Discord de test ?'))return;
+    const status=button.nextElementSibling;
+    button.disabled=true;status.textContent='Envoi…';
+    try{
+      const result=await api('/api/platform/discord/test-preview','POST',{confirm:'APERÇU'});
+      status.textContent=result.ok?`${result.sent} messages envoyés dans Discord.`:`${result.sent} message(s) confirmé(s). ${result.error}`;
+    }catch(error){status.textContent=error.message;}
+    finally{button.disabled=false;}
+  }
   app.addEventListener('click',event=>{
+    const preview=event.target.closest('[data-discord-test-preview]');
+    if(preview){sendPreview(preview);return;}
     const thread=event.target.closest('[data-supervision-thread]');
     if(thread)verifySupervisionThread(thread);
     const button=event.target.closest('[data-supervision-refresh]');
