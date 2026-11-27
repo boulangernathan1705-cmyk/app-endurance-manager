@@ -1,6 +1,7 @@
 import {carBrand} from '../shared/car-brands.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 import {memoCandidates} from '../shared/memo-links.mjs';
+import {memoCarArtwork} from '../shared/memo-car-artwork.mjs';
 
 const catalog = catalogForGame('lmu');
 const fold = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr');
@@ -30,6 +31,7 @@ export function memoPicker({view,esc,comboKey,openCombo,dialog}) {
     let image=kind==='track' ? trackImage(name) : '';
     if (['Hypercar','LMP2','LMP3'].includes(group)) image='/images/memo-prototype.svg';
     if (['GTE','LMGT3'].includes(group)) image='/images/memo-gt.svg';
+    if (kind==='car' && combo) image=memoCarArtwork(combo.car)||image;
     const logo=brand?.logo ? `<img class="cb-brand" src="/images/brands/${brand.logo}.webp" alt="">` : '';
     return `<button type="button" class="cb-tile is-${kind}" ${attrs}>
       <span class="cb-tile-art">${image?`<img src="${image}" alt="" loading="lazy">`:''}</span>
