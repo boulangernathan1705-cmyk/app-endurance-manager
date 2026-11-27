@@ -2,6 +2,7 @@ import {racesPath} from './races-path.mjs';
 import {durationLabel} from '../shared/duration.mjs';
 import {catalogForGame, SIMS, TRACK_LIMITS} from '../shared/catalog.mjs';
 import {hourLabel as streamHour,streamPlatform} from '../shared/stream.mjs';
+import {brandMark} from './discord-display-emojis.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
 const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
@@ -103,12 +104,12 @@ function departureTitle(departure){return startTimeLabel(departure.startsAt,depa
 function crewBlock(crew,sim,emojis){
   const marker=categoryMark(crew.category,sim,emojis),status=crew.locked?'🔒':'🔓';
   const category=emojis[categoryEmojiName(sim,crew.category)] ? `${categoryDisplay(crew.category,sim,emojis)} **${clean(crew.name)}**` : `${marker} **${clean(crew.name)}** · ${clean(crew.category)}`;
-  return [`${category} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
+  return [`${category} ${status}`,crew.car&&`${brandMark(crew.car,emojis)||'🏎️'} ${clean(crew.car)}`,
     ...(crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`):['*Aucun pilote*'])].filter(Boolean).join('\n');
 }
 const asPilot=pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot;
 function pilotLine(pilot,sim,emojis){
-  return [`👤 ${clean(pilot.name)}`,...orderedCategories(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' ');
+  return [`👤 ${clean(pilot.name)}`,...orderedCategories(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryDisplay(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' ');
 }
 // Pilots without a crew: one per line with the logos of their categories.
 function unassignedBlock(pilots,sim,emojis){

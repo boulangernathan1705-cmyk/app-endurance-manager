@@ -11,6 +11,7 @@ import {tdzOnly} from '../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
+import {brandEmojiAsset,knownDisplayEmojis,rememberDisplayEmojis,registerOneDisplayEmoji} from './discord-display-emojis.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
@@ -564,6 +565,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
     if (!app || !env.ASSETS) return ids;
     const list = await discord(env,'GET',`/applications/${app}/emojis`,null,budget);
     for (const emoji of list?.items || []) ids[emoji.name] = emoji.id;
+    if (Array.isArray(list?.items)) rememberDisplayEmojis(env,ids);
     for (const name of CATEGORY_EMOJI_NAMES.filter(name => !ids[name])) {
       const file = await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN || 'https://endurance-manager.app'}/images/discord-emojis/${name.slice(3)}.png`));
       if (!file.ok) continue;
@@ -571,6 +573,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
       let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
       ids[name] = (await discord(env,'POST',`/applications/${app}/emojis`,{name,image:`data:image/png;base64,${btoa(binary)}`},budget)).id;
     }
+    if (Array.isArray(list?.items)) rememberDisplayEmojis(env,ids);
     categoryEmojis = {at:timestamp, ids};
   } catch {
     // Without them the categories keep their colour; retried half an hour later.
@@ -581,7 +584,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
 // alone: a race's thread (its block only).
 // threads: « un fil par course », the week's message lists the races with a link to their threads ({eventId: thread}).
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, sims = null) {
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, sims = null, budget = null) {
   if (kind?.startsWith('head')) {
     const scope = sims?.length > 1 ? 'all' : kind.slice(5);
     const {periodLabel} = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope === 'all' ? 'lmu' : scope);
@@ -595,7 +598,13 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   }
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
-  const emojis = await botCategoryEmojis(env, timestamp);
+  const categoryIds = await botCategoryEmojis(env, timestamp);
+  const brandAssets = [...snapshot.currentDepartures,...snapshot.futureDepartures].flatMap(departure=>departure.crews.map(crew=>brandEmojiAsset(crew.car))).filter(Boolean);
+  // The preview does not register brands. Ordinary publication retains its existing request budget.
+  if (budget?.left >= 6 && brandAssets.length) await registerOneDisplayEmoji(env,brandAssets,(method,path,body)=>discord(env,method,path,body,budget));
+  const allIds = {...categoryIds,...knownDisplayEmojis(env)};
+  const relevant = new Set([...CATEGORY_EMOJI_NAMES,...brandAssets.map(asset=>asset.name)]);
+  const emojis = Object.fromEntries([...relevant].filter(name=>allIds[name]).map(name=>[name,allIds[name]]));
   const place = {head:!sims?.length || sims[0] === kind};
   const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, absent:discordAbsentButton(env), ...place});
   // Message edits are silent; never turn driver names into mentions.
@@ -715,7 +724,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
-  const {payload, hash:payloadHash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
+  const {payload, hash:payloadHash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims,budget);
   // Store the checked thread name with the content hash: routine edits need no extra Discord read.
   const nameTag = threaded ? `thread-name-v1:${await digest(raceThreadName(event))}:` : '';
   const hash = nameTag + payloadHash;
@@ -983,7 +992,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
-      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,Boolean(layout));
+      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,Boolean(layout),null,null,budget);
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
       await publish(env,timestamp,community,settings,row,event,budget,prepared,test);

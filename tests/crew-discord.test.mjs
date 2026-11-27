@@ -36,6 +36,7 @@ function fakeDiscord(){
     if(method==='DELETE'&&state.deleteStatus)return reply(state.deleteStatus,{code:50013});
     if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
+    if(method==='GET'&&path==='/applications/app-id/emojis')return reply(200,{items:[]});
     if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return state.botAbsent?reply(404,{code:10007}):reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);

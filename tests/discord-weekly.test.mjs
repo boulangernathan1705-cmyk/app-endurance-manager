@@ -284,7 +284,7 @@ test('plusieurs départs : chaque pilote sans équipage une seule fois, avec ses
   starts.push({...base,departureId:'d24',startsAt:Date.parse('2026-10-16T22:00:00Z'),unassignedPilots:[{name:'Léo',categories:['GT3']}]});
   const [,race]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
   assert.equal(race.fields.length,1);
-  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
+  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> WEC · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
   // Registered on every start: one word.
   starts[3].unassignedPilots.push({name:'Nathan',categories:['LMP2 ELMS']});
   const [,all]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
@@ -366,4 +366,12 @@ test('race categories are shown even without crews, with separate ELMS and WEC l
   assert.match(thread.embeds[0].description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
   const recap=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',emojis,{threads:{race:'123'},head:false});
   assert.match(recap.embeds.at(-1).description,/Catégories : <:em_hypercar:111> · <:em_lmp2:222> ELMS · <:em_lmp2:222> WEC · GT3/);
+});
+
+
+test('constructor emoji replaces generic car emoji when registered and keeps full car text',()=>{
+  const departure={eventId:'race',eventName:'Spa',circuit:'spa',startsAt:Date.parse('2090-10-15T12:00Z'),crews:[{name:'TDZ',category:'Hypercar',car:'Toyota GR010 Hybrid',pilots:['Alice']}],unassignedPilots:[]};
+  const snapshot={futureDepartures:[departure],currentDepartures:[],periodLabel:'semaine'};
+  const payload=buildWeeklyDiscordPayload(snapshot,{},0,'lmu',{em_hypercar:'111',em_brand_toyota:'222'},{alone:true});
+  assert.match(payload.embeds[0].fields[0].value,/<:em_hypercar:111> \*\*TDZ\*\* 🔓\n<:em_brand_toyota:222> Toyota GR010 Hybrid/);
 });
