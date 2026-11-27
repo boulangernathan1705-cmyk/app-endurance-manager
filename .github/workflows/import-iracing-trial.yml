@@ -23,6 +23,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           from urllib.request import Request, urlopen
+          from urllib.error import HTTPError
+          from time import sleep
           from io import BytesIO
           from PIL import Image, ImageOps
           sources = {
@@ -32,8 +34,21 @@ jobs:
           }
           for track, (url, focus) in sources.items():
               req = Request(url, headers={'User-Agent': 'EnduranceManager/1.0 (licensed Wikimedia Commons artwork for endurance-manager.app)'})
-              with urlopen(req, timeout=30) as resp:
-                  raw = resp.read(15_000_001)
+              sleep(12)
+              for attempt in range(3):
+                  try:
+                      with urlopen(req, timeout=30) as resp:
+                          raw = resp.read(15_000_001)
+                      break
+                  except HTTPError as error:
+                      if error.code != 429 or attempt == 2:
+                          raise
+                      retry = error.headers.get('Retry-After', '')
+                      wait = max(20, int(retry)) if retry.isdigit() else 30
+                      if wait > 90:
+                          raise
+                      print('Rate limited; respecting retry interval', wait, flush=True)
+                      sleep(wait)
               if len(raw) > 15_000_000:
                   raise ValueError('original too large')
               with Image.open(BytesIO(raw)) as img:
