@@ -12,6 +12,30 @@ const aliases = {
   'laguna-seca':['Laguna Seca'], 'long-beach':['Long Beach'], lusail:['Lusail','Losail International Circuit'],
   'paul-ricard':['Paul Ricard'], 'road-atlanta':['Road Atlanta'], sebring:['Sebring'], silverstone:['Silverstone']
 };
+
+// Artwork only: these observed LMU names share a venue photo, never memo data.
+// TrackCourse names checked against local LMU results; keep exact aliases rather
+// than prefix matching so unknown layouts still use the empty artwork fallback.
+const imageAliases = {
+  monza:['Monza Curva Grande Circuit'],
+  'paul-ricard':['Paul Ricard Circuit','Paul Ricard - ELMS','Paul Ricard - 1A','Paul Ricard - 1A-V2'],
+  sebring:['Sebring School Circuit'],
+  spa:['Circuit de Spa-Francorchamps Endurance'],
+  fuji:['Fuji Speedway Classic'],
+  silverstone:['Silverstone Grand Prix Circuit - ELMS','Silverstone International Circuit'],
+  barcelona:['Circuit de Barcelona'],
+  imola:['Autodromo Enzo e Dino Ferrari'],
+  daytona:['Daytona International Speedway Road Course'],
+  'long-beach':['Grand Prix of Long Beach']
+};
+const trackImages = new Map(catalogForGame('lmu').circuits.filter(item => !item.random).flatMap(item =>
+  [item.id,item.name,...(aliases[item.id] || []),...(imageAliases[item.id] || [])]
+    .map(name => [normal(name),'/images/endurance/lmu-pano/'+item.id+'.webp'])
+));
+export function memoTrackImage(track, game = 'lmu') {
+  return game === 'lmu' ? trackImages.get(normal(track)) || '' : '';
+}
+
 export function memoHref(event, car = '', crew = '') {
   if (!event || simForEvent(event) !== 'lmu' || event.format === 'solo' || !catalogForGame('lmu').circuits.some(item => item.id === event.circuit && !item.random)) return '';
   const q = new URLSearchParams({circuit:event.circuit});

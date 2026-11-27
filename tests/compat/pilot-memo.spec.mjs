@@ -94,6 +94,35 @@ test('pilot memo opens on the race and crew, saves preparation filters, and load
   await expect(page.getByText('Notes de l’équipe',{exact:true})).toBeHidden();
 });
 
+test('memo circuit picker loads parent artwork and selects the exact layout',async({page})=>{
+  const variants=[['Monza','monza'],['Monza Curva Grande Circuit','monza'],['Paul Ricard - ELMS','paul-ricard'],['Sebring School Circuit','sebring'],['Circuit de la Sarthe','le-mans'],['Spa-Francorchamps','spa'],['Fuji Speedway','fuji']];
+  const items=[...variants.map(([track])=>({...combo,track})),{...combo,track:'Unknown layout'}];
+  const requests=[];
+  await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:here}));
+  await page.route(url=>url.pathname==='/api/combos/link',route=>route.fulfill({json:{linked:true}}));
+  await page.route(url=>url.pathname==='/api/combos',route=>route.fulfill({json:{combos:items,preferenceScope:'artwork-test'}}));
+  await page.route(url=>url.pathname==='/api/combos/sheet',route=>{
+    const params=new URL(route.request().url()).searchParams;
+    requests.push(Object.fromEntries(params));
+    return route.fulfill({json:{...sheet,combo:{...combo,track:params.get('track')}}});
+  });
+  await page.goto('/simhub.html#memo');
+  await page.locator('[data-picker=track]').click();
+  const box=page.getByRole('dialog');
+  await expect(box.locator('[data-track-choice]')).toHaveCount(items.length);
+  for(const [track,id] of variants){
+    const img=box.locator(`[data-track-choice="${track}"] .cb-tile-art img`);
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toHaveAttribute('src',`/images/endurance/lmu-pano/${id}.webp`);
+    await expect.poll(()=>img.evaluate(node=>node.complete && node.naturalWidth>0)).toBe(true);
+  }
+  await expect(box.locator('[data-track-choice="Unknown layout"] .cb-tile-art img')).toHaveCount(0);
+  await box.locator('[data-track-choice="Monza Curva Grande Circuit"]').click();
+  await expect(page.locator('[data-picker=track]')).toContainText('Monza Curva Grande Circuit');
+  expect(requests.at(-1)).toMatchObject({track:'Monza Curva Grande Circuit',car:combo.car});
+  await expect(page.locator('[data-picker=track] .cb-tile-art img')).toHaveAttribute('src','/images/endurance/lmu-pano/monza.webp');
+});
+
 test('disabled memo hides pilot navigation and never fetches downloads, sheet or wall data',async({page})=>{
   const paths=[];
   await page.route(url=>url.pathname==='/api/session',route=>route.fulfill({json:{...here,combos:false}}));
