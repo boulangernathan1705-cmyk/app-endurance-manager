@@ -355,7 +355,11 @@ html[data-game] #app .race-header.tdz-event-artwork .solo-session-pill > svg {
 
 @media (max-width: 760px) {
   html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls .race-controls-actions {
-    flex-direction: row !important;
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center;
+    width: auto !important;
+    max-width: 100%;
     gap: 8px;
   }
   html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls [data-action="share-event"] {
@@ -363,6 +367,9 @@ html[data-game] #app .race-header.tdz-event-artwork .solo-session-pill > svg {
   }
   html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls .race-header-actions {
     order: 1 !important;
+    width: auto !important;
+    min-width: 0;
+    margin: 0;
     flex: 0 0 auto;
   }
 }
