@@ -53,6 +53,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile cards show the simulat
     const cards=page.locator('.race-card');
     await expect(cards).toHaveCount(circuits.length);
     const artworkSizes=[];
+    const artworkShapes=[];
     for(const card of await cards.all()){
       await expect(card.locator('.circuit-visual')).toHaveCount(0);
       const art=card.locator('.race-card-top > .endurance-card-head'),head=card.locator('.race-head'),date=head.locator('.race-date'),times=card.locator('.race-starts');
@@ -65,6 +66,8 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile cards show the simulat
       expect(await art.evaluate(el=>getComputedStyle(el).clipPath)).toContain('polygon');
       const [a,h,d,t,badgeBox]=await Promise.all([art.boundingBox(),head.boundingBox(),date.boundingBox(),times.boundingBox(),badge.boundingBox()]);
       artworkSizes.push(Math.round(a.width));
+      artworkShapes.push(await art.evaluate(el=>[getComputedStyle(el).clipPath,getComputedStyle(el,'::after').clipPath].join('|')));
+      expect(a.height).toBeCloseTo(104,0);
       expect(a.width).toBeGreaterThanOrEqual(82);
       expect(a.height).toBeGreaterThanOrEqual(82);
       expect(a.x+a.width).toBeLessThanOrEqual(h.x+1);
@@ -78,6 +81,7 @@ for(const game of ['lmu','iracing'])test(`${game}: mobile cards show the simulat
 
     }
     expect(new Set(artworkSizes).size).toBe(1);
+    expect(new Set(artworkShapes).size).toBe(1);
   }
 });
 
