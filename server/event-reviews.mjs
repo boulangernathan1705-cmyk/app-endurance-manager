@@ -45,7 +45,7 @@ export function eligibleReviewUsers(event, rows) {
 }
 
 export function validateReview(input) {
-  if (!Number.isInteger(input?.rating) || input.rating<1 || input.rating>5) fail(400,'Choisis une note de 1 à 5 étoiles.');
+  if (typeof input?.rating!=='number' || !Number.isInteger(input.rating*2) || input.rating<0.5 || input.rating>5) fail(400,'Choisis une note de 0,5 à 5 étoiles, par demi-étoile.');
   if (input.comment!=null && typeof input.comment!=='string') fail(400,'Commentaire invalide.');
   const comment=(input.comment||'').trim();
   if ([...comment].length>1000) fail(400,'Le commentaire est limité à 1000 caractères.');
