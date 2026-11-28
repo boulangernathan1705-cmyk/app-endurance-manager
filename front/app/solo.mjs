@@ -178,10 +178,11 @@ export function soloPasswordBlock(event){
   const password=canSeePassword(event)?event.details?.password:isGrindfest(event)&&entered?'Par MP Discord':'';
   return password?`<div class="solo-password-near-entry">${detailTile(detailSvg(ICONS.lock),'Mot de passe',esc(password))}</div>`:'';
 }
-export function soloHeaderChips(event){
+export function soloHeaderChips(event,{icons=false}={}){
   if(isGrindfest(event)||isStream(event)||simForEvent(event)==='acrally'||event.rounds?.length>1)return '';
   const round=event.rounds?.[0]||{durationMinutes:event.durationMinutes},weather=WEATHERS.find(([value])=>value===round.weather);
-  const chip=(label,value)=>value?`<span class="solo-session-pill">${esc(label)} · ${esc(value)}</span>`:'';
+  const chipIcons={'Essais':TILE_ICONS.practice,'Qualifs':TILE_ICONS.qualifying,'Course':TILE_ICONS.race,'Entraînement':ICONS.time,'Météo':'<path d="M6 17a4 4 0 1 1 1-7.9A6 6 0 0 1 18.5 11a3 3 0 0 1-.5 6z"/>','Carburant':ICONS.fuel,'Pneus':ICONS.tyres,'Voiture':ICONS.car,'Catégorie':ICONS.car};
+  const chip=(label,value)=>value?`<span class="solo-session-pill">${icons&&chipIcons[label]?detailSvg(chipIcons[label]):''}${esc(label)} · ${esc(value)}</span>`:'';
   const minutes=value=>Number(value)>0?`${Number(value)} min`:'';
   const training=isTraining(event)?trainingSpan(event.departures?.[0]?.startsAt,round.durationMinutes):'',stream=event.details?.streamTime?streamSpan(event.details.streamTime,event.details.streamEnd):'';
   const session=(training?chip('Entraînement',training):[chip('Essais',minutes(round.practice)),chip('Qualifs',minutes(round.qualifying)),chip('Course',minutes(round.durationMinutes))].join(''))+chip('📺 Stream',stream);
