@@ -23,6 +23,9 @@ for(const count of [1,2])for(const tdz of [false,true])test(`solo header ${tdz?'
      expect(settings.width).toBeGreaterThan(title.width);
    }
    expect(await page.locator('.race-header').evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+   const share=await page.locator('.race-controls [data-action="share-event"]').boundingBox();
+   const menu=await page.locator('.race-controls .race-actions-menu > summary').boundingBox();
+   expect(share.x+share.width).toBeLessThan(menu.x);
  }else expect(Math.abs(title.y-date.y)).toBeLessThan(15);
  await expect(page.locator('.race-header')).not.toContainText('test-password');
  await expect(page.locator('.race-controls [data-action="share-event"]')).toBeVisible();

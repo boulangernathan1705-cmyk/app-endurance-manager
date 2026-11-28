@@ -297,6 +297,8 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
   }
 
   html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls [data-action="share-event"] {
+    flex: none;
+    min-width: max-content;
     white-space: nowrap;
   }
 }
