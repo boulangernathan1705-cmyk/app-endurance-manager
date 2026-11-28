@@ -23,5 +23,29 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
 
 @media (max-width: 760px) {
   html[data-game] #app .tdz-event-artwork.race-header { --tdz-halo-position: center bottom; }
-  html[data-game] #app .tdz-event-artwork.week-block::before { background: var(--tdz-artwork); }
+  html[data-game] #app .tdz-event-artwork.week-block { --tdz-logo-cut: 10%; }
+
+  /* Cut the background and divider on the same diagonal, leaving the logo whole. */
+  html[data-game] #app .tdz-event-artwork.week-block::before,
+  html[data-game] #app .tdz-event-artwork.week-block::after {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--week-logo-panel);
+    pointer-events: none;
+  }
+
+  html[data-game] #app .tdz-event-artwork.week-block::before {
+    background: var(--tdz-artwork);
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--tdz-logo-cut)) 100%, 0 100%);
+  }
+
+  html[data-game] #app .tdz-event-artwork.week-block::after {
+    content: "";
+    background: var(--tdz-sim);
+    clip-path: polygon(calc(100% - 2px) 0, 100% 0, calc(100% - var(--tdz-logo-cut)) 100%, calc(100% - var(--tdz-logo-cut) - 2px) 100%);
+  }
+
+  html[data-game] #app .tdz-event-artwork.week-block .week-block-logo {
+    margin-inline-end: 4px;
+  }
 }
