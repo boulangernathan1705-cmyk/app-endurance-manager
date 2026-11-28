@@ -3,6 +3,7 @@ html[data-game] #app .tdz-event-artwork {
   --tdz-sim: var(--sim);
   --tdz-surface: var(--em-panel);
   --tdz-halo-position: right center;
+  --tdz-card-tint: linear-gradient(160deg, color-mix(in srgb, var(--tdz-sim) 26%, var(--em-panel-2)), var(--em-panel-2) 75%);
   --tdz-artwork:
     radial-gradient(ellipse at var(--tdz-halo-position), color-mix(in srgb, var(--tdz-sim) 24%, transparent), transparent 52%),
     linear-gradient(132deg, transparent 69%, color-mix(in srgb, var(--tdz-sim) 9%, transparent) 69% 77%, transparent 77% 83%, color-mix(in srgb, var(--tdz-sim) 12%, transparent) 83% 89%, transparent 89%),
@@ -22,7 +23,12 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
 }
 
 @media (max-width: 760px) {
+  html[data-game] #app :is(.week-block, .race-card).tdz-event-artwork {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   html[data-game] #app .tdz-event-artwork.week-block {
+    background: var(--tdz-card-tint);
     grid-template-columns: var(--em-compact-race-panel) minmax(0, 1fr);
     min-height: var(--em-compact-race-height);
     column-gap: 6px;
@@ -75,7 +81,7 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
     gap: 0 6px !important;
     min-height: var(--em-compact-race-height);
     align-items: stretch;
-    background: var(--em-panel-2);
+    background: var(--tdz-card-tint);
   }
 
   html[data-game] #app .tdz-event-artwork.race-card .race-card-type-logo {
@@ -344,5 +350,19 @@ html[data-game] #app .race-header.tdz-event-artwork .solo-session-pill > svg {
   html[data-game] #app .race-header.tdz-event-artwork .solo-session-chips .solo-session-row {
     flex-wrap: wrap;
     gap: 6px;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls .race-controls-actions {
+    flex-direction: row !important;
+    gap: 8px;
+  }
+  html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls [data-action="share-event"] {
+    order: 0 !important;
+  }
+  html[data-game] #app .race-header.tdz-event-artwork ~ .race-controls .race-header-actions {
+    order: 1 !important;
+    flex: 0 0 auto;
   }
 }
