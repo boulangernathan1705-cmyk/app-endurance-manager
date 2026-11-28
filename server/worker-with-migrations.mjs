@@ -6,7 +6,7 @@ import {cleanup, communityLabel, origin} from './core.mjs';
 import {importNextCommunity, syncIracingEvents} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
-import {solicitEventReviews} from './event-reviews.mjs';
+import {solicitEventReviews, purgeEventDiscussions} from './event-reviews.mjs';
 import {purgeNotifications} from './notifications.mjs';
 import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
@@ -242,6 +242,7 @@ export default {
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
     run('Event review solicitations failed', () => solicitEventReviews(env, at.getTime()));
+    run('Event review expiry failed', () => purgeEventDiscussions(env, at.getTime()));
     // Races changed in a community whose Discord does not follow the site (no recap set): forgotten after a day.
     run('Discord queue cleanup failed', () => env.DB.prepare('DELETE FROM discord_pending_races WHERE queued_at<?').bind(at.getTime() - 86400000).run());
     // Crew sync has its own minutes, so it is not duplicated here.
