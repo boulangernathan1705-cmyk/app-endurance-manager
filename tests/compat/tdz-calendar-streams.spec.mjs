@@ -126,13 +126,14 @@ test('TDZ logo and endurance photo share the same mobile panel in the home',asyn
   await page.getByRole('button',{name:'Tout',exact:true}).click();
   const track=page.locator('.week-block.is-endurance .endurance-card-head').first();
   const week=page.locator('.week-block.tdz-event-artwork',{hasText:tdz.name});
-  const geometry=(element,pseudo)=>[parseFloat(getComputedStyle(element,pseudo).width),getComputedStyle(element,pseudo).clipPath,getComputedStyle(element,'::after').clipPath];
+  const geometry=(element,pseudo)=>[parseFloat(getComputedStyle(element,pseudo).width),parseFloat(getComputedStyle(element,pseudo).height),getComputedStyle(element,pseudo).clipPath,getComputedStyle(element,'::after').clipPath];
   await expect(track).toBeVisible();
   const reference=await track.evaluate(geometry,null);
   const weekPanel=await week.evaluate(geometry,'::before');
   expect(weekPanel[0]).toBeCloseTo(reference[0],1);
   expect(weekPanel.slice(1)).toEqual(reference.slice(1));
-  expect(reference[1]).toContain('polygon');
+  expect(reference[1]).toBeCloseTo(104,0);
+  expect(reference[2]).toContain('polygon');
   const tint=card=>card.evaluate(el=>getComputedStyle(el).backgroundImage);
   const weekBackground=await tint(week);
   expect(weekBackground).toContain('linear-gradient(160deg');

@@ -38,8 +38,9 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
   html[data-game] #app .tdz-event-artwork.week-block::before,
   html[data-game] #app .tdz-event-artwork.week-block::after {
     position: absolute;
-    inset: 0 auto 0 0;
+    inset: 0 auto auto 0;
     width: var(--em-compact-race-panel);
+    height: var(--em-compact-race-height);
     pointer-events: none;
   }
 
@@ -61,6 +62,9 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
     height: auto;
     aspect-ratio: 1;
     margin-inline-end: 8%;
+    align-self: start;
+    top: calc(var(--em-compact-race-height) / 2);
+    transform: translateY(-50%);
   }
 
   html[data-game] #app .tdz-event-artwork.week-block .week-block-body {
@@ -91,9 +95,12 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
     display: grid;
     place-items: center;
     width: auto;
-    height: auto;
+    height: var(--em-compact-race-height);
+    min-height: var(--em-compact-race-height);
     max-width: none;
-    max-height: none;
+    max-height: var(--em-compact-race-height);
+    align-self: start;
+    box-sizing: border-box;
     padding: 0 8% 0 0;
   }
 

@@ -30,10 +30,11 @@
   --em-kind-bouloules: #ef8197;
   --em-kind-gridfest: #f47c57;
   --em-kind-stream: #a970ff;
-  /* Geometry shared by the compact race cards on mobile. */
-  --em-compact-race-panel: max(76px, 29%);
+  /* Compact artwork: one fixed height and diagonal; text may grow independently. */
+  --em-compact-race-panel: clamp(82px, 29%, 132px);
+  --em-compact-race-panel-desktop: clamp(86px, 28%, 132px);
   --em-compact-race-height: 104px;
-  --em-compact-race-cut: 10%;
+  --em-compact-race-cut: 10px;
   --em-compact-race-shape: polygon(0 0, 100% 0, calc(100% - var(--em-compact-race-cut)) 100%, 0 100%);
   --em-compact-race-divider: polygon(calc(100% - 2px) 0, 100% 0, calc(100% - var(--em-compact-race-cut)) 100%, calc(100% - var(--em-compact-race-cut) - 2px) 100%);
   /* Sizes */

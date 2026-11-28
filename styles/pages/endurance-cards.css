@@ -452,12 +452,12 @@ html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race
 /* Review branch: common compact card, using the existing live markup and assets.
    All other pages, event types and calendar column sizes are untouched. */
 .week-block.is-endurance {
-  display: grid; grid-template-columns: minmax(72px, 29%) minmax(0,1fr);
+  display: grid; grid-template-columns: var(--em-compact-race-panel) minmax(0,1fr);
   align-items: stretch;
 }
 .week-block.is-endurance > .endurance-card-head {
-  grid-column: 1; grid-row: 1; align-self: stretch;
-  min-height: var(--em-compact-race-height); padding: 0; border: 0; align-items: stretch;
+  grid-column: 1; grid-row: 1; align-self: start;
+  height: var(--em-compact-race-height); min-height: var(--em-compact-race-height); max-height: var(--em-compact-race-height); padding: 0; border: 0; align-items: stretch;
   background: #171d23;
   clip-path: var(--em-compact-race-shape);
 }
@@ -559,16 +559,17 @@ html[data-game] #app button.race-card.is-endurance.endurance-preview:hover .race
   .week-block.is-endurance { grid-template-columns: var(--em-compact-race-panel) minmax(0,1fr); }
 }
 html[data-game] #app button.race-card.is-endurance > .race-card-body {
-  display: grid !important; grid-template-columns: clamp(86px,28%,132px) minmax(0,1fr) !important;
+  display: grid !important; grid-template-columns: var(--em-compact-race-panel-desktop) minmax(0,1fr) !important;
   grid-template-rows: auto auto auto auto auto !important; gap: 3px 6px !important;
   align-items: start; padding: 0 7px 0 0 !important; width: 100%; min-width: 0; box-sizing: border-box;
 }
 html[data-game] #app button.race-card.is-endurance .race-card-content,
 html[data-game] #app button.race-card.is-endurance .race-card-top { display: contents !important; }
 html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
-  grid-column: 1 !important; grid-row: 1/6 !important; align-self: stretch; width: 100% !important; height: auto !important;
-  min-height: 104px; max-height: none; margin: 0; padding: 0;
-  border-radius: 5px 0 0 5px; --endurance-cut: 10%;
+  grid-column: 1 !important; grid-row: 1/6 !important; align-self: start; width: 100% !important; height: var(--em-compact-race-height) !important;
+  min-height: var(--em-compact-race-height); max-height: var(--em-compact-race-height); margin: 0; padding: 0;
+  border-radius: 5px 0 0 5px; --endurance-cut: var(--em-compact-race-cut);
+  clip-path: var(--em-compact-race-shape);
 }
 html[data-game] #app button.race-card.is-endurance .race-head {
   grid-column: 2/-1 !important; grid-row: 1 !important; min-width: 0; width: auto !important; justify-self: stretch; padding: 6px 0 0 !important;
@@ -618,14 +619,14 @@ html[data-game] #app button.race-card.is-endurance .event-category-badges { disp
 /* Keep the photo with the title. The schedule can then use the whole card. */
 @media (max-width:760px) {
   html[data-game] #app button.race-card.is-endurance > .race-card-body {
-    grid-template-columns: clamp(82px,27%,112px) minmax(0,1fr) !important;
+    grid-template-columns: var(--em-compact-race-panel) minmax(0,1fr) !important;
     gap: 3px var(--em-space-2) !important;
     padding-right: 0 !important;
   }
   html[data-game] #app button.race-card.is-endurance .race-card-top > .endurance-card-head {
     grid-row: 1 !important;
     min-width: 0;
-    min-height: 82px;
+    min-height: var(--em-compact-race-height);
   }
   html[data-game] #app button.race-card.is-endurance .race-head {
     align-self: center;
