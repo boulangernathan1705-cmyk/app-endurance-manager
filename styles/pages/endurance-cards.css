@@ -429,20 +429,6 @@ html[data-game] #app .race-header.endurance-pano .endurance-detail-hero > .endur
 .endurance-preview {
   --preview-shade: linear-gradient(90deg,rgba(7,12,17,.22),rgba(7,12,17,.78) 40%,rgba(7,12,17,.88));
 }
-.week-block.is-endurance.endurance-preview.is-panorama-preview, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview > .race-card-body {
-  background-image: var(--preview-shade), linear-gradient(0deg,rgba(7,12,17,.92),transparent 70%), var(--endurance-panorama);
-  background-size: cover; background-position: var(--panorama-focus,center); background-repeat: no-repeat;
-  color: #fff;
-}
-.week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head {
-  background: transparent; border-color: transparent; clip-path: none;
-}
-.week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head::before, .week-block.is-endurance.endurance-preview.is-panorama-preview > .endurance-card-head::after,
-html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head::before, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-card-top > .endurance-card-head::after { opacity: 0; }
-.week-block.is-endurance.endurance-preview.is-panorama-preview .week-block-name, .week-block.is-endurance.endurance-preview.is-panorama-preview .week-block-circuit, .week-block.is-endurance.endurance-preview.is-panorama-preview .week-plan-row,
-html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-head .event-name, html[data-game] #app button.race-card.is-endurance.endurance-preview.is-panorama-preview .race-head .race-meta {
-  color: #fff; text-shadow: 0 1px 3px #000;
-}
 
 @media (hover:hover) and (pointer:fine) {
 

@@ -113,30 +113,3 @@ export function enduranceHeader(event, game) {
   const caption = `<span class="endurance-card-caption"><span class="endurance-card-label"><span class="endurance-card-kind">Endurance</span><span class="endurance-card-brand">${label}</span></span>${duration ? `<span class="endurance-card-duration">${duration}</span>` : ''}</span>`;
   return enduranceArtwork(event, game, caption);
 }
-
-/* Touch: first tap previews, second tap opens the normal link/button.
-   A keyboard activation or mouse click still opens immediately. */
-if (typeof document !== 'undefined') {
-  const selector = '.week-block.is-endurance.endurance-preview, button.race-card.is-endurance.endurance-preview';
-  let touchCard = null;
-  const cardOf = target => target?.closest?.(selector) || null;
-  const clear = except => document.querySelectorAll(selector.split(', ').map(s=>s+'.is-panorama-preview').join(', ')).forEach(card=>{
-    if(card!==except) card.classList.remove('is-panorama-preview');
-  });
-  document.addEventListener('pointerdown', event=>{
-    touchCard = event.pointerType === 'touch' || event.pointerType === 'pen' ? cardOf(event.target) : null;
-  }, true);
-  document.addEventListener('pointercancel', ()=>{touchCard=null;}, true);
-  document.addEventListener('click', event=>{
-    const card = cardOf(event.target);
-    const touch = event.detail !== 0 && (event.pointerType === 'touch' || event.pointerType === 'pen' || (card && card===touchCard));
-    touchCard=null;
-    if(!card || !touch) { clear(null); return; }
-    if(card.classList.contains('is-panorama-preview')) { clear(null); return; }
-    clear(card);
-    card.classList.add('is-panorama-preview');
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }, true);
-  document.addEventListener('keydown',event=>{if(event.key==='Escape')clear(null);},true);
-}

@@ -110,13 +110,14 @@ test('TDZ logo and endurance photo share the same mobile panel in the home',asyn
   const tdz={id:'tdz-sample',name:'Course TDZ de test',format:'solo',sim:'lmu',access:'safe',details:{type:'SAFE',streamTime:'21:00',streamEnd:'23:00'},
     circuit:'cota',rounds:[{circuit:'cota',durationMinutes:30,practice:10,qualifying:5}],categories:[],version:1,absences:[],departures:[departure]};
   const endu={id:'endurance-sample',name:'Course endurance de test',format:'endurance',circuit:'cota',eventType:'lmu',
-    categories:['Hypercar'],durationMinutes:120,version:1,absences:[],departures:[{...departure,id:'endurance-start'}]};
+    categories:['Hypercar'],durationMinutes:120,version:1,details:{},absences:[],departures:[{...departure,id:'endurance-start'}]};
   await page.route('**/api/**',route=>{
     const url=new URL(route.request().url());
     let data={ok:true};
     if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_safe'],
       soloRaces:true,eventTdz:true,eventTypes:['OPEN','SAFE'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
     else if(['/api/events','/api/races'].includes(url.pathname))data={events:url.searchParams.get('game')==='iracing'?[]:[tdz,endu]};
+    else if(url.pathname==='/api/participants')data={participants:[]};
     else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
     return route.fulfill({json:data});
   });
@@ -132,6 +133,9 @@ test('TDZ logo and endurance photo share the same mobile panel in the home',asyn
   expect(weekPanel[0]).toBeCloseTo(reference[0],1);
   expect(weekPanel.slice(1)).toEqual(reference.slice(1));
   expect(reference[1]).toContain('polygon');
+  const tint=card=>card.evaluate(el=>getComputedStyle(el).backgroundImage);
+  const weekBackground=await tint(week);
+  expect(weekBackground).toContain('linear-gradient(160deg');
   await page.getByRole('button',{name:'Liste',exact:true}).click();
   const list=page.locator('.tdz-agenda .race-card.tdz-event-artwork',{hasText:tdz.name});
   await expect(list.locator('.solo-card-stream')).toBeVisible();
@@ -141,6 +145,18 @@ test('TDZ logo and endurance photo share the same mobile panel in the home',asyn
   expect(listPanel[0]).toBeCloseTo(reference[0],1);
   expect(listPanel.slice(1)).toEqual(reference.slice(1));
   expect(await list.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(0);
-  await list.click();
+  expect(await tint(list.locator('.race-card-body'))).toBe(weekBackground);
+  const tap=async card=>{
+    if(await page.evaluate(()=>navigator.maxTouchPoints>0))await card.tap();
+    else await card.click();
+  };
+  await tap(list);
   await expect(page.locator('.race-header h1')).toContainText(tdz.name);
+  await page.goto('/lmu/#accueil');
+  await page.getByRole('button',{name:'Semaine',exact:true}).click();
+  await tap(week);
+  await expect(page.locator('.race-header h1')).toContainText(tdz.name);
+  await page.goto('/lmu/#accueil');
+  await tap(page.locator('.week-block.is-endurance'));
+  await expect(page.locator('.race-header h1')).toContainText(endu.name);
 });
