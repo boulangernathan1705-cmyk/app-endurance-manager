@@ -89,6 +89,11 @@ export function filterHomeEvents(events){
   return events.flatMap(event=>{const departures=(event.departures||[]).filter(d=>homeMatches(event,d));return departures.length||(!(event.departures||[]).length&&homeMatches(event,{}))?[{...event,departures}]:[];});
 }
 
+// TDZ activities (including streamed endurance starts) come before plain endurances.
+export function homePriority(event){
+  return event.format==='solo'||isStream(event)||(event.departures||[]).some(d=>(d.availability||[]).some(reg=>reg.status!=='unavailable'&&reg.streamTime))?0:1;
+}
+
 // Group starts by Paris day, without changing the full event.
 export function agendaDays(events,monday){
   const days=Array.from({length:7},(_,i)=>({day:monday+i,events:[]}));

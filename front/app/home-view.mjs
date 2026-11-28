@@ -1,4 +1,4 @@
-import {fusedTdzHome,homeView,homeViewSwitch,homeFilterBar,homeWeekNav,agendaDays,filterHomeEvents} from './tdz-home-state.mjs';
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilterBar,homeWeekNav,agendaDays,filterHomeEvents,homePriority} from './tdz-home-state.mjs';
 import {weekStart,parisDay} from '../week-days.mjs';
 import {eventSchedule} from '../schedule.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
@@ -303,7 +303,7 @@ export function renderTdzCalendar(message=''){
     const date=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
     const list=days.map(({day,events})=>{
       const label=new Date(day*86400000),items=events.flatMap(decorate).map(event=>eventSchedule(event,now))
-        .sort((a,b)=>Number(a.event.departures[0].startsAt)-Number(b.event.departures[0].startsAt));
+        .sort((a,b)=>homePriority(a.event)-homePriority(b.event)||Number(a.event.departures[0].startsAt)-Number(b.event.departures[0].startsAt));
       return '<section class="tdz-agenda-day'+(day===today?' is-today':'')+'" aria-labelledby="tdz-day-'+day+'" data-day="'+label.toISOString().slice(0,10)+'"><h2 class="tdz-agenda-date" id="tdz-day-'+day+'"><span>'+esc(weekday.format(label))+'</span><small>'+esc(date.format(label))+'</small>'+(day===today?'<small class="tdz-agenda-today">Aujourd’hui</small>':'')+'</h2><div class="event-list tdz-agenda-cards">'+items.map(item=>eventCard(item,{agenda:true})).join('')+'</div></section>';
     }).join('');
     const pending=visible.filter(event=>event.schedulePending||!event.departures.some(d=>!d.tbd&&d.date));

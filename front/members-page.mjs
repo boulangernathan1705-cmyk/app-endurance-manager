@@ -181,7 +181,7 @@ function membersMarkup(result, settings) {
 
 // Short names of the permissions (the chips) and of the modules (overview).
 const PERMISSION_SHORT = {access:'Accès au site', endurance:'Endurances', solo_open:'Events OPEN', solo_safe:'Events SAFE', crews:'Équipages', combos:'Plugin SimHub', admin:'Administrer'};
-const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Plugin SimHub'], ['grindfest', 'Gridfest'], ['eventReviews', 'Avis des pilotes']];
+const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Plugin SimHub'], ['grindfest', 'Gridfest'], ['eventReviews', 'Avis et discussions']];
 
 // « Modules »: one line each, its switch on the right (saved at once), its settings below when it has some.
 function modulesMarkup(settings, setup) {
@@ -195,7 +195,7 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}
       : {key:'soloRaces', name:'EVENT SOLO', sub:'Un calendrier d’events : inscription en un clic, liste d’attente.', tip:'Les events de toutes les simus, avec des places limitées si besoin et une liste d’attente.'},
     {key:'categoryEntry', name:'Inscription par catégorie', sub:'Le pilote choisit ses catégories, les responsables forment les équipages.', tip:'Sur une course à plusieurs départs, le pilote coche ses catégories et ses départs possibles. Seuls les responsables d’équipage (autorisation « Équipages ») forment les équipages.'},
-    {key:'eventReviews', name:'Avis des pilotes', sub:'Une note et un commentaire facultatif après les événements.', tip:'Les participants donnent une note de 0,5 à 5 étoiles, par demi-étoile. Les commentaires anonymisés sont réservés aux administrateurs.'},
+    {key:'eventReviews', name:'Avis et discussions', sub:'Notes, commentaires et réponses sur les événements terminés.', tip:'Les avis publiés sont nominatifs et visibles par la communauté. Les réponses sont ouvertes aux participants et aux admins pendant 30 jours.'},
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', sub:'Inscription par streamer.', tip:'Le pilote choisit le streamer qu’il représente et donne son nom en jeu ; le mot de passe arrive par message privé Discord.'}] : [])];
   const line = item => `<article class="adm-module${states[item.key] ? ' is-on' : ''}" data-module-tile="${item.key}">
     <div class="adm-module-line"><span class="admin-module-icon">${icon(item.key)}</span>
@@ -331,7 +331,7 @@ async function load() {
     const overview = overviewMarkup(setup, settings, members);
     // The showcase (main address) has no Discord server and nobody real: only modules and appearance there.
     const sections = SECTIONS.filter(([key]) => !session.openSite || !['overview', 'roles', 'members', 'discord'].includes(key));
-    if (settings.modules.eventReviews && !session.openSite) sections.push(['eventReviews','Avis des pilotes']);
+    if (settings.modules.eventReviews && !session.openSite) sections.push(['eventReviews','Avis et discussions']);
     if (platform) sections.push(['platform', 'Plateforme']);
     const panels = {overview:overview.html, roles:rolesMarkup(settings), members:membersMarkup(result, settings), discord:discordTabMarkup(setup, settings, settings.community),
       eventReviews:'<div data-event-review-admin></div>', modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform:platform ? `<p class="adm-intro">Visible seulement des gestionnaires d’Endurance Manager : les demandes, les communautés et le Discord officiel.</p>${platform}` : ''};
@@ -410,9 +410,10 @@ async function loadEventReviewAdmin(){
     try{
       const data=await api(base+'?offset='+offset+(eventId?'&event='+encodeURIComponent(eventId):''));
       if(!root.isConnected)return;
-      root.innerHTML='<h2>'+ (eventId?esc(name):'Avis des pilotes')+'</h2>'+(eventId?'<button class="secondary-button" type="button" data-review-back>Retour aux événements</button>':'<p class="adm-intro">Notes et commentaires anonymisés des participants.</p>')+
-        (eventId? (data.reviews.length?data.reviews.map(r=>'<article class="admin-review-item"><strong>Pilote anonyme · '+Number(r.rating).toLocaleString('fr-FR',{maximumFractionDigits:1})+'/5 ★</strong><p>'+esc(r.comment||'Aucun commentaire')+'</p></article>').join(''):'<p>Aucun avis.</p>') : (data.events.length?data.events.map(e=>'<article class="admin-review-item"><strong>'+esc(e.name)+'</strong><p>'+(e.average==null?'Aucune note':Number(e.average).toFixed(1).replace('.',',')+'/5 ★')+' · '+e.count+' avis</p><button class="secondary-button" type="button" data-review-event="'+esc(e.id)+'" data-review-name="'+esc(e.name)+'">Voir les avis</button></article>').join(''):'<p>Aucun événement évalué pour le moment.</p>'))+
+      root.innerHTML='<h2>'+ (eventId?esc(name):'Avis et discussions')+'</h2>'+(eventId?'<button class="secondary-button" type="button" data-review-back>Retour aux événements</button>':'<p class="adm-intro">Notes, avis nominatifs et anciens avis anonymes. Les discussions sont sur la fiche de chaque événement.</p>')+
+        (eventId? (data.reviews.length?data.reviews.map(r=>'<article class="admin-review-item"><strong>'+esc(r.author)+' · '+Number(r.rating).toLocaleString('fr-FR',{maximumFractionDigits:1})+'/5 ★</strong><p>'+esc(r.comment||'Aucun commentaire')+'</p>'+(r.comment?'<button class="link-button" type="button" data-review-remove="'+esc(r.key)+'">Supprimer le commentaire</button>':'')+'</article>').join(''):'<p>Aucun avis.</p>') : (data.events.length?data.events.map(e=>'<article class="admin-review-item"><strong>'+esc(e.name)+'</strong><p>'+(e.average==null?'Aucune note':Number(e.average).toFixed(1).replace('.',',')+'/5 ★')+' · '+e.count+' avis</p><button class="secondary-button" type="button" data-review-event="'+esc(e.id)+'" data-review-name="'+esc(e.name)+'">Voir les avis</button></article>').join(''):'<p>Aucun événement évalué pour le moment.</p>'))+
         '<div class="settings-actions">'+(offset?'<button class="secondary-button" type="button" data-review-prev>Précédent</button>':'')+(data.more?'<button class="secondary-button" type="button" data-review-next>Suivant</button>':'')+'</div>';
+      root.querySelectorAll('[data-review-remove]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Supprimer le commentaire et ses réponses ? La note est conservée.'))return;try{await api('/api/events/'+encodeURIComponent(eventId)+'/review/'+encodeURIComponent(b.dataset.reviewRemove)+'/comment','DELETE');await show(offset,eventId,name);}catch(error){alert(error.message);}}));
       root.querySelectorAll('[data-review-event]').forEach(b=>b.addEventListener('click',()=>show(0,b.dataset.reviewEvent,b.dataset.reviewName)));
       root.querySelector('[data-review-back]')?.addEventListener('click',()=>show());
       root.querySelector('[data-review-prev]')?.addEventListener('click',()=>show(Math.max(0,offset-(eventId?50:20)),eventId,name));

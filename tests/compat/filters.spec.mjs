@@ -418,3 +418,31 @@ for(const game of ['lmu','iracing'])test(`${game}: mixed home agenda uses each e
   }
   await expect(lmu.locator('.event-category-badge').filter({hasText:'Unknown class'})).toHaveCount(1);
 });
+
+test('TDZ home prioritises community events and streams with Tout on desktop and mobile',async({page})=>{
+  await page.clock.setFixedTime(Date.parse('2090-10-13T06:00:00Z'));
+  const slot=(id,time,availability=[])=>({id,date:'2090-10-13',time,startsAt:Date.parse('2090-10-13T'+time+':00+02:00'),availability,crews:[]});
+  const solo=(id,name,time,sim='lmu')=>race('lmu',{id,name,format:'solo',sim,access:'open',official:false,categories:[],rounds:sim==='stream'?[]:[{circuit:'spa',durationMinutes:30,categories:[]}],details:sim==='stream'?{streamTime:time,streamEnd:'22:00',activity:'Discussion'}:{type:'OPEN'},departures:[slot(id,time)]});
+  const events=[
+    race('lmu',{id:'plain-first',name:'Endurance matin',departures:[slot('early','10:00')]}),
+    solo('tdz-late','TDZ soir','20:00'),
+    race('lmu',{id:'plain-second',name:'Endurance après-midi',departures:[slot('afternoon','14:00')]}),
+    solo('tdz-stream','Stream indépendant','21:00','stream'),
+    race('lmu',{id:'streamed-endu',name:'Endurance streamée',departures:[slot('streamed','16:00',[{id:'reg',name:'Pilote',status:'whole',category:'GT3',streamTime:'15:30',streamEnd:'18:30'}])]}),
+    solo('tdz-early','TDZ midi','12:00')
+  ];
+  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
+  await boot(page,'lmu',events);
+  await page.goto('/lmu/#accueil');
+  await page.getByRole('button',{name:'Tout',exact:true}).click();
+  const names=['TDZ midi','Endurance streamée','TDZ soir','Stream indépendant','Endurance matin','Endurance après-midi'];
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:900});
+    for(const [view,selector] of [['Semaine','.week-block'],['Liste','.tdz-agenda .event-card']]){
+      await page.getByRole('button',{name:view,exact:true}).click();
+      const cards=page.locator(selector);
+      await expect(cards).toHaveCount(names.length);
+      for(const [index,name] of names.entries())await expect(cards.nth(index)).toContainText(name);
+    }
+  }
+});
