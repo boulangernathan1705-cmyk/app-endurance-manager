@@ -91,7 +91,7 @@ test('community cards retain logos while endurances share a compact header', () 
   assert.match(css, /\.week-block\.is-endurance::before \{ display: none; \}/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
   assert.match(css, /\.week-block-body \{ display: contents; \}/);
-  assert.match(css, /\.week-block \{ display: grid; grid-template-columns: 76px minmax\(0, 1fr\);/);
+  assert.match(css, /\.week-block \{ --week-logo-panel: 76px; display: grid; grid-template-columns: var\(--week-logo-panel\) minmax\(0, 1fr\);/);
   assert.match(css, /\.week-block-logo \{ width: 60px; height: 60px;/);
 });
 

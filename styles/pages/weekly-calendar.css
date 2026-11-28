@@ -158,9 +158,9 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-soon { display: inline; }
   .week-day-list { gap: 8px; padding: 0; }
   /* The computer's colour band, turned on its side: a striped band on the left holds the logo (Nathan 2026-11-02). */
-  .week-block { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 0; border-radius: 14px;
+  .week-block { --week-logo-panel: 76px; display: grid; grid-template-columns: var(--week-logo-panel) minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 0; border-radius: 14px;
     background: var(--em-panel-2); }
-  .week-block::before { display: block; width: 76px;
+  .week-block::before { display: block; width: var(--week-logo-panel);
     background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(180deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
   .week-block-head { display: contents; }
   .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block .week-block-band, .week-block-live, .week-block-gauge { display: none; }
