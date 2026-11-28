@@ -23,3 +23,7 @@ La page `/charte` montre la référence visuelle. La charte s’applique à chaq
   les textes longs et les formulaires ouverts.
 - Les comparaisons se font dans le même moteur, avec les mêmes données. Les commandes et références sont dans
   [DEPLOYMENT.md](../DEPLOYMENT.md). Un refactoring à rendu constant conserve les références visuelles de la CI.
+
+## Habillage des Events TDZ
+
+La Semaine, la Liste et l’en-tête de la fiche TDZ utilisent les accents des simulateurs sur le liseré et le fond diagonal. La Liste et la fiche reprennent les mêmes teintes LMU et iRacing que les Endurances. Le logo de l’admin reste dans son emplacement d’origine et garde ses proportions. Les pastilles indiquent le format et l’accès. Le Mois conserve sa légende par type. Gridfest et les streams gardent leurs visuels dédiés.

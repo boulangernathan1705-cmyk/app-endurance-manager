@@ -1,0 +1,27 @@
+/* TDZ races use the simulator for the frame and the community artwork for the visual. */
+html[data-game] #app .tdz-event-artwork {
+  --tdz-sim: var(--sim);
+  --tdz-surface: var(--em-panel);
+  --tdz-halo-position: right center;
+  --tdz-artwork:
+    radial-gradient(ellipse at var(--tdz-halo-position), color-mix(in srgb, var(--tdz-sim) 24%, transparent), transparent 52%),
+    linear-gradient(132deg, transparent 69%, color-mix(in srgb, var(--tdz-sim) 9%, transparent) 69% 77%, transparent 77% 83%, color-mix(in srgb, var(--tdz-sim) 12%, transparent) 83% 89%, transparent 89%),
+    linear-gradient(110deg, var(--tdz-surface) 37%, color-mix(in srgb, var(--tdz-sim) 11%, var(--tdz-surface)));
+  --kind: var(--tdz-sim);
+  --event-accent: var(--tdz-sim) !important;
+  border-color: color-mix(in srgb, var(--tdz-sim) 64%, var(--em-border));
+}
+
+html[data-game] #app .tdz-event-artwork.sim-lmu { --tdz-sim: var(--em-kind-lmu); }
+html[data-game] #app .tdz-event-artwork.sim-iracing { --tdz-sim: var(--em-kind-iracing); }
+
+html[data-game] #app .tdz-event-artwork.race-header,
+html[data-game] #app .tdz-event-artwork .race-card-body,
+html[data-game] #app .tdz-event-artwork .week-block-band {
+  background: var(--tdz-artwork);
+}
+
+@media (max-width: 760px) {
+  html[data-game] #app .tdz-event-artwork.race-header { --tdz-halo-position: center bottom; }
+  html[data-game] #app .tdz-event-artwork.week-block::before { background: var(--tdz-artwork); }
+}
