@@ -11,7 +11,22 @@ for(const count of [1,2])for(const tdz of [false,true])test(`solo header ${tdz?'
  await expect(page.locator('.race-header .event-access-logo')).toBeVisible();
  await expect(page.locator('.race-side .event-sim-badge')).toBeVisible();
  if(tdz)await expect(page.locator('.race-side .event-access-badge')).toBeVisible();
- const title=await page.locator('.race-head h1').boundingBox(),date=await page.locator('.race-date').boundingBox();expect(Math.abs(title.y-date.y)).toBeLessThan(15);
+ const title=await page.locator('.race-head h1').boundingBox(),date=await page.locator('.race-date').boundingBox();
+ if(tdz&&page.viewportSize().width<=760){
+   const logo=await page.locator('.race-header .event-access-logo').boundingBox();
+   expect(title.y).toBeGreaterThanOrEqual(date.y+date.height);
+   expect(logo.x).toBeGreaterThan(title.x);
+   expect(logo.y).toBeLessThan(title.y+title.height);
+   if(count===1){
+     const settings=await page.getByRole('region',{name:'Réglages de course'}).boundingBox();
+     expect(settings.y).toBeGreaterThanOrEqual(logo.y+logo.height);
+     expect(settings.width).toBeGreaterThan(title.width);
+   }
+   expect(await page.locator('.race-header').evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+   const share=await page.locator('.race-controls [data-action="share-event"]').boundingBox();
+   const menu=await page.locator('.race-controls .race-actions-menu > summary').boundingBox();
+   expect(share.x+share.width).toBeLessThan(menu.x);
+ }else expect(Math.abs(title.y-date.y)).toBeLessThan(15);
  await expect(page.locator('.race-header')).not.toContainText('test-password');
  await expect(page.locator('.race-controls [data-action="share-event"]')).toBeVisible();
  if(count===1){await expect(page.locator('.solo-session-row').first()).toContainText('Essais · 5 min');await expect(page.locator('.solo-session-row').first()).toContainText('Qualifs · 10 min');await expect(page.locator('.solo-session-row').nth(1)).toContainText('Carburant · ×2');}

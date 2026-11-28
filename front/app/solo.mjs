@@ -187,7 +187,8 @@ export function soloHeaderChips(event){
   const session=(training?chip('Entraînement',training):[chip('Essais',minutes(round.practice)),chip('Qualifs',minutes(round.qualifying)),chip('Course',minutes(round.durationMinutes))].join(''))+chip('📺 Stream',stream);
   const conditions=[chip('Météo',weather?.[2]),chip('Carburant',round.fuel!=null?`×${round.fuel}`:''),chip('Pneus',round.tyres!=null?`×${round.tyres}`:'')].join('');
   const cars=chip('Voiture',round.car)||chip('Catégorie',round.randomCategory?'Aléatoire':(round.categories||[]).join(' / ')||round.category);
-  return `<div class="solo-session-chips">${[session,conditions,cars].filter(Boolean).map(row=>`<div class="solo-session-row">${row}</div>`).join('')}</div>`;
+  const rows=[session,conditions,cars].filter(Boolean);
+  return rows.length?`<section class="solo-session-chips" aria-label="Réglages de course">${rows.map(row=>`<div class="solo-session-row">${row}</div>`).join('')}</section>`:'';
 }
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
