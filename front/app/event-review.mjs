@@ -47,15 +47,15 @@ export async function mountEventReview(panel,eventId) {
       <div class="event-review-scale"><span>Insatisfait</span><span>Excellent</span></div>
     </div></fieldset>
     <label>Commentaire (facultatif)<textarea name="comment" maxlength="1000" rows="3" placeholder="Une suggestion sur le format, la durée, l’organisation…">${esc(data.own?.comment||'')}</textarea></label>
-    <small>Ton pseudo, ta note et ton commentaire seront visibles par les membres de cette communauté pendant 30 jours après l’événement. Les réponses sont également publiques dans la communauté. Seuls la moyenne et le nombre de votes sont conservés ensuite.</small>
-    ${data.own&&!data.own.public?'<p>Ton ancien avis reste privé tant que tu ne le republies pas.</p>':''}<label class="event-review-consent"><input type="checkbox" name="public" required ${data.own?.public?'checked':''}> Je confirme la publication de mon avis avec mon pseudo.</label>
-    <div class="event-review-actions"><button class="primary-button" type="submit">${data.own?'Modifier mon avis':'Envoyer mon avis'}</button>${data.own?'<button class="secondary-button" type="button" data-delete-review>Supprimer mon avis</button>':''}<span role="status"></span></div></form>`);
+    <small class="event-review-visibility">Ton avis est visible avec ton pseudo par la communauté pendant 30 jours.</small>
+    ${data.own&&!data.own.public?'<small class="event-review-visibility">Ton ancien avis reste anonyme jusqu’à sa republication.</small>':''}
+    <div class="event-review-actions"><button class="primary-button" type="submit">${data.own?.public?'Modifier mon avis':'Publier mon avis'}</button>${data.own?'<button class="secondary-button" type="button" data-delete-review>Supprimer mon avis</button>':''}<span role="status"></span></div></form>`);
   const form=panel.querySelector('form'), status=form.querySelector('[role=status]');
   bindRatingPicker(form,data.own?.rating??3.5);
   const save=async(method)=>{
     const buttons=[...form.querySelectorAll('button')]; buttons.forEach(b=>b.disabled=true);
     try {
-      await api(path,method,method==='PUT'?{rating:Number(form.elements.rating.value),comment:form.elements.comment.value,public:form.elements.public.checked}:undefined);
+      await api(path,method,method==='PUT'?{rating:Number(form.elements.rating.value),comment:form.elements.comment.value,public:true}:undefined);
       await mountEventReview(panel,eventId);
       if (panel.isConnected) panel.insertAdjacentHTML('beforeend','<p role="status">Ton avis a été enregistré.</p>');
     } catch(error) {status.textContent=error.message;}
