@@ -30,6 +30,12 @@
   --em-kind-bouloules: #ef8197;
   --em-kind-gridfest: #f47c57;
   --em-kind-stream: #a970ff;
+  /* Geometry shared by the compact race cards on mobile. */
+  --em-compact-race-panel: max(76px, 29%);
+  --em-compact-race-height: 104px;
+  --em-compact-race-cut: 10%;
+  --em-compact-race-shape: polygon(0 0, 100% 0, calc(100% - var(--em-compact-race-cut)) 100%, 0 100%);
+  --em-compact-race-divider: polygon(calc(100% - 2px) 0, 100% 0, calc(100% - var(--em-compact-race-cut)) 100%, calc(100% - var(--em-compact-race-cut) - 2px) 100%);
   /* Sizes */
   --em-text-xs: 11.5px;
   --em-text-sm: 13px;
