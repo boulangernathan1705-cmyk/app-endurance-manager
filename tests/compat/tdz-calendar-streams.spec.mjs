@@ -101,3 +101,46 @@ test('a streamed iRacing endurance shows in the events list and under the home Â
   await expect(page.locator('.week-grid')).not.toContainText('Stream du Nurburgring');
   expect(errors).toEqual([]);
 });
+
+test('TDZ logo and endurance photo share the same mobile panel in the home',async({page})=>{
+  test.skip((page.viewportSize()?.width||0)>760,'Mobile card layout');
+  await page.clock.setFixedTime(new Date('2026-11-25T10:00:00Z'));
+  const date='2026-11-25', startsAt=Date.parse(date+'T20:00:00Z');
+  const departure={id:'start',date,time:'21:00',startsAt,endsAt:startsAt+3600000,availability:[],crews:[]};
+  const tdz={id:'tdz-sample',name:'Course TDZ de test',format:'solo',sim:'lmu',access:'safe',details:{type:'SAFE',streamTime:'21:00',streamEnd:'23:00'},
+    circuit:'cota',rounds:[{circuit:'cota',durationMinutes:30,practice:10,qualifying:5}],categories:[],version:1,absences:[],departures:[departure]};
+  const endu={id:'endurance-sample',name:'Course endurance de test',format:'endurance',circuit:'cota',eventType:'lmu',
+    categories:['Hypercar'],durationMinutes:120,version:1,absences:[],departures:[{...departure,id:'endurance-start'}]};
+  await page.route('**/api/**',route=>{
+    const url=new URL(route.request().url());
+    let data={ok:true};
+    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_safe'],
+      soloRaces:true,eventTdz:true,eventTypes:['OPEN','SAFE'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
+    else if(['/api/events','/api/races'].includes(url.pathname))data={events:url.searchParams.get('game')==='iracing'?[]:[tdz,endu]};
+    else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
+    return route.fulfill({json:data});
+  });
+  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');document.cookie='em_sim=lmu; Path=/';});
+  await page.goto('/lmu/#accueil');
+  await page.getByRole('button',{name:'Tout',exact:true}).click();
+  const track=page.locator('.week-block.is-endurance .endurance-card-head').first();
+  const week=page.locator('.week-block.tdz-event-artwork',{hasText:tdz.name});
+  const geometry=(element,pseudo)=>[parseFloat(getComputedStyle(element,pseudo).width),getComputedStyle(element,pseudo).clipPath,getComputedStyle(element,'::after').clipPath];
+  await expect(track).toBeVisible();
+  const reference=await track.evaluate(geometry,null);
+  const weekPanel=await week.evaluate(geometry,'::before');
+  expect(weekPanel[0]).toBeCloseTo(reference[0],1);
+  expect(weekPanel.slice(1)).toEqual(reference.slice(1));
+  expect(reference[1]).toContain('polygon');
+  await page.getByRole('button',{name:'Liste',exact:true}).click();
+  const list=page.locator('.tdz-agenda .race-card.tdz-event-artwork',{hasText:tdz.name});
+  await expect(list.locator('.solo-card-stream')).toBeVisible();
+  await expect(list.locator('.solo-card-start')).toBeVisible();
+  await expect(list.locator('img.event-access-logo')).toHaveAttribute('src','/images/event-access/safe-lmu.png');
+  const listPanel=await list.locator('.race-card-type-logo').evaluate(geometry,null);
+  expect(listPanel[0]).toBeCloseTo(reference[0],1);
+  expect(listPanel.slice(1)).toEqual(reference.slice(1));
+  expect(await list.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(0);
+  await list.click();
+  await expect(page.locator('.race-header h1')).toContainText(tdz.name);
+});

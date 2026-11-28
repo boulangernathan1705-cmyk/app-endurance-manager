@@ -23,29 +23,155 @@ html[data-game] #app .tdz-event-artwork .week-block-band {
 
 @media (max-width: 760px) {
   html[data-game] #app .tdz-event-artwork.race-header { --tdz-halo-position: center bottom; }
-  html[data-game] #app .tdz-event-artwork.week-block { --tdz-logo-cut: 10%; }
 
-  /* Cut the background and divider on the same diagonal, leaving the logo whole. */
+  html[data-game] #app .tdz-event-artwork.week-block {
+    grid-template-columns: var(--em-compact-race-panel) minmax(0, 1fr);
+    min-height: var(--em-compact-race-height);
+    column-gap: 6px;
+    padding: 0;
+  }
+
   html[data-game] #app .tdz-event-artwork.week-block::before,
   html[data-game] #app .tdz-event-artwork.week-block::after {
     position: absolute;
     inset: 0 auto 0 0;
-    width: var(--week-logo-panel);
+    width: var(--em-compact-race-panel);
     pointer-events: none;
   }
 
-  html[data-game] #app .tdz-event-artwork.week-block::before {
+  html[data-game] #app .tdz-event-artwork.week-block::before,
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-type-logo {
     background: var(--tdz-artwork);
-    clip-path: polygon(0 0, 100% 0, calc(100% - var(--tdz-logo-cut)) 100%, 0 100%);
+    clip-path: var(--em-compact-race-shape);
   }
 
-  html[data-game] #app .tdz-event-artwork.week-block::after {
+  html[data-game] #app .tdz-event-artwork.week-block::after,
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-type-logo::after {
     content: "";
     background: var(--tdz-sim);
-    clip-path: polygon(calc(100% - 2px) 0, 100% 0, calc(100% - var(--tdz-logo-cut)) 100%, calc(100% - var(--tdz-logo-cut) - 2px) 100%);
+    clip-path: var(--em-compact-race-divider);
   }
 
   html[data-game] #app .tdz-event-artwork.week-block .week-block-logo {
-    margin-inline-end: 4px;
+    width: min(72%, 84px);
+    height: auto;
+    aspect-ratio: 1;
+    margin-inline-end: 8%;
+  }
+
+  html[data-game] #app .tdz-event-artwork.week-block .week-block-body {
+    grid-column: 2;
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    padding: 4px 7px 4px 3px;
+  }
+
+  html[data-game] #app .tdz-event-artwork.week-block .week-block-body > * {
+    grid-column: 1;
+  }
+
+  html[data-game] #app button.race-card.tdz-event-artwork > .race-card-body {
+    display: grid !important;
+    grid-template: auto / var(--em-compact-race-panel) minmax(0, 1fr) !important;
+    gap: 0 6px !important;
+    min-height: var(--em-compact-race-height);
+    align-items: stretch;
+    background: var(--em-panel-2);
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-type-logo {
+    grid-area: 1 / 1;
+    position: relative;
+    inset: auto;
+    display: grid;
+    place-items: center;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    padding: 0 8% 0 0;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-type-logo::after {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .event-access-logo {
+    width: min(78%, 84px);
+    height: auto;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-content {
+    grid-area: 1 / 2;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px 7px 4px 3px;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-card-top,
+  html[data-game] #app .tdz-event-artwork.race-card :is(.solo-card-info, .solo-info-row) {
+    display: contents;
+  }
+
+  /* The day is already above the list. The race page keeps the session details. */
+  html[data-game] #app .tdz-event-artwork.race-card :is(.race-card-top > .race-date, .solo-round-lines, .solo-info-row > :not(.solo-card-stream, .solo-card-training), .solo-fill-bar) {
+    display: none;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    overflow-wrap: anywhere;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-head .event-name {
+    font-size: 15.5px;
+    line-height: 1.12;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .race-meta {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .event-badge-row {
+    order: -1;
+    gap: 3px;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .solo-card-stream {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--em-kind-stream);
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .solo-card-foot {
+    gap: 3px var(--em-space-2);
+    margin-top: 0;
+    padding-top: 3px;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .solo-card-start {
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    font-size: var(--em-text-sm);
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .solo-fill {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  html[data-game] #app .tdz-event-artwork.race-card .solo-fill-copy,
+  html[data-game] #app .tdz-event-artwork.race-card .solo-fill-copy strong {
+    font-size: var(--em-text-xs);
   }
 }

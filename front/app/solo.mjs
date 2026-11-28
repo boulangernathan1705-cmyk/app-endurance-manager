@@ -84,7 +84,7 @@ const ICONS = {
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
 };
-const infoChip = (icon, value, title) => `<span class="solo-info-chip" title="${esc(title)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon]}</svg><span>${esc(value)}</span></span>`;
+const infoChip = (icon, value, title, variant = '') => `<span class="solo-info-chip${variant}" title="${esc(title)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon]}</svg><span>${esc(value)}</span></span>`;
 // The event's details on the calendar card: per round its sessions, weather, multipliers and car, then the
 // schedule of an open session, the server password and the note.
 export function soloCardInfo(event) {
@@ -103,7 +103,7 @@ export function soloCardInfo(event) {
       rounds.length > 1 ? `<span class="solo-info-circuit">${esc(eventCircuitName(event, round.circuit))}</span>` : '',
       round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire"><span aria-hidden="true">❓</span><span>Catégorie aléatoire</span></span>' : '',
       ...(round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`),
-      training ? infoChip('time', `Entraînement ${training}`, 'Horaires de l’entraînement') : infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
+      training ? infoChip('time', `Entraînement ${training}`, 'Horaires de l’entraînement', ' solo-card-training') : infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
       weather ? `<span class="solo-info-chip solo-info-weather" title="Météo : ${esc(weather[2])}"><span aria-hidden="true">${weather[1]}</span><span class="sr-only">${esc(weather[2])}</span></span>` : '',
       round.fuel != null ? infoChip('fuel', `×${round.fuel}`, 'Consommation de carburant') : '',
       round.tyres != null ? infoChip('tyres', `×${round.tyres}`, 'Usure des pneus') : '',
@@ -115,7 +115,7 @@ export function soloCardInfo(event) {
   const roundLine = (round, index) => `<span class="solo-round-line"><span class="solo-round-label">Manche ${index + 1}</span><span class="solo-round-name">${esc(eventCircuitName(event, round.circuit))}</span><span class="solo-round-cats">${round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire">❓</span>' : (round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`).join('')}</span>${infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)')}</span>`;
   // The server password is not on the card: on the event page, for its pilots only.
   const extra = [
-    details.streamTime ? `<span class="solo-info-chip" title="Stream"><span aria-hidden="true">📺</span><span>${esc(streamSpan(details.streamTime, details.streamEnd))}</span></span>` : '',
+    details.streamTime ? `<span class="solo-info-chip solo-card-stream" title="Stream"><span aria-hidden="true">📺</span><span>${esc(streamSpan(details.streamTime, details.streamEnd))}</span></span>` : '',
     details.note ? infoChip('info', details.note, 'Info') : '',
   ].filter(Boolean);
   if (rounds.length > 1) return `<span class="solo-card-info"><span class="solo-round-lines">${rounds.map(roundLine).join('')}</span>${extra.length ? `<span class="solo-info-row">${extra.join('')}</span>` : ''}</span>`;
