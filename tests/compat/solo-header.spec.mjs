@@ -21,6 +21,12 @@ for(const count of [1,2])for(const tdz of [false,true])test(`solo header ${tdz?'
      const settings=await page.getByRole('region',{name:'Réglages de course'}).boundingBox();
      expect(settings.y).toBeGreaterThanOrEqual(logo.y+logo.height);
      expect(settings.width).toBeGreaterThan(title.width);
+     const card=page.locator('.race-header > .race-card-top');
+     const settingsRegion=page.getByRole('region',{name:'Réglages de course'});
+     expect(await card.evaluate(el=>getComputedStyle(el,'::before').gridRowEnd)).toBe('-1');
+     expect(await settingsRegion.evaluate(el=>getComputedStyle(el).borderLeftWidth)).toBe('0px');
+     expect(await settingsRegion.locator('.solo-session-pill svg').count()).toBeGreaterThan(0);
+
    }
    expect(await page.locator('.race-header').evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
    const share=await page.locator('.race-controls [data-action="share-event"]').boundingBox();
