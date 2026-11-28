@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-import {reviewOpensAt,eligibleReviewUsers,validateReview,REVIEW_GRACE} from '../server/event-reviews.mjs';
+import {reviewOpensAt,eligibleReviewUsers,validateReview,validateReply,purgeEventDiscussions,REVIEW_RETENTION,REVIEW_GRACE} from '../server/event-reviews.mjs';
 const race={departures:JSON.stringify([{id:'a',startsAt:1000},{id:'b',startsAt:2000}]),duration_minutes:1440,format:'endurance'};
 test('reviews open after last finish, never at archive/start',()=>{
  assert.equal(reviewOpensAt(race),2000+1440*60000+REVIEW_GRACE);
@@ -45,4 +45,26 @@ test('half-star migration preserves old votes, enforces increments and keeps for
   db.exec("DELETE FROM event_review_eligible WHERE user_id='u'");
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM event_reviews').get().count,0);
  } finally {db.close();}
+});
+
+test('discussion migration keeps anonymous votes private and expiry removes content but keeps aggregate',async()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  db.exec("PRAGMA foreign_keys=ON; CREATE TABLE events(id TEXT PRIMARY KEY); CREATE TABLE communities(id TEXT PRIMARY KEY); CREATE TABLE users(id TEXT PRIMARY KEY); CREATE TABLE notifications(id TEXT PRIMARY KEY,event_id TEXT,community_id TEXT,kind TEXT);");
+  for(const migration of ['0107_event_reviews.sql','0108_event_review_half_stars.sql'])db.exec(readFileSync(new URL('../migrations/'+migration,import.meta.url),'utf8'));
+  db.exec("INSERT INTO events VALUES('e'); INSERT INTO communities VALUES('c'); INSERT INTO users VALUES('u'),('v'); INSERT INTO event_review_sessions VALUES('e','c',1000,2000); INSERT INTO event_review_eligible VALUES('e','c','u'),('e','c','v'); INSERT INTO event_reviews VALUES('e','c','u',4.5,'ancien',1,1);");
+  db.exec(readFileSync(new URL('../migrations/0109_event_review_discussions.sql',import.meta.url),'utf8'));
+  const old=db.prepare('SELECT public,review_key FROM event_reviews').get();assert.equal(old.public,0);assert.ok(old.review_key);
+  db.exec("INSERT INTO event_reviews(event_id,community_id,user_id,rating,comment,created_at,updated_at,public,review_key) VALUES('e','c','v',3.5,'public',1,1,1,'key'); INSERT INTO event_review_replies VALUES('reply','key','u','Pseudo','réponse',1,1); INSERT INTO notifications VALUES('n','e','c','event_review_reply');");
+  const env={DB:{prepare(sql){return {bind(...args){return {all:async()=>({results:db.prepare(sql).all(...args)}),run:async()=>db.prepare(sql).run(...args)}}}},async batch(stmts){db.exec('BEGIN');try{for(const s of stmts)await s.run();db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}}}};
+  assert.equal(await purgeEventDiscussions(env,1000+REVIEW_RETENTION-1),0);
+  assert.equal(await purgeEventDiscussions(env,1000+REVIEW_RETENTION),1);
+  assert.deepEqual({...db.prepare('SELECT archived_count,archived_sum FROM event_review_sessions').get()},{archived_count:2,archived_sum:8});
+  for(const table of ['event_reviews','event_review_eligible','event_review_replies','notifications'])assert.equal(db.prepare('SELECT COUNT(*) AS n FROM '+table).get().n,0);
+  assert.equal(await purgeEventDiscussions(env,1000+REVIEW_RETENTION+1),0);
+ }finally{db.close();}
+});
+test('reply text is required, Unicode is accepted and length is bounded',()=>{
+ assert.equal(validateReply({comment:'  C’est bien ! 🏁 '}),'C’est bien ! 🏁');
+ for(const comment of ['', '   ', 1, 'x'.repeat(1001)])assert.throws(()=>validateReply({comment}));
 });
