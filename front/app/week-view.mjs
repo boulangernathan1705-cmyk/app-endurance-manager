@@ -153,11 +153,11 @@ function block(item,now){
   const label=`${pending?'Horaire à définir':several?starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(', '):hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
   // An event takes its simulator's colour, as its card on the events page (Nathan 2026-11-01).
   const sim2=!solo?` is-${event.otherGame||activeGame}`:kind.key==='event'?` sim-${simForEvent(event)}`:'';
-  // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
-  // championship endurances. Other races keep their simulator's colour.
+  // Keep the kind for format-specific details. TDZ race artwork follows the simulator.
+  const tdzArtwork=state.eventTdz&&kind.key==='event'?' tdz-event-artwork':'';
   const type=solo?(state.eventTdz||isGrindfest(event)||stream?calendarType(event):''):event.eventType==='special'?'special':event.eventType==='lmu'?'championnat':'';
   const panorama=solo?'':endurancePreviewClass(event,enduSim);
-  const cls=`week-block is-${kind.key}${sim2}${panorama}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  const cls=`week-block is-${kind.key}${sim2}${panorama}${tdzArtwork}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
