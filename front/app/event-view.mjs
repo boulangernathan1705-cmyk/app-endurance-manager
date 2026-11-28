@@ -1,3 +1,4 @@
+import {mountEventReview} from './event-review.mjs';
 import {memoHref} from '../../shared/memo-links.mjs';
 import {contextHelpMarker as helpContext} from './core.mjs';
 import {calendarType} from './season-calendar.mjs';
@@ -283,6 +284,9 @@ export function renderEvent(message=''){
   const detailContent=`<div class="race-card-top endurance-detail-content"><div class="race-head"><div class="endurance-detail-meta">${raceDate}${badges}</div><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${esc(circuitLabel(event.circuit,game))}</span>${raceInfoChips(event)}</div></div>`;
   const header=solo?`<div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${(event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`}${!isStream(event)?soloHeaderTime(event,next):''}</span>${soloHeaderChips(event)}</div>${eventTypePanel(event)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}`:`<div class="endurance-detail-hero">${enduranceHeader(event,sim)}${circuitVisual(event.circuit)}${panorama?detailContent:''}</div>${panorama?'':detailContent}`;
   app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${solo?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:` is-endurance-detail endurance-sim-${sim}${panorama}`}${isGrindfest(event)?' is-gridfest':''}"${solo?` data-race-kind="${calendarType(event)}"`:''} data-event-id="${event.id}">${header}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${memo?`<a class="secondary-button" href="${esc(memo)}">Fiche mémo</a>`:''}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${isStream(event)?'':absencesSection(event,!!(next||undated.length))}`}`;
+  if(state.eventReviews && !isStream(event) && !event.schedulePending && !event.officialScheduleStatus && (event.departures||[]).some(d=>!d.tbd&&d.startsAt<=now)) {
+    const panel=document.createElement('section'); panel.className='event-review-panel'; app.append(panel); mountEventReview(panel,event.id);
+  }
   if(days.length)syncPlanning(app);
   notifyRender();
 }

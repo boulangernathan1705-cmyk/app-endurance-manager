@@ -40,6 +40,7 @@ import {combosApi, combosPlugin, combosEnabled} from './combos.mjs';
 
 import {botRecapSettings} from './recap-discord.mjs';
 import {parseLayout} from './discord-layout.mjs';
+import {eventReviewsApi} from './event-reviews.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {dropEmptyCommonStart, waitingMoves, askToChooseStart} from './event-departures.mjs';
 // "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
@@ -126,7 +127,7 @@ async function api(request, env) {
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
   // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), tdzSeason:access.status === 'member' && soloRacesEnabled(env, community) && tdzOnly(community, isDevelopment(env)) ? await communitySeason(env, community).catch(() => null) : null, eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, eventReviews:community.modules?.eventReviews === true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), tdzSeason:access.status === 'member' && soloRacesEnabled(env, community) && tdzOnly(community, isDevelopment(env)) ? await communitySeason(env, community).catch(() => null) : null, eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // The community's stream link (« Annonce du jour »), for the events it streams on the week (members only).
     mayStream:access.status === 'member' && await mayStream(env, {permissions:access.permissions}, community, actor),
     communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
@@ -170,6 +171,8 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
+  const reviews = await eventReviewsApi(path,method,request,env,actor,community);
+  if (reviews) return reviews;
   // Fiches combo (server/combos.mjs).
   const combos = await combosApi(path, method, request, env, actor, community);
   if (combos) return combos;

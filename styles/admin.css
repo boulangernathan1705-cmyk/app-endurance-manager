@@ -258,3 +258,6 @@ img.admin-preview-badge { width: 22px; min-width: 0; padding: 0; border: 0; bord
 .platform-row.platform-report { grid-template-columns: minmax(0, 1fr) auto; }
 .platform-report span { color: var(--em-muted); font-size: var(--em-text-sm); }
 .platform-report p { margin: var(--em-space-1) 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+
+.admin-review-item{padding:12px 0;border-bottom:1px solid var(--border,#39404a)}
+.admin-review-item p{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0}

@@ -296,3 +296,19 @@
     max-width:440px!important;
   }
 }
+
+/* Optional post-event review (native radio controls remain accessible). */
+.event-review-panel:empty{display:none}
+.event-review-panel{margin-top:16px;padding:16px;border:1px solid var(--border, #39404a);border-radius:12px}
+.event-review-panel h2{margin:0 0 12px;font-size:18px}
+.event-review-form{display:grid;gap:12px;max-width:640px}
+.event-review-form fieldset{border:0;margin:0;padding:0}
+.event-review-stars{display:flex;gap:8px;flex-wrap:wrap}
+.event-review-stars label{position:relative;display:flex;align-items:center;gap:4px;cursor:pointer}
+.event-review-stars input{accent-color:#eab54a}
+.event-review-stars label span[aria-hidden]{font-size:26px;color:#8a8a8a}
+.event-review-stars label:has(input:checked) span[aria-hidden],.event-review-stars label:has(~label input:checked) span[aria-hidden]{color:#eab54a}
+.event-review-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.event-review-form textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;resize:vertical}
+.event-review-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.event-review-average span{color:#eab54a}
