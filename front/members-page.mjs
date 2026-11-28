@@ -195,7 +195,7 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}
       : {key:'soloRaces', name:'EVENT SOLO', sub:'Un calendrier d’events : inscription en un clic, liste d’attente.', tip:'Les events de toutes les simus, avec des places limitées si besoin et une liste d’attente.'},
     {key:'categoryEntry', name:'Inscription par catégorie', sub:'Le pilote choisit ses catégories, les responsables forment les équipages.', tip:'Sur une course à plusieurs départs, le pilote coche ses catégories et ses départs possibles. Seuls les responsables d’équipage (autorisation « Équipages ») forment les équipages.'},
-    {key:'eventReviews', name:'Avis des pilotes', sub:'Une note et un commentaire facultatif après les événements.', tip:'Les participants donnent une note de 1 à 5 étoiles. Les commentaires anonymisés sont réservés aux administrateurs.'},
+    {key:'eventReviews', name:'Avis des pilotes', sub:'Une note et un commentaire facultatif après les événements.', tip:'Les participants donnent une note de 0,5 à 5 étoiles, par demi-étoile. Les commentaires anonymisés sont réservés aux administrateurs.'},
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', sub:'Inscription par streamer.', tip:'Le pilote choisit le streamer qu’il représente et donne son nom en jeu ; le mot de passe arrive par message privé Discord.'}] : [])];
   const line = item => `<article class="adm-module${states[item.key] ? ' is-on' : ''}" data-module-tile="${item.key}">
     <div class="adm-module-line"><span class="admin-module-icon">${icon(item.key)}</span>
