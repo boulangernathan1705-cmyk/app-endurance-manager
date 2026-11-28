@@ -253,21 +253,20 @@ test('endurance-lmu-panoramas',async({page},testInfo)=>{
   await page.goto('/lmu/');
   const cards=page.locator('button.race-card.is-endurance.endurance-preview');
   await expect(cards).toHaveCount(18);
-  const audit=await cards.evaluateAll(async items=>Promise.all(items.map(async card=>{
-    const id=[...card.classList].find(c=>c.startsWith('endurance-preview-track-')).slice('endurance-preview-track-'.length);
-    card.classList.add('is-panorama-preview');
-    const body=card.querySelector('.race-card-body'),style=getComputedStyle(body),img=new Image();
-    img.src='/images/endurance/lmu-pano/'+id+'.webp';let loaded=true;try{await img.decode();}catch{loaded=false;}
-    const ok=loaded&&img.naturalWidth>img.naturalHeight&&style.backgroundImage.includes(img.getAttribute('src'))&&body.scrollWidth<=body.clientWidth+1;
-    card.classList.remove('is-panorama-preview');return {id,ok};
-  })));
-  expect(audit.filter(a=>!a.ok)).toEqual([]);
+  test.skip(!await page.evaluate(()=>matchMedia('(hover:hover) and (pointer:fine)').matches),'Panoramas use mouse hover');
   await page.evaluate(()=>document.fonts.ready);
-  await cards.locator('img').evaluateAll(async imgs=>Promise.all(imgs.map(async img=>{img.loading='eager';await img.decode().catch(()=>{});})));
-  // Keep groups small enough to review through the GitHub image viewer.
+  await cards.locator('img').evaluateAll(async imgs=>Promise.all(imgs.map(async img=>{img.loading='eager';await img.decode().catch(()=>{}); })));
   for(let i=0;i<18;i++){
-    const card=cards.nth(i);await card.evaluate(el=>el.classList.add('is-panorama-preview'));
-    await expect(card).toHaveScreenshot('endurance-pano-'+audit[i].id+'.png',{timeout:20000});
-    await card.evaluate(el=>el.classList.remove('is-panorama-preview'));
+    const card=cards.nth(i);
+    await card.hover();
+    const result=await card.evaluate(async el=>{
+      const id=[...el.classList].find(c=>c.startsWith('endurance-preview-track-')).slice('endurance-preview-track-'.length);
+      const body=el.querySelector('.race-card-body'),img=new Image();
+      img.src='/images/endurance/lmu-pano/'+id+'.webp';
+      await img.decode();
+      return {id,ok:img.naturalWidth>img.naturalHeight&&getComputedStyle(body).backgroundImage.includes(img.getAttribute('src'))&&body.scrollWidth<=body.clientWidth+1};
+    });
+    expect(result.ok).toBe(true);
+    await expect(card).toHaveScreenshot('endurance-pano-'+result.id+'.png',{timeout:20000});
   }
 });
