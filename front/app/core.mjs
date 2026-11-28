@@ -175,7 +175,7 @@ export async function load() {
   // Solo races and SAFE drivers only where the site enables them (dev for now).
   state.soloRaces=session.soloRaces===true;state.iracingImport=session.iracingImport===true;
   // « Inscription par catégorie » (module): one entry for the race, its categories and starts; the TM makes the crews.
-  state.categoryEntry=session.categoryEntry===true;
+  state.categoryEntry=session.categoryEntry===true; state.eventReviews=session.eventReviews===true;
   if (typeof session.soloLabel==='string' && session.soloLabel) state.soloLabel=session.soloLabel;
   state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.

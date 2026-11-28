@@ -63,6 +63,7 @@ function memberCard(member, allPermissions) {
 // - « Apparence »: name, colour, banner, with a preview of the site.
 // Plus « Plateforme » for the managers of Endurance Manager. Every setting is in one place only.
 const ICONS = {
+  eventReviews:'<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/>',
   overview:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .6 3.2 2.4 3.6 5.4"/>',
   modules:'<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
@@ -81,7 +82,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
   return {discord:Boolean(setup.botRecap?.enabled),
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true, combos:settings.modules.combos === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true, combos:settings.modules.combos === true, eventReviews:settings.modules.eventReviews === true};
 }
 
 // A ⓘ that explains in a bubble (front/tooltip.mjs).
@@ -180,7 +181,7 @@ function membersMarkup(result, settings) {
 
 // Short names of the permissions (the chips) and of the modules (overview).
 const PERMISSION_SHORT = {access:'Accès au site', endurance:'Endurances', solo_open:'Events OPEN', solo_safe:'Events SAFE', crews:'Équipages', combos:'Plugin SimHub', admin:'Administrer'};
-const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Plugin SimHub'], ['grindfest', 'Gridfest']];
+const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Plugin SimHub'], ['grindfest', 'Gridfest'], ['eventReviews', 'Avis des pilotes']];
 
 // « Modules »: one line each, its switch on the right (saved at once), its settings below when it has some.
 function modulesMarkup(settings, setup) {
@@ -194,6 +195,7 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}
       : {key:'soloRaces', name:'EVENT SOLO', sub:'Un calendrier d’events : inscription en un clic, liste d’attente.', tip:'Les events de toutes les simus, avec des places limitées si besoin et une liste d’attente.'},
     {key:'categoryEntry', name:'Inscription par catégorie', sub:'Le pilote choisit ses catégories, les responsables forment les équipages.', tip:'Sur une course à plusieurs départs, le pilote coche ses catégories et ses départs possibles. Seuls les responsables d’équipage (autorisation « Équipages ») forment les équipages.'},
+    {key:'eventReviews', name:'Avis des pilotes', sub:'Une note et un commentaire facultatif après les événements.', tip:'Les participants donnent une note de 1 à 5 étoiles. Les commentaires anonymisés sont réservés aux administrateurs.'},
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', sub:'Inscription par streamer.', tip:'Le pilote choisit le streamer qu’il représente et donne son nom en jeu ; le mot de passe arrive par message privé Discord.'}] : [])];
   const line = item => `<article class="adm-module${states[item.key] ? ' is-on' : ''}" data-module-tile="${item.key}">
     <div class="adm-module-line"><span class="admin-module-icon">${icon(item.key)}</span>
@@ -329,9 +331,10 @@ async function load() {
     const overview = overviewMarkup(setup, settings, members);
     // The showcase (main address) has no Discord server and nobody real: only modules and appearance there.
     const sections = SECTIONS.filter(([key]) => !session.openSite || !['overview', 'roles', 'members', 'discord'].includes(key));
+    if (settings.modules.eventReviews && !session.openSite) sections.push(['eventReviews','Avis des pilotes']);
     if (platform) sections.push(['platform', 'Plateforme']);
     const panels = {overview:overview.html, roles:rolesMarkup(settings), members:membersMarkup(result, settings), discord:discordTabMarkup(setup, settings, settings.community),
-      modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform:platform ? `<p class="adm-intro">Visible seulement des gestionnaires d’Endurance Manager : les demandes, les communautés et le Discord officiel.</p>${platform}` : ''};
+      eventReviews:'<div data-event-review-admin></div>', modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform:platform ? `<p class="adm-intro">Visible seulement des gestionnaires d’Endurance Manager : les demandes, les communautés et le Discord officiel.</p>${platform}` : ''};
     const wanted = TAB_ALIASES[openTab || location.hash.slice(1)] || openTab || location.hash.slice(1);
     const current = sections.some(([key]) => key === wanted) ? wanted : sections[0][0];
     app.innerHTML = `<div class="crews-head adm-head"><h1 class="page-title">ADMINISTRATION</h1><p class="crews-lead">${esc(settings.community?.name || '')} · les réglages du site et du bot Discord.</p></div>
@@ -340,6 +343,7 @@ async function load() {
       </div>
       ${sections.map(([key]) => `<section class="adm-panel${key === 'platform' ? ' community-settings' : ''}" id="adm-panel-${key}" data-panel="${key}" role="tabpanel" aria-labelledby="adm-tab-${key}" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}`;
     openTab = current;
+    if(current==='eventReviews') void loadEventReviewAdmin();
     for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
     void fillTodo(session.community?.id);
     if (openModule === 'discord') openDiscordSheet(app, api, true);
@@ -393,7 +397,29 @@ function selectTab(key, focus = false) {
   }
   for (const panel of app.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== key;
   openTab = key;
+  if(key==='eventReviews') void loadEventReviewAdmin();
   history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
+}
+
+async function loadEventReviewAdmin(){
+  const root=app.querySelector('[data-event-review-admin]'); if(!root||root.dataset.loaded)return;
+  root.dataset.loaded='1';
+  const base='/api/event-reviews/admin';
+  async function show(offset=0,eventId='',name=''){
+    root.textContent='Chargement…';
+    try{
+      const data=await api(base+'?offset='+offset+(eventId?'&event='+encodeURIComponent(eventId):''));
+      if(!root.isConnected)return;
+      root.innerHTML='<h2>'+ (eventId?esc(name):'Avis des pilotes')+'</h2>'+(eventId?'<button class="secondary-button" type="button" data-review-back>Retour aux événements</button>':'<p class="adm-intro">Notes et commentaires anonymisés des participants.</p>')+
+        (eventId? (data.reviews.length?data.reviews.map(r=>'<article class="admin-review-item"><strong>Pilote anonyme · '+r.rating+'/5 ★</strong><p>'+esc(r.comment||'Aucun commentaire')+'</p></article>').join(''):'<p>Aucun avis.</p>') : (data.events.length?data.events.map(e=>'<article class="admin-review-item"><strong>'+esc(e.name)+'</strong><p>'+(e.average==null?'Aucune note':Number(e.average).toFixed(1).replace('.',',')+'/5 ★')+' · '+e.count+' avis</p><button class="secondary-button" type="button" data-review-event="'+esc(e.id)+'" data-review-name="'+esc(e.name)+'">Voir les avis</button></article>').join(''):'<p>Aucun événement évalué pour le moment.</p>'))+
+        '<div class="settings-actions">'+(offset?'<button class="secondary-button" type="button" data-review-prev>Précédent</button>':'')+(data.more?'<button class="secondary-button" type="button" data-review-next>Suivant</button>':'')+'</div>';
+      root.querySelectorAll('[data-review-event]').forEach(b=>b.addEventListener('click',()=>show(0,b.dataset.reviewEvent,b.dataset.reviewName)));
+      root.querySelector('[data-review-back]')?.addEventListener('click',()=>show());
+      root.querySelector('[data-review-prev]')?.addEventListener('click',()=>show(Math.max(0,offset-(eventId?50:20)),eventId,name));
+      root.querySelector('[data-review-next]')?.addEventListener('click',()=>show(offset+(eventId?50:20),eventId,name));
+    }catch(error){root.textContent=error.message;delete root.dataset.loaded;}
+  }
+  await show();
 }
 
 // Reloads the page content and comes back to the same tab.

@@ -126,7 +126,7 @@ export async function communityApi({path, method, request, env, actor, community
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community), botAvatarUrl:community.appearance?.botAvatarUrl || null}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true, combos:combosEnabled(community), combosManager:actor.manager === true},
+        eventReviews:community.modules.eventReviews === true, crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true, combos:combosEnabled(community), combosManager:actor.manager === true},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -197,6 +197,10 @@ export async function communityApi({path, method, request, env, actor, community
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
+    if (typeof input.eventReviews === 'boolean') {
+      if (input.eventReviews && modules.eventReviews !== true) modules.eventReviewsSince = Date.now();
+      modules.eventReviews = input.eventReviews;
+    }
     if (typeof input.grindfest === 'boolean') {
       if (!grindfestAvailable(community, isDevelopment(env))) fail(403, 'Le module Gridfest est réservé aux TDZ.');
       modules.grindfest = input.grindfest;

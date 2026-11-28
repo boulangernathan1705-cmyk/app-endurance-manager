@@ -6,7 +6,7 @@ import {id, now, fail, json} from './core.mjs';
 const KEEP_DAYS = 30;
 const LIST_SIZE = 30;
 const MAX_RECIPIENTS = 200;
-export const NOTIFICATION_KINDS = ['entry', 'entered_by', 'crew_join', 'crew_added', 'crew_leave', 'crew_removed', 'crew_deleted', 'crew_start', 'crew_car', 'withdrawn', 'removed_by', 'race_changed', 'choose_departure', 'race_deleted', 'race_reminder', 'crew_request', 'crew_request_accepted', 'crew_request_refused', 'discord_error'];
+export const NOTIFICATION_KINDS = ['entry', 'entered_by', 'crew_join', 'crew_added', 'crew_leave', 'crew_removed', 'crew_deleted', 'crew_start', 'crew_car', 'withdrawn', 'removed_by', 'race_changed', 'choose_departure', 'race_deleted', 'race_reminder', 'event_review', 'crew_request', 'crew_request_accepted', 'crew_request_refused', 'discord_error'];
 
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const game = event => String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
@@ -54,7 +54,7 @@ export async function notify(env, recipients, kind, event, {departure = null, sk
 }
 
 // Seen on this community's site: its own notifications and those of the official races (common to every community).
-const VISIBLE = 'user_id=? AND (community_id=? OR official=1)';
+const VISIBLE = "user_id=? AND (community_id=? OR official=1) AND (kind!='event_review' OR EXISTS(SELECT 1 FROM communities c WHERE c.id=notifications.community_id AND json_extract(c.modules,'$.eventReviews')=1))";
 
 export async function notificationsApi(path, method, env, actor, community) {
   if (path !== '/api/notifications' && path !== '/api/notifications/read') return null;
