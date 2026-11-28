@@ -297,18 +297,23 @@
   }
 }
 
-/* Optional post-event review (native radio controls remain accessible). */
+/* Optional post-event review: accessible native half-star slider. */
 .event-review-panel:empty{display:none}
 .event-review-panel{margin-top:16px;padding:16px;border:1px solid var(--border, #39404a);border-radius:12px}
 .event-review-panel h2{margin:0 0 12px;font-size:18px}
 .event-review-form{display:grid;gap:12px;max-width:640px}
 .event-review-form fieldset{border:0;margin:0;padding:0}
-.event-review-stars{display:flex;gap:8px;flex-wrap:wrap}
-.event-review-stars label{position:relative;display:flex;align-items:center;gap:4px;cursor:pointer}
-.event-review-stars input{accent-color:#eab54a}
-.event-review-stars label span[aria-hidden]{font-size:26px;color:#8a8a8a}
-.event-review-stars label:has(input:checked) span[aria-hidden],.event-review-stars label:has(~label input:checked) span[aria-hidden]{color:#eab54a}
-.event-review-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.event-review-picker{width:min(100%,320px);margin:12px auto 0;display:grid;gap:8px;justify-items:stretch}
+.event-review-score{margin:0;text-align:center;font-size:16px;color:inherit}
+.event-review-score strong{font-size:30px;line-height:1.15;color:#eab54a;font-variant-numeric:tabular-nums}
+.event-review-score span{opacity:.7}
+.event-review-stars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:center}
+.event-review-star{display:block;position:relative;cursor:pointer;aspect-ratio:1;--star-fill:0%}
+.event-review-star svg{display:block;width:100%;height:100%;fill:#777f8c;opacity:.65}
+.event-review-star-fill{display:block;position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--star-fill)) 0 0);pointer-events:none}
+.event-review-star-fill svg{fill:#eab54a;opacity:1}
+.event-review-picker input[type=range]{width:100%;box-sizing:border-box;min-height:30px;margin:0;accent-color:#eab54a;cursor:pointer;touch-action:pan-y;padding:0;background:transparent;border:0}
+.event-review-scale{display:flex;justify-content:space-between;font-size:12px;opacity:.75}
 .event-review-form textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;resize:vertical}
 .event-review-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .event-review-average span{color:#eab54a}
