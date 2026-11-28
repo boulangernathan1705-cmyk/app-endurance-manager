@@ -30,3 +30,5 @@ La Semaine, la Liste et l’en-tête de la fiche TDZ utilisent les accents des s
 Sur mobile, la Semaine et la Liste TDZ reprennent la hauteur minimale, la largeur du panneau et la découpe en biais des cartes Endurances de la Semaine. Le logo reste entier. La Liste affiche le circuit ou le nombre de manches, les horaires et les inscriptions. Les réglages des manches figurent sur la fiche.
 
 Sur téléphone, les cartes Endurances et Events TDZ ouvrent leur fiche au premier appui. Le fond teinté des cartes TDZ est visible au repos. Sur ordinateur, le panorama des Endurances apparaît au survol à la souris.
+
+Sur la fiche TDZ mobile, l’en-tête regroupe les pastilles, la date en ligne, le titre, le circuit et le départ autour du logo. Les réglages de la course apparaissent dans un bloc pleine largeur sous l’en-tête. Les cartes d’accueil et les autres formats de fiche suivent leurs dispositions propres.
