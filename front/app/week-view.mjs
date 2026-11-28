@@ -1,4 +1,4 @@
-import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter,filterHomeEvents} from './tdz-home-state.mjs';
+import {fusedTdzHome,homeView,homeViewSwitch,homeFilters,homeFilterBar,selectHomeFilter,filterHomeEvents,homePriority} from './tdz-home-state.mjs';
 import {memoHref} from '../../shared/memo-links.mjs';
 import {enduranceArtwork, enduranceCardDuration, enduranceCardIdentity, enduranceSim, endurancePreviewClass, enduranceStartIcon} from '../endurance-card.mjs';
 // « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
@@ -293,7 +293,14 @@ export function renderWeek(message=''){
   const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const races=[...state.events,...otherEndurances()],starts=streamedStarts(races),all=races.filter(event=>!mergedStream(event,starts));
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts(fusedTdzHome()?filterHomeEvents(all):all,monday).map(day=>({...day,items:day.items.filter(item=>fusedTdzHome()||keep(item,chosen))}));
+  const tdz=fusedTdzHome();
+  const priority=item=>homePriority({...item.event,departures:item.starts.map(start=>start.departure)});
+  const days=weekStarts(tdz?filterHomeEvents(all):all,monday).map(day=>{
+    const items=day.items.filter(item=>tdz||keep(item,chosen));
+    // Stable sort preserves the existing chronological order within each group.
+    if(tdz)items.sort((a,b)=>priority(a)-priority(b));
+    return {...day,items};
+  });
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
